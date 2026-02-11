@@ -1,6 +1,6 @@
 cmake CMakeLists.txt
 make
-cls
+clear
 echo 'RUNNING PROJECT'
 chmod +x appnightlock.app
-./appnightlock.app
+open appnightlock.app

@@ -1,29 +1,11 @@
-#include <iostream>
 #include <cstring>
-#include <optional>
-
-
-struct Entry {
-    std::string NAME;
-    std::string PASSWORD;
-
-    std::optional<std::string> USERNAME;
-    std::optional<std::string> URL;
-    std::optional<std::string> NOTE;
-    std::optional<unsigned int> LAST_MODIFICATION_TIME;
-    std::optional<unsigned int> CREATION_TIME;
-};
-
-
-class Manager {
-    
-};
-
-
+#include <iostream>
+#include "Manager.h"
 
 int main() {
-
-    std::cout << "Hello, kernel!" << std::endl;
-
+    Manager manager;
+    manager.root_set_password("Google Account", "admin123123", "admin@gmail.com", "https://accounts.google.com/", "Primary Account");
+    manager.root_set_wifi("home2c", "987328455728");
+    manager.root_get_specific_entry<Password>("Google Account");
 
 }
