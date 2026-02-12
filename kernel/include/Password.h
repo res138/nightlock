@@ -3,7 +3,7 @@
 #include <optional>
 
 struct Password {
-    std::string NAME;
+    std::string NAME; /* TITLE */
     std::string PASSWORD;
 
     std::optional<std::string> USERNAME;
