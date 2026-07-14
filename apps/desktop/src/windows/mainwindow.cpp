@@ -1,10 +1,16 @@
 #include "mainwindow.hpp"
 
+#include <QClipboard>
+#include <QDebug>
+#include <QDesktopServices>
 #include <QFrame>
+#include <QGuiApplication>
 #include <QLabel>
 #include <QListView>
+#include <QMimeData>
 #include <QSplitter>
-#include <QTreeView>
+#include <QTimer>
+#include <QUrl>
 #include <QVBoxLayout>
 
 #include <nightlock/group.hpp>
@@ -13,6 +19,8 @@
 #include "models/grouptreemodel.hpp"
 #include "widgets/entrydetailview.hpp"
 #include "widgets/entrylistdelegate.hpp"
+#include "widgets/grouptreeview.hpp"
+#include "widgets/nlmenu.hpp"
 
 namespace {
 
@@ -25,19 +33,18 @@ nightlock::Group* findGroup(nightlock::Group* group, const QString& name) {
     return nullptr;
 }
 
+QIcon menuIcon(const QString& name) {
+    return QIcon(QStringLiteral(":/icons/menu/%1.svg").arg(name));
+}
+
 }  // namespace
 
 MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(parent) {
     setWindowTitle(QStringLiteral("Primary.nlck"));
 
     treeModel_ = new GroupTreeModel(root, this);
-    tree_ = new QTreeView;
-    tree_->setObjectName(QStringLiteral("groupTree"));
+    tree_ = new GroupTreeView;
     tree_->setModel(treeModel_);
-    tree_->setHeaderHidden(true);
-    tree_->setIndentation(22);
-    tree_->setRootIsDecorated(false);
-    tree_->setIconSize(QSize(22, 22));
     tree_->expandAll();
 
     entryModel_ = new EntryListModel(this);
@@ -85,6 +92,22 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     connect(list_->selectionModel(), &QItemSelectionModel::currentChanged, this,
             [this](const QModelIndex& current, const QModelIndex&) { onEntryChanged(current); });
 
+    tree_->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(tree_, &QWidget::customContextMenuRequested, this, &MainWindow::showGroupMenu);
+    list_->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(list_, &QWidget::customContextMenuRequested, this, &MainWindow::showEntryMenu);
+
+    connect(treeModel_, &GroupTreeModel::groupMoved, this, [this](nightlock::Group* moved) {
+        // Let the view settle after the move, then show where it landed.
+        QTimer::singleShot(0, this, [this, moved] {
+            const QModelIndex idx = treeModel_->indexOf(moved);
+            tree_->scrollTo(idx);
+            tree_->flashRow(idx);
+            if (auto* current = treeModel_->group(tree_->currentIndex()))
+                pathLabel_->setText(QString::fromStdString(current->path()));
+        });
+    });
+
     detail_->setEntry(nullptr);
 }
 
@@ -119,4 +142,117 @@ void MainWindow::onGroupChanged(const QModelIndex& current) {
 
 void MainWindow::onEntryChanged(const QModelIndex& current) {
     detail_->setEntry(entryModel_->entry(current));
+}
+
+void MainWindow::showGroupMenu(const QPoint& pos) {
+    const QModelIndex idx = tree_->indexAt(pos);
+    auto* group = treeModel_->group(idx);
+    if (!group)
+        return;
+
+    auto* menu = new NlMenu(this);
+    connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
+
+    menu->addAction(menuIcon(QStringLiteral("file-plus")), tr("New entry"), this,
+                    [] { qInfo() << "TODO: new entry"; });
+    menu->addAction(menuIcon(QStringLiteral("folder-plus")), tr("New folder"), this,
+                    [] { qInfo() << "TODO: new folder"; });
+    if (group != treeModel_->rootGroup()) {
+        menu->addSeparator();
+        menu->addAction(menuIcon(QStringLiteral("edit-3")), tr("Rename"), this,
+                        [] { qInfo() << "TODO: rename folder"; });
+        menu->addAction(menuIcon(QStringLiteral("image")), tr("Change icon…"), this,
+                        [] { qInfo() << "TODO: change folder icon"; });
+        menu->addSeparator();
+        auto* del = menu->addAction(menuIcon(QStringLiteral("trash")), tr("Delete"), this,
+                                    [] { qInfo() << "TODO: delete folder"; });
+        del->setProperty("danger", true);
+    }
+    menu->popupAt(tree_->viewport()->mapToGlobal(pos));
+}
+
+void MainWindow::showEntryMenu(const QPoint& pos) {
+    const QModelIndex idx = list_->indexAt(pos);
+    auto* entry = entryModel_->entry(idx);
+    if (!entry)
+        return;
+    if (idx != list_->currentIndex())
+        list_->setCurrentIndex(idx);  // keeps the detail panel in sync
+
+    auto* menu = buildEntryMenu(entry);
+    menu->popupAt(list_->viewport()->mapToGlobal(pos));
+}
+
+NlMenu* MainWindow::buildEntryMenu(nightlock::Entry* entry) {
+    auto* menu = new NlMenu(this);
+    connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
+
+    menu->addAction(menuIcon(QStringLiteral("user")), tr("Copy login"), this, [entry] {
+        QGuiApplication::clipboard()->setText(QString::fromStdString(entry->login));
+    });
+    menu->addAction(menuIcon(QStringLiteral("key")), tr("Copy password"), this, [entry] {
+        QGuiApplication::clipboard()->setText(QString::fromStdString(entry->password));
+    });
+    if (!entry->code.empty()) {
+        menu->addAction(menuIcon(QStringLiteral("hash")), tr("Copy 2FA code"), this, [entry] {
+            QGuiApplication::clipboard()->setText(QString::fromStdString(entry->code));
+        });
+    }
+    if (!entry->url.empty()) {
+        menu->addAction(menuIcon(QStringLiteral("external-link")), tr("Open URL"), this, [entry] {
+            QDesktopServices::openUrl(QUrl(QString::fromStdString(entry->url)));
+        });
+    }
+
+    menu->addSeparator();
+    menu->addAction(menuIcon(QStringLiteral("edit")), tr("Edit"), this,
+                    [] { qInfo() << "TODO: edit entry"; });
+    auto* moveMenu = buildMoveMenu(treeModel_->rootGroup(), menu);
+    moveMenu->setTitle(tr("Move to"));
+    moveMenu->setIcon(menuIcon(QStringLiteral("corner-up-right")));
+    menu->addMenu(moveMenu);
+
+    menu->addSeparator();
+    auto* del = menu->addAction(menuIcon(QStringLiteral("trash")), tr("Delete"), this,
+                                [] { qInfo() << "TODO: delete entry"; });
+    del->setProperty("danger", true);
+    return menu;
+}
+
+NlMenu* MainWindow::buildMoveMenu(nightlock::Group* group, QWidget* parent) {
+    auto* menu = new NlMenu(parent);
+    for (const auto& sub : group->groups()) {
+        nightlock::Group* target = sub.get();
+        const QString name = QString::fromStdString(target->name());
+        if (target->groups().empty()) {
+            menu->addAction(name, this, [target] {
+                qInfo() << "TODO: move to" << QString::fromStdString(target->path());
+            });
+        } else {
+            auto* subMenu = buildMoveMenu(target, menu);
+            subMenu->setTitle(name);
+            menu->addMenu(subMenu);
+        }
+    }
+    return menu;
+}
+
+void MainWindow::debugMoveGroup(const QString& groupName, const QString& targetName) {
+    auto* moving = findGroup(treeModel_->rootGroup(), groupName);
+    auto* target = findGroup(treeModel_->rootGroup(), targetName);
+    if (!moving || !target)
+        return;
+    QMimeData* mime = treeModel_->mimeData({treeModel_->indexOf(moving)});
+    treeModel_->dropMimeData(mime, Qt::MoveAction, -1, 0, treeModel_->indexOf(target));
+    delete mime;
+    tree_->expandAll();
+}
+
+QMenu* MainWindow::popupEntryMenuForScreenshot() {
+    auto* entry = entryModel_->entry(list_->currentIndex());
+    if (!entry)
+        return nullptr;
+    auto* menu = buildEntryMenu(entry);
+    menu->popupAt(list_->viewport()->mapToGlobal(QPoint(240, 300)));
+    return menu;
 }

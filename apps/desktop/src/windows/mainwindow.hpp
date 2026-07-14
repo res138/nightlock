@@ -4,13 +4,16 @@
 
 class QLabel;
 class QListView;
-class QTreeView;
+class QMenu;
 class EntryDetailView;
 class EntryListModel;
 class GroupTreeModel;
+class GroupTreeView;
+class NlMenu;
 
 namespace nightlock {
 class Group;
+struct Entry;
 }
 
 class MainWindow : public QMainWindow {
@@ -21,13 +24,24 @@ public:
     void selectGroupNamed(const QString& name);
     void selectEntryNamed(const QString& name);
 
+    // Debug hook for NIGHTLOCK_SCREENSHOT_MENU.
+    QMenu* popupEntryMenuForScreenshot();
+    // Debug hook for NIGHTLOCK_TEST_MOVE: drops `groupName` onto
+    // `targetName` through the same model path a mouse drag uses.
+    void debugMoveGroup(const QString& groupName, const QString& targetName);
+
 private:
     void onGroupChanged(const QModelIndex& current);
     void onEntryChanged(const QModelIndex& current);
 
+    void showGroupMenu(const QPoint& pos);
+    void showEntryMenu(const QPoint& pos);
+    NlMenu* buildEntryMenu(nightlock::Entry* entry);
+    NlMenu* buildMoveMenu(nightlock::Group* group, QWidget* parent);
+
     GroupTreeModel* treeModel_;
     EntryListModel* entryModel_;
-    QTreeView* tree_;
+    GroupTreeView* tree_;
     QListView* list_;
     QLabel* countLabel_;
     QLabel* pathLabel_;

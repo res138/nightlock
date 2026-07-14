@@ -30,6 +30,13 @@ public:
     int indexInParent() const;
     std::string path(char separator = '/') const;  // "Root/Personal 2020"
 
+    bool isAncestorOf(const Group* other) const;
+
+    // Moves `child` out of its current parent into `newParent` at
+    // `position` (pre-removal index semantics when moving within the
+    // same parent; clamped to the end otherwise). Fails on cycles.
+    static bool reparent(Group& child, Group& newParent, int position = -1);
+
 private:
     std::string name_;
     std::string icon_;
