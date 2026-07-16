@@ -1,5 +1,7 @@
 #include "nightlock/group.hpp"
 
+#include <algorithm>
+
 namespace nightlock {
 
 Group::Group(std::string name, Group* parent)
@@ -40,6 +42,39 @@ std::string Group::path(char separator) const {
     if (!parent_)
         return name_;
     return parent_->path(separator) + separator + name_;
+}
+
+bool Group::isAncestorOf(const Group* other) const {
+    for (const Group* p = other ? other->parent_ : nullptr; p; p = p->parent_)
+        if (p == this)
+            return true;
+    return false;
+}
+
+bool Group::reparent(Group& child, Group& newParent, int position) {
+    Group* oldParent = child.parent_;
+    if (!oldParent || &child == &newParent || child.isAncestorOf(&newParent))
+        return false;
+
+    auto& source = oldParent->groups_;
+    const auto it = std::find_if(source.begin(), source.end(),
+                                 [&child](const auto& p) { return p.get() == &child; });
+    if (it == source.end())
+        return false;
+
+    const int oldIndex = static_cast<int>(it - source.begin());
+    std::unique_ptr<Group> holder = std::move(*it);
+    source.erase(it);
+
+    auto& destination = newParent.groups_;
+    int index = position;
+    if (oldParent == &newParent && position > oldIndex)
+        --index;
+    if (index < 0 || index > static_cast<int>(destination.size()))
+        index = static_cast<int>(destination.size());
+    destination.insert(destination.begin() + index, std::move(holder));
+    child.parent_ = &newParent;
+    return true;
 }
 
 }  // namespace nightlock

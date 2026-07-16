@@ -3,5 +3,16 @@
         <file>style.qss</file>
         <file>icons/folder.jpg</file>
         <file>icons/keys.png</file>
+        <file>icons/menu/user.svg</file>
+        <file>icons/menu/key.svg</file>
+        <file>icons/menu/hash.svg</file>
+        <file>icons/menu/external-link.svg</file>
+        <file>icons/menu/edit.svg</file>
+        <file>icons/menu/edit-3.svg</file>
+        <file>icons/menu/corner-up-right.svg</file>
+        <file>icons/menu/trash.svg</file>
+        <file>icons/menu/file-plus.svg</file>
+        <file>icons/menu/folder-plus.svg</file>
+        <file>icons/menu/image.svg</file>
     </qresource>
 </RCC>
