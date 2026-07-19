@@ -112,9 +112,9 @@ public:
         const bool danger = action && action->property("danger").toBool();
         const bool enabled = item->state & State_Enabled;
 
-        // hairline above the item, unless the item opens a group or the
-        // hovered pill sits right next to it (its edge would collide
-        // with the rounded highlight).
+        // hairline above the item, unless the item opens a group. Kept
+        // visible under hover too: the pill is inset by kHoverInset, so
+        // every hairline/band/edge sits at the same distance from it.
         if (action) {
             QAction* previous = nullptr;
             for (QAction* a : menu->actions()) {
@@ -123,9 +123,7 @@ public:
                 if (a->isVisible())
                     previous = a;
             }
-            QAction* hovered = menu->activeAction();
-            if (previous && !previous->isSeparator() && action != hovered &&
-                previous != hovered) {
+            if (previous && !previous->isSeparator()) {
                 painter->setPen(kHairlineColor);
                 painter->drawLine(rect.topLeft(), rect.topRight());
             }

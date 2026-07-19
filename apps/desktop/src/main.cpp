@@ -56,15 +56,17 @@ int main(int argc, char* argv[]) {
                 QApplication::quit();
                 return;
             }
-            // NIGHTLOCK_SCREENSHOT_MENU_ACTIVE=<row> highlights an item
-            // as if hovered, to capture the hover state.
-            if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_MENU_ACTIVE")) {
-                const int row = qEnvironmentVariableIntValue("NIGHTLOCK_SCREENSHOT_MENU_ACTIVE");
-                if (row >= 0 && row < menu->actions().size())
-                    menu->setActiveAction(menu->actions().at(row));
-            }
             const int delay = qEnvironmentVariableIntValue("NIGHTLOCK_SCREENSHOT_MENU_DELAY");
             QTimer::singleShot(delay > 0 ? delay : 400, menu, [menu] {
+                // NIGHTLOCK_SCREENSHOT_MENU_ACTIVE=<row> highlights an
+                // item as if hovered. Set right before the grab: a stray
+                // real mouse-over would reset it otherwise.
+                if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_MENU_ACTIVE")) {
+                    const int row =
+                        qEnvironmentVariableIntValue("NIGHTLOCK_SCREENSHOT_MENU_ACTIVE");
+                    if (row >= 0 && row < menu->actions().size())
+                        menu->setActiveAction(menu->actions().at(row));
+                }
                 menu->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_MENU"));
                 QApplication::quit();
             });
