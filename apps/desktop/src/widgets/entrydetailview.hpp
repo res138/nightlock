@@ -25,6 +25,10 @@ public:
     // floating window mid-drag, so the drag continues seamlessly.
     void beginFloatingDrag(const QPoint& globalPos);
 
+    // Toggles the floating-window look: transparent base with a
+    // rounded panel and the traffic-light controls in the corner.
+    void setFloatingMode(bool floating);
+
     // Grip callbacks (used by the internal drag handle).
     void gripPressed(const QPoint& globalPos);
     void gripDragged(const QPoint& globalPos);
@@ -36,6 +40,8 @@ signals:
     // The floating window was dropped at globalPos: dock me back if
     // this lands on the main window.
     void dropped(const QPoint& globalPos);
+    // The red traffic-light button of the floating window was clicked.
+    void dockRequested();
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
@@ -51,6 +57,8 @@ private:
 
     QWidget* content_;
     QWidget* grip_;
+    QWidget* floatingControls_;
+    QWidget* floatingBackdrop_;
     QPoint pressGlobal_;
     QPoint grabOffset_;
     QLabel* iconLabel_;

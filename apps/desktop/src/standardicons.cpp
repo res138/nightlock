@@ -2,6 +2,12 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QHash>
+#include <QSettings>
+
+#include <atomic>
+#include <mutex>
+#include <thread>
 
 namespace standardicons {
 
@@ -10,9 +16,6 @@ const QVector<StandardIcon>& entryIcons() {
         {QStringLiteral("default"),
          QCoreApplication::translate("standardicons", "Default"),
          QStringLiteral(":/icons/entry.png")},
-        {QStringLiteral("globe"),
-         QCoreApplication::translate("standardicons", "Website"),
-         QStringLiteral(":/icons/entry/globe.svg")},
     };
     return icons;
 }
@@ -57,6 +60,66 @@ QStringList galleryIconPaths() {
             result << dir.filePath(file);
     }
     return result;
+}
+
+namespace {
+
+std::mutex g_galleryCacheMutex;
+QHash<QString, QImage> g_galleryCache;
+std::atomic<bool> g_stopPreload{false};
+std::thread g_preloadThread;
+
+constexpr int kGalleryDecodeSize = 64;  // 32px cells on a 2x display
+constexpr int kMaxRecentIcons = 10;
+const QLatin1String kRecentIconsKey("recentIcons");
+
+}  // namespace
+
+void preloadGalleryIcons() {
+    const QStringList paths = galleryIconPaths();
+    // QImage decoding is thread-safe (unlike QPixmap); the gallery
+    // converts the cached images on the GUI thread when painting. The
+    // thread must be stopped before the application tears down —
+    // decoding against unloaded image plugins crashes.
+    g_preloadThread = std::thread([paths] {
+        for (const QString& path : paths) {
+            if (g_stopPreload.load(std::memory_order_relaxed))
+                return;
+            QImage image(path);
+            if (image.isNull())
+                continue;
+            if (image.width() > kGalleryDecodeSize || image.height() > kGalleryDecodeSize)
+                image = image.scaled(kGalleryDecodeSize, kGalleryDecodeSize,
+                                     Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            std::lock_guard<std::mutex> lock(g_galleryCacheMutex);
+            g_galleryCache.insert(path, image);
+        }
+    });
+}
+
+void stopGalleryPreload() {
+    g_stopPreload.store(true, std::memory_order_relaxed);
+    if (g_preloadThread.joinable())
+        g_preloadThread.join();
+}
+
+QImage cachedGalleryImage(const QString& path) {
+    std::lock_guard<std::mutex> lock(g_galleryCacheMutex);
+    return g_galleryCache.value(path);
+}
+
+QStringList recentIconPaths() {
+    return QSettings().value(kRecentIconsKey).toStringList().mid(0, kMaxRecentIcons);
+}
+
+void addRecentIconPath(const QString& path) {
+    if (path.isEmpty())
+        return;
+    QSettings settings;
+    QStringList recents = settings.value(kRecentIconsKey).toStringList();
+    recents.removeAll(path);
+    recents.prepend(path);
+    settings.setValue(kRecentIconsKey, recents.mid(0, kMaxRecentIcons));
 }
 
 }  // namespace standardicons

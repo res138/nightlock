@@ -28,6 +28,13 @@ public:
     // not a direct sub-group.
     bool removeGroup(Group* child);
 
+    // Destroys `entry`. Fails when it does not belong to this group.
+    bool removeEntry(Entry* entry);
+
+    // Moves the entry at `from` to `to` (pre-removal index semantics,
+    // like reparent()).
+    bool moveEntry(int from, int to);
+
     const std::vector<std::unique_ptr<Group>>& groups() const;
     const std::vector<std::unique_ptr<Entry>>& entries() const;
 

@@ -123,12 +123,6 @@ QTreeView#groupTree QLineEdit {
 QDialog#entryEditDialog {
     background: #FFFFFF;
 }
-QLabel#dialogTitle {
-    font-family: Georgia;
-    font-size: 22px;
-    font-weight: bold;
-    color: #000000;
-}
 QLabel#dialogFieldLabel {
     font-size: 12px;
     font-weight: 600;
@@ -160,7 +154,7 @@ QToolButton#iconPickerButton:hover {
 }
 QToolButton#iconPickerButton:checked {
     background: #FFFFFF;
-    border: 2px solid #000000;
+    border: 1px solid #000000;
 }
 QPushButton#primaryButton {
     background: #000000;
@@ -192,7 +186,7 @@ QPushButton#ghostButton:hover {
 
 QToolButton#iconPickerAdd {
     background: #FFFFFF;
-    border: 1px dashed #DFDFDF;
+    border: 1px solid #DFDFDF;
     border-radius: 10px;
     font-size: 20px;
     color: #6E6E6E;
@@ -212,4 +206,45 @@ QListView#iconGallery::item {
 }
 QListView#iconGallery::item:hover {
     background: rgba(0, 0, 0, 0.07);
+}
+
+QScrollArea[floatingWindow="true"] {
+    background: transparent;
+}
+QScrollArea[floatingWindow="true"] > QWidget > QWidget {
+    background: transparent;
+}
+
+QScrollBar:vertical {
+    background: transparent;
+    width: 12px;
+    margin: 3px 3px 3px 3px;
+}
+QScrollBar:horizontal {
+    background: transparent;
+    height: 12px;
+    margin: 3px 3px 3px 3px;
+}
+QScrollBar::handle:vertical {
+    background: #CFCFCF;
+    border-radius: 3px;
+    min-height: 36px;
+}
+QScrollBar::handle:horizontal {
+    background: #CFCFCF;
+    border-radius: 3px;
+    min-width: 36px;
+}
+QScrollBar::handle:vertical:hover,
+QScrollBar::handle:horizontal:hover {
+    background: #A9A9A9;
+}
+QScrollBar::add-line, QScrollBar::sub-line {
+    width: 0;
+    height: 0;
+    background: transparent;
+    border: none;
+}
+QScrollBar::add-page, QScrollBar::sub-page {
+    background: transparent;
 }

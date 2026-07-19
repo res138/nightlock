@@ -1,9 +1,12 @@
 #include "iconpicker.hpp"
 
 #include <QButtonGroup>
+#include <QFileInfo>
 #include <QGridLayout>
 #include <QIcon>
 #include <QToolButton>
+
+#include "standardicons.hpp"
 
 namespace {
 
@@ -23,19 +26,28 @@ QToolButton* makeIconButton() {
 
 }  // namespace
 
-IconPicker::IconPicker(const QVector<standardicons::StandardIcon>& icons, QWidget* parent)
-    : QWidget(parent), icons_(icons), buttons_(new QButtonGroup(this)) {
+IconPicker::IconPicker(QWidget* parent)
+    : QWidget(parent), buttons_(new QButtonGroup(this)) {
     buttons_->setExclusive(true);
 
     grid_ = new QGridLayout(this);
     grid_->setContentsMargins(0, 0, 0, 0);
     grid_->setSpacing(8);
 
-    for (int i = 0; i < icons_.size(); ++i) {
+    const auto& fallback = standardicons::defaultEntryIcon();
+    values_ << QString();  // the default icon persists as an empty value
+    auto* defaultButton = makeIconButton();
+    defaultButton->setIcon(QIcon(fallback.resource));
+    defaultButton->setToolTip(fallback.title);
+    buttons_->addButton(defaultButton, 0);
+
+    // The user's ten most recent gallery picks.
+    for (const QString& path : standardicons::recentIconPaths()) {
         auto* button = makeIconButton();
-        button->setIcon(QIcon(icons_[i].resource));
-        button->setToolTip(icons_[i].title);
-        buttons_->addButton(button, i);
+        button->setIcon(QIcon(path));
+        button->setToolTip(QFileInfo(path).completeBaseName());
+        buttons_->addButton(button, static_cast<int>(values_.size()));
+        values_ << path;
     }
 
     plusButton_ = new QToolButton;
@@ -48,30 +60,23 @@ IconPicker::IconPicker(const QVector<standardicons::StandardIcon>& icons, QWidge
     grid_->setColumnStretch(kColumns, 1);  // keep the grid left-aligned
     relayout();
 
-    if (auto* first = buttons_->button(0))
-        first->setChecked(true);
+    buttons_->button(0)->setChecked(true);
 }
 
 QString IconPicker::selectedIconValue() const {
     const int id = buttons_->checkedId();
     if (id == kCustomId)
         return customPath_;
-    if (id > 0 && id < icons_.size())
-        return icons_[id].resource;
+    if (id > 0 && id < values_.size())
+        return values_[id];
     return {};  // the default icon (or nothing selected)
 }
 
 void IconPicker::setSelectedIconValue(const QString& value) {
-    if (value.isEmpty()) {
-        if (auto* first = buttons_->button(0))
-            first->setChecked(true);
+    const int id = static_cast<int>(values_.indexOf(value));
+    if (id >= 0) {
+        buttons_->button(id)->setChecked(true);
         return;
-    }
-    for (int i = 0; i < icons_.size(); ++i) {
-        if (icons_[i].resource == value) {
-            buttons_->button(i)->setChecked(true);
-            return;
-        }
     }
     setCustomIcon(value);
 }
@@ -86,7 +91,7 @@ void IconPicker::setCustomIcon(const QString& path) {
         relayout();
     }
     customButton_->setIcon(QIcon(path));
-    customButton_->setToolTip(path);
+    customButton_->setToolTip(QFileInfo(path).completeBaseName());
     customButton_->setChecked(true);
 }
 

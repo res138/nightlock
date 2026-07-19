@@ -5,7 +5,9 @@
 #include <QGuiApplication>
 #include <QHash>
 #include <QIcon>
+#include <QLinearGradient>
 #include <QListView>
+#include <QPainter>
 #include <QScreen>
 #include <QVBoxLayout>
 #include <QVariantAnimation>
@@ -38,8 +40,14 @@ public:
         switch (role) {
         case Qt::DecorationRole: {
             QIcon& icon = cache_[index.row()];
-            if (icon.isNull())
-                icon = QIcon(paths_[index.row()]);
+            if (icon.isNull()) {
+                // Preferably from the preloaded cache (decoded at app
+                // start on a background thread), so fast scrolling
+                // doesn't hitch on file loads.
+                const QImage image = standardicons::cachedGalleryImage(paths_[index.row()]);
+                icon = image.isNull() ? QIcon(paths_[index.row()])
+                                      : QIcon(QPixmap::fromImage(image));
+            }
             return icon;
         }
         case Qt::ToolTipRole:
@@ -55,6 +63,28 @@ public:
 private:
     QStringList paths_;
     mutable QHash<int, QIcon> cache_;
+};
+
+// Soft white gradient over the grid's top/bottom edge, so scrolled
+// icons fade out instead of being cut off.
+class EdgeFade : public QWidget {
+public:
+    EdgeFade(bool top, QWidget* parent) : QWidget(parent), top_(top) {
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        setFixedHeight(26);
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QLinearGradient gradient(0, top_ ? 0 : height(), 0, top_ ? height() : 0);
+        gradient.setColorAt(0.0, QColor(255, 255, 255, 240));
+        gradient.setColorAt(1.0, QColor(255, 255, 255, 0));
+        QPainter painter(this);
+        painter.fillRect(rect(), gradient);
+    }
+
+private:
+    bool top_;
 };
 
 }  // namespace
@@ -91,6 +121,15 @@ IconGalleryPopup::IconGalleryPopup(QWidget* parent) : QWidget(parent) {
 
     // Width: the grid plus room for the overlay scrollbar.
     setFixedSize(kColumns * kCell + 14 + 2 * margin, kViewHeight + 2 * margin);
+
+    // Icons fade out under a gradient at both edges of the grid.
+    auto* topFade = new EdgeFade(true, this);
+    topFade->setGeometry(margin, margin, width() - 2 * margin, topFade->height());
+    topFade->raise();
+    auto* bottomFade = new EdgeFade(false, this);
+    bottomFade->setGeometry(margin, height() - margin - bottomFade->height(),
+                            width() - 2 * margin, bottomFade->height());
+    bottomFade->raise();
 
     connect(view, &QListView::clicked, this, [this, model](const QModelIndex& index) {
         const QString path = model->path(index);

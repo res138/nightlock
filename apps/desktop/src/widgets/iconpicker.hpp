@@ -1,22 +1,20 @@
 #pragma once
 
+#include <QStringList>
 #include <QWidget>
-
-#include "standardicons.hpp"
 
 class QButtonGroup;
 class QGridLayout;
 class QToolButton;
 
-// Exclusive grid of icon buttons for the entry dialog: the standard
-// catalog plus a trailing "+" button that requests one more icon from
-// the pack gallery (the chosen icon appears as an extra selectable
-// button). Wraps into rows, so a larger catalog needs no changes here.
+// Exclusive grid of icon buttons for the entry dialog: the default
+// icon, up to ten recently used pack icons, and a trailing "+" button
+// that requests one more from the gallery (the chosen icon appears as
+// an extra selectable button). Wraps into rows as the set grows.
 class IconPicker : public QWidget {
     Q_OBJECT
 public:
-    explicit IconPicker(const QVector<standardicons::StandardIcon>& icons,
-                        QWidget* parent = nullptr);
+    explicit IconPicker(QWidget* parent = nullptr);
 
     // The value stored in Entry::icon: empty for the default icon, a
     // resource/file path otherwise.
@@ -35,7 +33,7 @@ signals:
 private:
     void relayout();
 
-    QVector<standardicons::StandardIcon> icons_;
+    QStringList values_;  // per-button icon values, parallel to group ids
     QButtonGroup* buttons_;
     QGridLayout* grid_;
     QToolButton* plusButton_;

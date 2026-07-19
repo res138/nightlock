@@ -10,7 +10,6 @@
 
 #include <nightlock/entry.hpp>
 
-#include "standardicons.hpp"
 #include "widgets/icongallerypopup.hpp"
 #include "widgets/iconpicker.hpp"
 
@@ -24,12 +23,7 @@ EntryEditDialog::EntryEditDialog(Mode mode, QWidget* parent) : QDialog(parent) {
     layout->setContentsMargins(28, 24, 28, 24);
     layout->setSpacing(14);
 
-    auto* heading = new QLabel(title);
-    heading->setObjectName(QStringLiteral("dialogTitle"));
-    layout->addWidget(heading);
-    layout->addSpacing(2);
-
-    iconPicker_ = new IconPicker(standardicons::entryIcons());
+    iconPicker_ = new IconPicker;
     connect(iconPicker_, &IconPicker::addIconRequested, this, [this] {
         auto* gallery = new IconGalleryPopup(this);
         connect(gallery, &IconGalleryPopup::iconSelected, iconPicker_,
@@ -54,9 +48,6 @@ EntryEditDialog::EntryEditDialog(Mode mode, QWidget* parent) : QDialog(parent) {
     urlEdit_ = new QLineEdit;
     urlEdit_->setPlaceholderText(QStringLiteral("https://"));
     layout->addWidget(makeField(tr("URL"), urlEdit_));
-
-    codeEdit_ = new QLineEdit;
-    layout->addWidget(makeField(tr("2FA code"), codeEdit_));
 
     noteEdit_ = new QPlainTextEdit;
     noteEdit_->setFixedHeight(74);
@@ -91,7 +82,6 @@ void EntryEditDialog::setEntry(const nightlock::Entry& entry) {
     loginEdit_->setText(QString::fromStdString(entry.login));
     passwordEdit_->setText(QString::fromStdString(entry.password));
     urlEdit_->setText(QString::fromStdString(entry.url));
-    codeEdit_->setText(QString::fromStdString(entry.code));
     noteEdit_->setPlainText(QString::fromStdString(entry.note));
     iconPicker_->setSelectedIconValue(QString::fromStdString(entry.icon));
 }
@@ -101,7 +91,6 @@ void EntryEditDialog::applyTo(nightlock::Entry& entry) const {
     entry.login = loginEdit_->text().trimmed().toStdString();
     entry.password = passwordEdit_->text().toStdString();
     entry.url = urlEdit_->text().trimmed().toStdString();
-    entry.code = codeEdit_->text().trimmed().toStdString();
     entry.note = noteEdit_->toPlainText().trimmed().toStdString();
     entry.icon = iconPicker_->selectedIconValue().toStdString();
 }
@@ -112,7 +101,9 @@ QWidget* EntryEditDialog::makeField(const QString& label, QWidget* editor, bool 
     fieldLayout->setContentsMargins(0, 0, 0, 0);
     fieldLayout->setSpacing(5);
 
-    auto* caption = new QLabel(required ? label + QStringLiteral(" *") : label);
+    auto* caption = new QLabel(
+        required ? label + QStringLiteral(" <span style=\"color:#FF3B30;\">*</span>") : label);
+    caption->setTextFormat(required ? Qt::RichText : Qt::PlainText);
     caption->setObjectName(QStringLiteral("dialogFieldLabel"));
     fieldLayout->addWidget(caption);
     fieldLayout->addWidget(editor);

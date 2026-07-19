@@ -10,7 +10,9 @@
 #include <QListView>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QMouseEvent>
 #include <QPushButton>
+#include <QWindow>
 #include <QSplitter>
 #include <QTimer>
 #include <QUrl>
@@ -22,6 +24,7 @@
 
 #include "models/entrylistmodel.hpp"
 #include "models/grouptreemodel.hpp"
+#include "standardicons.hpp"
 #include "widgets/entrydetailview.hpp"
 #include "widgets/entrylistdelegate.hpp"
 #include "widgets/grouptreeview.hpp"
@@ -44,6 +47,19 @@ QIcon menuIcon(const QString& name) {
     return QIcon(QStringLiteral(":/icons/menu/%1.svg").arg(name));
 }
 
+// Invisible strip over the tree's top padding (the traffic-light zone):
+// grabbing it moves the whole window, replacing the old title bar.
+class WindowDragStrip : public QWidget {
+public:
+    using QWidget::QWidget;
+
+protected:
+    void mousePressEvent(QMouseEvent* event) override {
+        if (event->button() == Qt::LeftButton && window()->windowHandle())
+            window()->windowHandle()->startSystemMove();
+    }
+};
+
 }  // namespace
 
 MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(parent) {
@@ -62,6 +78,12 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     list_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     list_->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    // Entries reorder by drag within the group.
+    list_->setDragDropMode(QAbstractItemView::InternalMove);
+    list_->setDragEnabled(true);
+    list_->setAcceptDrops(true);
+    list_->setDropIndicatorShown(true);
+    list_->setDefaultDropAction(Qt::MoveAction);
 
     countLabel_ = new QLabel;
     countLabel_->setObjectName(QStringLiteral("itemsCount"));
@@ -96,6 +118,11 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
 
     connect(detail_, &EntryDetailView::detachRequested, this, &MainWindow::detachDetail);
     connect(detail_, &EntryDetailView::dropped, this, &MainWindow::maybeReattachDetail);
+    connect(detail_, &EntryDetailView::dockRequested, this, &MainWindow::dockDetail);
+
+    dragStrip_ = new WindowDragStrip(tree_);
+    dragStrip_->setGeometry(0, 0, tree_->width(), 28);
+    tree_->installEventFilter(this);
 
     connect(tree_->selectionModel(), &QItemSelectionModel::currentChanged, this,
             [this](const QModelIndex& current, const QModelIndex&) { onGroupChanged(current); });
@@ -240,7 +267,7 @@ NlMenu* MainWindow::buildEntryMenu(nightlock::Entry* entry) {
 
     menu->addSeparator();
     auto* del = menu->addAction(menuIcon(QStringLiteral("trash")), tr("Delete"), this,
-                                [] { qInfo() << "TODO: delete entry"; });
+                                [this, entry] { deleteEntry(entry); });
     del->setProperty("danger", true);
     return menu;
 }
@@ -271,6 +298,7 @@ void MainWindow::addEntryTo(nightlock::Group* group) {
     nightlock::Entry entry;
     dialog.applyTo(entry);
     entry.created = entry.modified = std::chrono::system_clock::now();
+    standardicons::addRecentIconPath(QString::fromStdString(entry.icon));
     auto& added = group->addEntry(std::move(entry));
 
     tree_->setCurrentIndex(treeModel_->indexOf(group));
@@ -286,6 +314,7 @@ void MainWindow::editEntry(nightlock::Entry* entry) {
 
     dialog.applyTo(*entry);
     entry->modified = std::chrono::system_clock::now();
+    standardicons::addRecentIconPath(QString::fromStdString(entry->icon));
     entryModel_->notifyEntryChanged(entry);
     detail_->setEntry(entry);
 }
@@ -328,6 +357,7 @@ void MainWindow::changeFolderIcon(nightlock::Group* group) {
     auto* gallery = new IconGalleryPopup(this);
     connect(gallery, &IconGalleryPopup::iconSelected, this, [this, group](const QString& path) {
         treeModel_->setGroupIcon(treeModel_->indexOf(group), path);
+        standardicons::addRecentIconPath(path);
     });
     gallery->popupAt(QCursor::pos());
 }
@@ -383,6 +413,7 @@ void MainWindow::detachDetail(const QPoint& globalPos) {
     detailSplitterSizes_ = splitter_->sizes();
     const QSize paneSize = detail_->size();
     detail_->setParent(nullptr);
+    detail_->setFloatingMode(true);
     detail_->setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
     detail_->resize(paneSize);
     // Keep the grip (top-center of the panel) under the cursor.
@@ -392,11 +423,41 @@ void MainWindow::detachDetail(const QPoint& globalPos) {
 }
 
 void MainWindow::maybeReattachDetail(const QPoint& globalPos) {
-    if (!detail_->isWindow() || !frameGeometry().contains(globalPos))
+    if (frameGeometry().contains(globalPos))
+        dockDetail();
+}
+
+void MainWindow::dockDetail() {
+    if (!detail_->isWindow())
         return;
+    detail_->setFloatingMode(false);
     splitter_->addWidget(detail_);  // rightmost pane — its original slot
     splitter_->setSizes(detailSplitterSizes_);
     detail_->show();
+}
+
+bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
+    if (watched == tree_ && event->type() == QEvent::Resize)
+        dragStrip_->setGeometry(0, 0, tree_->width(), 28);
+    return QMainWindow::eventFilter(watched, event);
+}
+
+void MainWindow::deleteEntry(nightlock::Entry* entry) {
+    QMessageBox box(QMessageBox::Warning, tr("Delete Entry"),
+                    tr("Delete “%1”?").arg(QString::fromStdString(entry->name)),
+                    QMessageBox::NoButton, this);
+    box.setInformativeText(tr("This cannot be undone."));
+    QAbstractButton* deleteButton = box.addButton(tr("Delete"), QMessageBox::DestructiveRole);
+    box.addButton(QMessageBox::Cancel);
+    box.setDefaultButton(QMessageBox::Cancel);
+    box.exec();
+    if (box.clickedButton() != deleteButton)
+        return;
+
+    if (detail_->isWindow())
+        detail_->setEntry(nullptr);
+    entryModel_->removeEntry(entry);
+    onGroupChanged(tree_->currentIndex());  // refreshes the counter
 }
 
 void MainWindow::debugSetEntryIcon(const QString& path) {

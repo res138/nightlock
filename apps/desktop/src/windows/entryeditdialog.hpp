@@ -35,7 +35,6 @@ private:
     QLineEdit* loginEdit_;
     QLineEdit* passwordEdit_;
     QLineEdit* urlEdit_;
-    QLineEdit* codeEdit_;
     QPlainTextEdit* noteEdit_;
     QPushButton* saveButton_;
 };

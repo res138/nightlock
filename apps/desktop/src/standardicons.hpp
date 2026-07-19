@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QImage>
 #include <QString>
 #include <QStringList>
 #include <QVector>
@@ -33,5 +34,18 @@ QString entryIconForId(const QString& id);
 // live on disk rather than in the Qt resource system — ~190 MB is too
 // much to embed into the binary.
 QStringList galleryIconPaths();
+
+// Starts decoding every pack icon on a background thread, so the
+// gallery scrolls without hitching on first open.
+void preloadGalleryIcons();
+// Stops and joins the preload thread; call before the app shuts down.
+void stopGalleryPreload();
+// Pre-decoded image for a pack icon; null if not (yet) cached.
+QImage cachedGalleryImage(const QString& path);
+
+// The last icons the user picked (most recent first, up to 10),
+// persisted across runs.
+QStringList recentIconPaths();
+void addRecentIconPath(const QString& path);
 
 }  // namespace standardicons

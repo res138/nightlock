@@ -68,6 +68,8 @@ private:
 
     void detachDetail(const QPoint& globalPos);
     void maybeReattachDetail(const QPoint& globalPos);
+    void dockDetail();
+    void deleteEntry(nightlock::Entry* entry);
 
     GroupTreeModel* treeModel_;
     EntryListModel* entryModel_;
@@ -78,4 +80,8 @@ private:
     EntryDetailView* detail_;
     QSplitter* splitter_;
     QList<int> detailSplitterSizes_;  // pane widths to restore on re-dock
+    QWidget* dragStrip_;              // window-drag zone over the tree top
+
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
 };

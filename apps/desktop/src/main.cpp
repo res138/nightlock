@@ -7,6 +7,7 @@
 #include <nightlock/group.hpp>
 
 #include "demovault.hpp"
+#include "standardicons.hpp"
 #include "windows/mainwindow.hpp"
 
 #ifdef Q_OS_MACOS
@@ -15,6 +16,7 @@
 
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
+    QApplication::setOrganizationName(QStringLiteral("Nightlock"));
     QApplication::setApplicationName(QStringLiteral("Nightlock"));
 
     QFile qss(QStringLiteral(":/style.qss"));
@@ -37,6 +39,12 @@ int main(int argc, char* argv[]) {
 #ifdef Q_OS_MACOS
     macwindow::hideTitleBar(&window);
 #endif
+
+    // Decode the icon packs up front (background thread), so the
+    // gallery scrolls smoothly the first time it opens.
+    standardicons::preloadGalleryIcons();
+    QObject::connect(&app, &QCoreApplication::aboutToQuit,
+                     [] { standardicons::stopGalleryPreload(); });
     window.selectGroupNamed(QStringLiteral("Personal 2020"));
     window.selectEntryNamed(
         qEnvironmentVariable("NIGHTLOCK_SELECT_ENTRY", QStringLiteral("GitHub")));
