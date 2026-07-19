@@ -8,6 +8,7 @@
 #include <QLinearGradient>
 #include <QListView>
 #include <QPainter>
+#include <QScrollBar>
 #include <QScreen>
 #include <QVBoxLayout>
 #include <QVariantAnimation>
@@ -119,8 +120,13 @@ IconGalleryPopup::IconGalleryPopup(QWidget* parent) : QWidget(parent) {
     layout->setContentsMargins(margin, margin, margin, margin);
     layout->addWidget(view);
 
-    // Width: the grid plus room for the overlay scrollbar.
-    setFixedSize(kColumns * kCell + 14 + 2 * margin, kViewHeight + 2 * margin);
+    // The viewport must hold kColumns full cells AFTER the scrollbar
+    // takes its slice, with slack for the icon-flow wrap math —
+    // otherwise a row wraps one column early, leaving a dead white
+    // strip on the right.
+    const int scrollBarWidth = view->verticalScrollBar()->sizeHint().width();
+    setFixedSize(kColumns * kCell + scrollBarWidth + 16 + 2 * margin,
+                 kViewHeight + 2 * margin);
 
     // Icons fade out under a gradient at both edges of the grid.
     auto* topFade = new EdgeFade(true, this);
