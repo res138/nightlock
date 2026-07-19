@@ -24,10 +24,11 @@ constexpr int kMinItemWidth = 172;
 constexpr int kRevealMs = 130;
 constexpr qreal kVeilOpacity = 0.85;  // solid color share over the blurred backdrop
 
-// Hover highlight: a rounded pill inset from the panel edges, so the
-// corner radius reads cleanly instead of clashing with the panel corners.
-constexpr int kHoverInsetX = 5;
-constexpr int kHoverInsetY = 2;
+// Hover highlight: a rounded pill inset by the same amount on every
+// side. The menu has no extra vertical padding (PM_MenuVMargin is 0),
+// so the gap stays identical against the panel edges, the separator
+// bands and the sides.
+constexpr int kHoverInset = 4;
 constexpr qreal kHoverRadius = 6.5;
 
 const QColor kTextColor(0x1F, 0x1F, 0x1F);
@@ -48,9 +49,8 @@ public:
         switch (metric) {
         case PM_MenuPanelWidth:
         case PM_MenuHMargin:
-            return 0;
         case PM_MenuVMargin:
-            return 4;
+            return 0;
         default:
             return QProxyStyle::pixelMetric(metric, option, widget);
         }
@@ -137,7 +137,7 @@ public:
             painter->setPen(Qt::NoPen);
             painter->setBrush(kHoverColor);
             painter->drawRoundedRect(
-                QRectF(rect).adjusted(kHoverInsetX, kHoverInsetY, -kHoverInsetX, -kHoverInsetY),
+                QRectF(rect).adjusted(kHoverInset, kHoverInset, -kHoverInset, -kHoverInset),
                 kHoverRadius, kHoverRadius);
         }
 
