@@ -365,6 +365,15 @@ QWidget* MainWindow::openIconGalleryForScreenshot() {
     return gallery;
 }
 
+void MainWindow::debugSetEntryIcon(const QString& path) {
+    auto* entry = entryModel_->entry(list_->currentIndex());
+    if (!entry)
+        return;
+    entry->icon = path.toStdString();
+    entryModel_->notifyEntryChanged(entry);
+    detail_->setEntry(entry);
+}
+
 void MainWindow::debugFolderOps() {
     treeModel_->addGroup(treeModel_->indexOf(treeModel_->rootGroup()),
                          QStringLiteral("Debug Created"));

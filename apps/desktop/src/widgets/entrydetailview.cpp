@@ -2,6 +2,7 @@
 
 #include <QDateTime>
 #include <QFrame>
+#include <QIcon>
 #include <QLabel>
 #include <QStyle>
 #include <QVBoxLayout>
@@ -13,6 +14,8 @@
 #include "totpring.hpp"
 
 namespace {
+
+constexpr int kIconSize = 58;
 
 QString formatDate(std::chrono::system_clock::time_point tp) {
     const auto secs =
@@ -31,7 +34,10 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     layout->setSpacing(0);
 
     iconLabel_ = new QLabel;
-    iconLabel_->setAlignment(Qt::AlignHCenter);
+    iconLabel_->setAlignment(Qt::AlignCenter);
+    // Multi-size icons may resolve below 58px (e.g. 48px .ico packs);
+    // a fixed height keeps the header from shifting.
+    iconLabel_->setFixedHeight(kIconSize);
     layout->addWidget(iconLabel_);
     layout->addSpacing(10);
 
@@ -91,7 +97,12 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
 
     const QString iconPath = entry->icon.empty() ? QStringLiteral(":/icons/keys.png")
                                                  : QString::fromStdString(entry->icon);
-    iconLabel_->setPixmap(QPixmap(iconPath).scaledToHeight(58, Qt::SmoothTransformation));
+    // Select the variant through QIcon, exactly like the entry list
+    // does: pack .ico files hold several sizes and color depths, and
+    // QPixmap would load only the first sub-image — often a different
+    // rendition than the one the list shows.
+    iconLabel_->setPixmap(QIcon(iconPath).pixmap(QSize(kIconSize, kIconSize),
+                                                 iconLabel_->devicePixelRatioF()));
 
     titleLabel_->setText(QString::fromStdString(entry->name));
 

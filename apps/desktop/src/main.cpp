@@ -34,6 +34,11 @@ int main(int argc, char* argv[]) {
             window.debugMoveGroup(parts[0], parts[1]);
     }
 
+    // Debug hook: NIGHTLOCK_TEST_ENTRY_ICON=<path> assigns an icon to
+    // the selected entry.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_ENTRY_ICON"))
+        window.debugSetEntryIcon(qEnvironmentVariable("NIGHTLOCK_TEST_ENTRY_ICON"));
+
     // Debug hook: NIGHTLOCK_TEST_FOLDERS=1 exercises folder create,
     // rename and delete through the tree model.
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_FOLDERS"))

@@ -39,6 +39,9 @@ public:
     // Debug hook for NIGHTLOCK_TEST_FOLDERS: exercises folder create,
     // rename and delete through the tree model.
     void debugFolderOps();
+    // Debug hook for NIGHTLOCK_TEST_ENTRY_ICON: assigns an icon path to
+    // the selected entry (list + detail refresh included).
+    void debugSetEntryIcon(const QString& path);
 
 private:
     void onGroupChanged(const QModelIndex& current);
