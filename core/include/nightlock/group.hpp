@@ -24,6 +24,10 @@ public:
     Group& addGroup(std::string name);
     Entry& addEntry(Entry entry);
 
+    // Destroys `child` (with its whole subtree). Fails when `child` is
+    // not a direct sub-group.
+    bool removeGroup(Group* child);
+
     const std::vector<std::unique_ptr<Group>>& groups() const;
     const std::vector<std::unique_ptr<Entry>>& entries() const;
 

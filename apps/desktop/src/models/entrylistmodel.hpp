@@ -21,6 +21,12 @@ public:
 
     void setGroup(nightlock::Group* group);
     nightlock::Entry* entry(const QModelIndex& index) const;
+    QModelIndex indexOf(const nightlock::Entry* entry) const;
+
+    // Re-reads the group after entries were added or removed.
+    void refresh();
+    // Announces in-place edits of one entry (name/icon in the list).
+    void notifyEntryChanged(nightlock::Entry* entry);
 
     int rowCount(const QModelIndex& parent = {}) const override;
     QVariant data(const QModelIndex& index, int role) const override;

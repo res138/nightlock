@@ -7,11 +7,15 @@
 #include <QGuiApplication>
 #include <QLabel>
 #include <QListView>
+#include <QMessageBox>
 #include <QMimeData>
+#include <QPushButton>
 #include <QSplitter>
 #include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
+
+#include <chrono>
 
 #include <nightlock/group.hpp>
 
@@ -21,6 +25,7 @@
 #include "widgets/entrylistdelegate.hpp"
 #include "widgets/grouptreeview.hpp"
 #include "widgets/nlmenu.hpp"
+#include "windows/entryeditdialog.hpp"
 
 namespace {
 
@@ -97,6 +102,12 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     list_->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(list_, &QWidget::customContextMenuRequested, this, &MainWindow::showEntryMenu);
 
+    connect(treeModel_, &QAbstractItemModel::dataChanged, this, [this] {
+        // A folder rename may change the path shown under the counter.
+        if (auto* current = treeModel_->group(tree_->currentIndex()))
+            pathLabel_->setText(QString::fromStdString(current->path()));
+    });
+
     connect(treeModel_, &GroupTreeModel::groupMoved, this, [this](nightlock::Group* moved) {
         // Let the view settle after the move, then show where it landed.
         QTimer::singleShot(0, this, [this, moved] {
@@ -154,18 +165,18 @@ void MainWindow::showGroupMenu(const QPoint& pos) {
     connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
 
     menu->addAction(menuIcon(QStringLiteral("file-plus")), tr("New entry"), this,
-                    [] { qInfo() << "TODO: new entry"; });
+                    [this, group] { addEntryTo(group); });
     menu->addAction(menuIcon(QStringLiteral("folder-plus")), tr("New folder"), this,
-                    [] { qInfo() << "TODO: new folder"; });
+                    [this, group] { addFolderTo(group); });
     if (group != treeModel_->rootGroup()) {
         menu->addSeparator();
         menu->addAction(menuIcon(QStringLiteral("edit-3")), tr("Rename"), this,
-                        [] { qInfo() << "TODO: rename folder"; });
+                        [this, group] { renameFolder(group); });
         menu->addAction(menuIcon(QStringLiteral("image")), tr("Change icon…"), this,
                         [] { qInfo() << "TODO: change folder icon"; });
         menu->addSeparator();
         auto* del = menu->addAction(menuIcon(QStringLiteral("trash")), tr("Delete"), this,
-                                    [] { qInfo() << "TODO: delete folder"; });
+                                    [this, group] { deleteFolder(group); });
         del->setProperty("danger", true);
     }
     menu->popupAt(tree_->viewport()->mapToGlobal(pos));
@@ -206,7 +217,7 @@ NlMenu* MainWindow::buildEntryMenu(nightlock::Entry* entry) {
 
     menu->addSeparator();
     menu->addAction(menuIcon(QStringLiteral("edit")), tr("Edit"), this,
-                    [] { qInfo() << "TODO: edit entry"; });
+                    [this, entry] { editEntry(entry); });
     auto* moveMenu = buildMoveMenu(treeModel_->rootGroup(), menu);
     moveMenu->setTitle(tr("Move to"));
     moveMenu->setIcon(menuIcon(QStringLiteral("corner-up-right")));
@@ -237,6 +248,67 @@ NlMenu* MainWindow::buildMoveMenu(nightlock::Group* group, QWidget* parent) {
     return menu;
 }
 
+void MainWindow::addEntryTo(nightlock::Group* group) {
+    EntryEditDialog dialog(EntryEditDialog::Mode::Add, this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    nightlock::Entry entry;
+    dialog.applyTo(entry);
+    entry.created = entry.modified = std::chrono::system_clock::now();
+    auto& added = group->addEntry(std::move(entry));
+
+    tree_->setCurrentIndex(treeModel_->indexOf(group));
+    onGroupChanged(tree_->currentIndex());  // re-reads the list and the header
+    list_->setCurrentIndex(entryModel_->indexOf(&added));
+}
+
+void MainWindow::editEntry(nightlock::Entry* entry) {
+    EntryEditDialog dialog(EntryEditDialog::Mode::Edit, this);
+    dialog.setEntry(*entry);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    dialog.applyTo(*entry);
+    entry->modified = std::chrono::system_clock::now();
+    entryModel_->notifyEntryChanged(entry);
+    detail_->setEntry(entry);
+}
+
+void MainWindow::addFolderTo(nightlock::Group* group) {
+    const QModelIndex parentIdx = treeModel_->indexOf(group);
+    const QModelIndex idx = treeModel_->addGroup(parentIdx, tr("New Folder"));
+    if (!idx.isValid())
+        return;
+    tree_->expand(parentIdx);
+    tree_->setCurrentIndex(idx);
+    tree_->edit(idx);  // Finder-style: name the folder right away
+}
+
+void MainWindow::renameFolder(nightlock::Group* group) {
+    const QModelIndex idx = treeModel_->indexOf(group);
+    tree_->setCurrentIndex(idx);
+    tree_->edit(idx);
+}
+
+void MainWindow::deleteFolder(nightlock::Group* group) {
+    QMessageBox box(QMessageBox::Warning, tr("Delete Folder"),
+                    tr("Delete “%1” and everything inside it?")
+                        .arg(QString::fromStdString(group->name())),
+                    QMessageBox::NoButton, this);
+    box.setInformativeText(tr("This cannot be undone."));
+    QAbstractButton* deleteButton = box.addButton(tr("Delete"), QMessageBox::DestructiveRole);
+    box.addButton(QMessageBox::Cancel);
+    box.setDefaultButton(QMessageBox::Cancel);
+    box.exec();
+    if (box.clickedButton() != deleteButton)
+        return;
+
+    nightlock::Group* parent = group->parent();
+    if (treeModel_->removeGroup(treeModel_->indexOf(group)))
+        tree_->setCurrentIndex(treeModel_->indexOf(parent));
+}
+
 void MainWindow::debugMoveGroup(const QString& groupName, const QString& targetName) {
     auto* moving = findGroup(treeModel_->rootGroup(), groupName);
     auto* target = findGroup(treeModel_->rootGroup(), targetName);
@@ -255,4 +327,24 @@ QMenu* MainWindow::popupEntryMenuForScreenshot() {
     auto* menu = buildEntryMenu(entry);
     menu->popupAt(list_->viewport()->mapToGlobal(QPoint(240, 300)));
     return menu;
+}
+
+QDialog* MainWindow::openEntryDialogForScreenshot() {
+    auto* entry = entryModel_->entry(list_->currentIndex());
+    auto* dialog = new EntryEditDialog(
+        entry ? EntryEditDialog::Mode::Edit : EntryEditDialog::Mode::Add, this);
+    if (entry)
+        dialog->setEntry(*entry);
+    dialog->show();
+    return dialog;
+}
+
+void MainWindow::debugFolderOps() {
+    treeModel_->addGroup(treeModel_->indexOf(treeModel_->rootGroup()),
+                         QStringLiteral("Debug Created"));
+    if (auto* g = findGroup(treeModel_->rootGroup(), QStringLiteral("Demo Folder")))
+        treeModel_->setData(treeModel_->indexOf(g), QStringLiteral("Renamed Folder"));
+    if (auto* g = findGroup(treeModel_->rootGroup(), QStringLiteral("Personal 2018")))
+        treeModel_->removeGroup(treeModel_->indexOf(g));
+    tree_->expandAll();
 }

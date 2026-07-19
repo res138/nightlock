@@ -88,6 +88,9 @@ GroupTreeView::GroupTreeView(QWidget* parent) : QTreeView(parent) {
     setRootIsDecorated(false);
     setIconSize(QSize(22, 22));
     setSelectionMode(QAbstractItemView::SingleSelection);
+    // Renaming starts only from the context menu (via edit()); a plain
+    // double-click keeps toggling expand/collapse.
+    setEditTriggers(QAbstractItemView::NoEditTriggers);
 
     setDragDropMode(QAbstractItemView::InternalMove);
     setDragEnabled(true);

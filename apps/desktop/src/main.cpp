@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QDialog>
 #include <QFile>
 #include <QMenu>
 #include <QTimer>
@@ -33,6 +34,11 @@ int main(int argc, char* argv[]) {
             window.debugMoveGroup(parts[0], parts[1]);
     }
 
+    // Debug hook: NIGHTLOCK_TEST_FOLDERS=1 exercises folder create,
+    // rename and delete through the tree model.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_FOLDERS"))
+        window.debugFolderOps();
+
     // Debug hook: NIGHTLOCK_SCREENSHOT=<path> saves a frame and exits.
     if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT")) {
         QTimer::singleShot(800, &window, [&window] {
@@ -50,9 +56,28 @@ int main(int argc, char* argv[]) {
                 QApplication::quit();
                 return;
             }
+            // NIGHTLOCK_SCREENSHOT_MENU_ACTIVE=<row> highlights an item
+            // as if hovered, to capture the hover state.
+            if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_MENU_ACTIVE")) {
+                const int row = qEnvironmentVariableIntValue("NIGHTLOCK_SCREENSHOT_MENU_ACTIVE");
+                if (row >= 0 && row < menu->actions().size())
+                    menu->setActiveAction(menu->actions().at(row));
+            }
             const int delay = qEnvironmentVariableIntValue("NIGHTLOCK_SCREENSHOT_MENU_DELAY");
             QTimer::singleShot(delay > 0 ? delay : 400, menu, [menu] {
                 menu->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_MENU"));
+                QApplication::quit();
+            });
+        });
+    }
+
+    // Debug hook: NIGHTLOCK_SCREENSHOT_DIALOG=<path> saves the entry
+    // edit dialog (prefilled from the selected entry) and exits.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_DIALOG")) {
+        QTimer::singleShot(800, &window, [&window] {
+            QDialog* dialog = window.openEntryDialogForScreenshot();
+            QTimer::singleShot(400, dialog, [dialog] {
+                dialog->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_DIALOG"));
                 QApplication::quit();
             });
         });

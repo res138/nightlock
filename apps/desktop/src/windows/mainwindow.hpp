@@ -2,6 +2,7 @@
 
 #include <QMainWindow>
 
+class QDialog;
 class QLabel;
 class QListView;
 class QMenu;
@@ -26,9 +27,15 @@ public:
 
     // Debug hook for NIGHTLOCK_SCREENSHOT_MENU.
     QMenu* popupEntryMenuForScreenshot();
+    // Debug hook for NIGHTLOCK_SCREENSHOT_DIALOG: opens the edit dialog
+    // for the selected entry (or an empty add dialog) non-modally.
+    QDialog* openEntryDialogForScreenshot();
     // Debug hook for NIGHTLOCK_TEST_MOVE: drops `groupName` onto
     // `targetName` through the same model path a mouse drag uses.
     void debugMoveGroup(const QString& groupName, const QString& targetName);
+    // Debug hook for NIGHTLOCK_TEST_FOLDERS: exercises folder create,
+    // rename and delete through the tree model.
+    void debugFolderOps();
 
 private:
     void onGroupChanged(const QModelIndex& current);
@@ -38,6 +45,12 @@ private:
     void showEntryMenu(const QPoint& pos);
     NlMenu* buildEntryMenu(nightlock::Entry* entry);
     NlMenu* buildMoveMenu(nightlock::Group* group, QWidget* parent);
+
+    void addEntryTo(nightlock::Group* group);
+    void editEntry(nightlock::Entry* entry);
+    void addFolderTo(nightlock::Group* group);
+    void renameFolder(nightlock::Group* group);
+    void deleteFolder(nightlock::Group* group);
 
     GroupTreeModel* treeModel_;
     EntryListModel* entryModel_;

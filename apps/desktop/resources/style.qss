@@ -107,3 +107,83 @@ QLabel#fieldValue {
     font-size: 12px;
     color: #3C3C3C;
 }
+
+QTreeView#groupTree QLineEdit {
+    background: #FFFFFF;
+    border: 1px solid #000000;
+    border-radius: 4px;
+    padding-left: 8px;
+    color: #111111;
+    selection-background-color: #000000;
+    selection-color: #FFFFFF;
+}
+
+QDialog#entryEditDialog {
+    background: #FFFFFF;
+}
+QLabel#dialogTitle {
+    font-family: Georgia;
+    font-size: 22px;
+    font-weight: bold;
+    color: #000000;
+}
+QLabel#dialogFieldLabel {
+    font-size: 12px;
+    font-weight: 600;
+    color: #141414;
+}
+QDialog#entryEditDialog QLineEdit,
+QDialog#entryEditDialog QPlainTextEdit {
+    background: #FBF9FB;
+    border: 1px solid #E3E3E3;
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 13px;
+    color: #111111;
+    selection-background-color: #000000;
+    selection-color: #FFFFFF;
+}
+QDialog#entryEditDialog QLineEdit:focus,
+QDialog#entryEditDialog QPlainTextEdit:focus {
+    background: #FFFFFF;
+    border: 1px solid #000000;
+}
+QToolButton#iconPickerButton {
+    background: #FBF9FB;
+    border: 1px solid #E3E3E3;
+    border-radius: 10px;
+}
+QToolButton#iconPickerButton:hover {
+    background: #F1EFF1;
+}
+QToolButton#iconPickerButton:checked {
+    background: #FFFFFF;
+    border: 2px solid #000000;
+}
+QPushButton#primaryButton {
+    background: #000000;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 22px;
+    font-size: 13px;
+    font-weight: 600;
+}
+QPushButton#primaryButton:hover {
+    background: #262626;
+}
+QPushButton#primaryButton:disabled {
+    background: #BDBDBD;
+}
+QPushButton#ghostButton {
+    background: #FFFFFF;
+    color: #111111;
+    border: 1px solid #D9D9D9;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 600;
+}
+QPushButton#ghostButton:hover {
+    background: #F5F5F5;
+}

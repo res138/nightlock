@@ -24,9 +24,15 @@ constexpr int kMinItemWidth = 172;
 constexpr int kRevealMs = 130;
 constexpr qreal kVeilOpacity = 0.85;  // solid color share over the blurred backdrop
 
+// Hover highlight: a rounded pill inset from the panel edges, so the
+// corner radius reads cleanly instead of clashing with the panel corners.
+constexpr int kHoverInsetX = 5;
+constexpr int kHoverInsetY = 2;
+constexpr qreal kHoverRadius = 6.5;
+
 const QColor kTextColor(0x1F, 0x1F, 0x1F);
 const QColor kDangerColor(0xFF, 0x3B, 0x30);
-const QColor kHoverColor(0, 0, 0, 10);
+const QColor kHoverColor(0, 0, 0, 14);
 const QColor kHairlineColor(0, 0, 0, 18);
 const QColor kBandColor(0, 0, 0, 14);
 const QColor kChevronColor(0x8A, 0x8A, 0x8E);
@@ -106,10 +112,9 @@ public:
         const bool danger = action && action->property("danger").toBool();
         const bool enabled = item->state & State_Enabled;
 
-        if ((item->state & State_Selected) && enabled)
-            painter->fillRect(rect, kHoverColor);
-
-        // hairline above the item, unless the item opens a group
+        // hairline above the item, unless the item opens a group or the
+        // hovered pill sits right next to it (its edge would collide
+        // with the rounded highlight).
         if (action) {
             QAction* previous = nullptr;
             for (QAction* a : menu->actions()) {
@@ -118,13 +123,23 @@ public:
                 if (a->isVisible())
                     previous = a;
             }
-            if (previous && !previous->isSeparator()) {
+            QAction* hovered = menu->activeAction();
+            if (previous && !previous->isSeparator() && action != hovered &&
+                previous != hovered) {
                 painter->setPen(kHairlineColor);
                 painter->drawLine(rect.topLeft(), rect.topRight());
             }
         }
 
         painter->setRenderHint(QPainter::Antialiasing);
+
+        if ((item->state & State_Selected) && enabled) {
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(kHoverColor);
+            painter->drawRoundedRect(
+                QRectF(rect).adjusted(kHoverInsetX, kHoverInsetY, -kHoverInsetX, -kHoverInsetY),
+                kHoverRadius, kHoverRadius);
+        }
 
         const QRect panel = panelRect(widget);
         int x = panel.left() + kPadLeft;
@@ -186,9 +201,8 @@ NlMenu::NlMenu(QWidget* parent) : QMenu(parent) {
     setAttribute(Qt::WA_TranslucentBackground);
     setStyle(sharedStyle());
     setContentsMargins(kShadow, kShadow, kShadow, kShadow);
-    // Same face as the middle-pane items counter ("9 items").
     QFont f = font();
-    f.setPixelSize(13);
+    f.setPixelSize(11);  // 13px of the middle-pane counter, scaled down 1.2×
     f.setWeight(QFont::DemiBold);
     setFont(f);
 }

@@ -7,13 +7,16 @@ qt_add_executable(nightlock-desktop
     src/main.cpp
     src/demovault.cpp
     src/iconutils.cpp
+    src/standardicons.cpp
     src/models/grouptreemodel.cpp
     src/models/entrylistmodel.cpp
     src/widgets/entrydetailview.cpp
     src/widgets/entrylistdelegate.cpp
     src/widgets/grouptreeview.cpp
+    src/widgets/iconpicker.cpp
     src/widgets/nlmenu.cpp
     src/widgets/totpring.cpp
+    src/windows/entryeditdialog.cpp
     src/windows/mainwindow.cpp
     resources/resources.qrc
 )

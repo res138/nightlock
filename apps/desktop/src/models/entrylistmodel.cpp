@@ -17,6 +17,26 @@ nightlock::Entry* EntryListModel::entry(const QModelIndex& index) const {
     return group_->entries()[index.row()].get();
 }
 
+QModelIndex EntryListModel::indexOf(const nightlock::Entry* entry) const {
+    if (!group_ || !entry)
+        return {};
+    for (int row = 0; row < rowCount(); ++row)
+        if (group_->entries()[row].get() == entry)
+            return index(row, 0);
+    return {};
+}
+
+void EntryListModel::refresh() {
+    beginResetModel();
+    endResetModel();
+}
+
+void EntryListModel::notifyEntryChanged(nightlock::Entry* entry) {
+    const QModelIndex idx = indexOf(entry);
+    if (idx.isValid())
+        emit dataChanged(idx, idx);
+}
+
 int EntryListModel::rowCount(const QModelIndex& parent) const {
     if (parent.isValid() || !group_)
         return 0;
