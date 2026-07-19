@@ -91,6 +91,15 @@ QModelIndex GroupTreeModel::addGroup(const QModelIndex& parent, const QString& n
     return indexOf(&created);
 }
 
+bool GroupTreeModel::setGroupIcon(const QModelIndex& index, const QString& path) {
+    auto* g = group(index);
+    if (!g)
+        return false;
+    g->setIcon(path.toStdString());
+    emit dataChanged(index, index, {Qt::DecorationRole});
+    return true;
+}
+
 bool GroupTreeModel::removeGroup(const QModelIndex& index) {
     auto* g = group(index);
     if (!g || g == root_)

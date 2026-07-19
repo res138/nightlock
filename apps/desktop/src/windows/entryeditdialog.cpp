@@ -1,5 +1,6 @@
 #include "entryeditdialog.hpp"
 
+#include <QCursor>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -10,6 +11,7 @@
 #include <nightlock/entry.hpp>
 
 #include "standardicons.hpp"
+#include "widgets/icongallerypopup.hpp"
 #include "widgets/iconpicker.hpp"
 
 EntryEditDialog::EntryEditDialog(Mode mode, QWidget* parent) : QDialog(parent) {
@@ -28,6 +30,12 @@ EntryEditDialog::EntryEditDialog(Mode mode, QWidget* parent) : QDialog(parent) {
     layout->addSpacing(2);
 
     iconPicker_ = new IconPicker(standardicons::entryIcons());
+    connect(iconPicker_, &IconPicker::addIconRequested, this, [this] {
+        auto* gallery = new IconGalleryPopup(this);
+        connect(gallery, &IconGalleryPopup::iconSelected, iconPicker_,
+                &IconPicker::setCustomIcon);
+        gallery->popupAt(QCursor::pos());
+    });
     layout->addWidget(makeField(tr("Icon"), iconPicker_));
 
     nameEdit_ = new QLineEdit;
@@ -85,8 +93,7 @@ void EntryEditDialog::setEntry(const nightlock::Entry& entry) {
     urlEdit_->setText(QString::fromStdString(entry.url));
     codeEdit_->setText(QString::fromStdString(entry.code));
     noteEdit_->setPlainText(QString::fromStdString(entry.note));
-    iconPicker_->setSelectedId(
-        standardicons::idForEntryIcon(QString::fromStdString(entry.icon)));
+    iconPicker_->setSelectedIconValue(QString::fromStdString(entry.icon));
 }
 
 void EntryEditDialog::applyTo(nightlock::Entry& entry) const {
@@ -96,7 +103,7 @@ void EntryEditDialog::applyTo(nightlock::Entry& entry) const {
     entry.url = urlEdit_->text().trimmed().toStdString();
     entry.code = codeEdit_->text().trimmed().toStdString();
     entry.note = noteEdit_->toPlainText().trimmed().toStdString();
-    entry.icon = standardicons::entryIconForId(iconPicker_->selectedId()).toStdString();
+    entry.icon = iconPicker_->selectedIconValue().toStdString();
 }
 
 QWidget* EntryEditDialog::makeField(const QString& label, QWidget* editor, bool required) {

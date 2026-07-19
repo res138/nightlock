@@ -1,6 +1,7 @@
 #include "standardicons.hpp"
 
 #include <QCoreApplication>
+#include <QDir>
 
 namespace standardicons {
 
@@ -36,6 +37,26 @@ QString entryIconForId(const QString& id) {
         if (item.id == id)
             return item.resource;
     return {};
+}
+
+QStringList galleryIconPaths() {
+    QStringList result;
+    // NIGHTLOCK_ICONS_DIR points at resources/icons in the source tree
+    // (set by CMake); a packaged build would ship the packs next to the
+    // binary and adjust this lookup.
+    QDir root(QStringLiteral(NIGHTLOCK_ICONS_DIR));
+    const QStringList packs =
+        root.entryList({QStringLiteral("P*")}, QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+    for (const QString& pack : packs) {
+        QDir dir(root.filePath(pack));
+        const QStringList files =
+            dir.entryList({QStringLiteral("*.ico"), QStringLiteral("*.png"),
+                           QStringLiteral("*.jpg"), QStringLiteral("*.svg")},
+                          QDir::Files, QDir::Name);
+        for (const QString& file : files)
+            result << dir.filePath(file);
+    }
+    return result;
 }
 
 }  // namespace standardicons

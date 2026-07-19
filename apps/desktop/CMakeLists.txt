@@ -12,7 +12,9 @@ qt_add_executable(nightlock-desktop
     src/models/entrylistmodel.cpp
     src/widgets/entrydetailview.cpp
     src/widgets/entrylistdelegate.cpp
+    src/widgets/frostedpanel.cpp
     src/widgets/grouptreeview.cpp
+    src/widgets/icongallerypopup.cpp
     src/widgets/iconpicker.cpp
     src/widgets/nlmenu.cpp
     src/widgets/totpring.cpp
@@ -22,6 +24,11 @@ qt_add_executable(nightlock-desktop
 )
 
 target_include_directories(nightlock-desktop PRIVATE src)
+
+# The P* icon packs are loaded from disk at runtime — ~190 MB is too
+# much to embed as Qt resources. Dev builds read the source tree.
+target_compile_definitions(nightlock-desktop PRIVATE
+    NIGHTLOCK_ICONS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/icons")
 target_link_libraries(nightlock-desktop PRIVATE Qt6::Widgets Qt6::Svg nightlock-core)
 
 set_target_properties(nightlock-desktop PROPERTIES OUTPUT_NAME nightlock)

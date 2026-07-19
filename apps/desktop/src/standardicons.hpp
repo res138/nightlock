@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QStringList>
 #include <QVector>
 
 // Catalog of the standard (built-in) entry icons. The picker in the
@@ -26,5 +27,11 @@ QString idForEntryIcon(const QString& icon);
 // Maps a catalog id to the Entry::icon value to persist: empty string
 // for the default icon, the resource path otherwise.
 QString entryIconForId(const QString& id);
+
+// All icons of the bundled "P*" packs (resources/icons/P1, P2, …)
+// merged into one flat list of file paths, pack by pack. The packs
+// live on disk rather than in the Qt resource system — ~190 MB is too
+// much to embed into the binary.
+QStringList galleryIconPaths();
 
 }  // namespace standardicons

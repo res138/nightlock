@@ -73,6 +73,18 @@ int main(int argc, char* argv[]) {
         });
     }
 
+    // Debug hook: NIGHTLOCK_SCREENSHOT_GALLERY=<path> saves the icon
+    // pack gallery popup and exits.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_GALLERY")) {
+        QTimer::singleShot(800, &window, [&window] {
+            QWidget* gallery = window.openIconGalleryForScreenshot();
+            QTimer::singleShot(400, gallery, [gallery] {
+                gallery->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_GALLERY"));
+                QApplication::quit();
+            });
+        });
+    }
+
     // Debug hook: NIGHTLOCK_SCREENSHOT_DIALOG=<path> saves the entry
     // edit dialog (prefilled from the selected entry) and exits.
     if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_DIALOG")) {

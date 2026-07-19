@@ -1,6 +1,7 @@
 #include "mainwindow.hpp"
 
 #include <QClipboard>
+#include <QCursor>
 #include <QDebug>
 #include <QDesktopServices>
 #include <QFrame>
@@ -24,6 +25,7 @@
 #include "widgets/entrydetailview.hpp"
 #include "widgets/entrylistdelegate.hpp"
 #include "widgets/grouptreeview.hpp"
+#include "widgets/icongallerypopup.hpp"
 #include "widgets/nlmenu.hpp"
 #include "windows/entryeditdialog.hpp"
 
@@ -159,7 +161,7 @@ void MainWindow::showGroupMenu(const QPoint& pos) {
     const QModelIndex idx = tree_->indexAt(pos);
     auto* group = treeModel_->group(idx);
     if (!group)
-        return;
+        group = treeModel_->rootGroup();  // empty area acts on the vault root
 
     auto* menu = new NlMenu(this);
     connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
@@ -173,7 +175,7 @@ void MainWindow::showGroupMenu(const QPoint& pos) {
         menu->addAction(menuIcon(QStringLiteral("edit-3")), tr("Rename"), this,
                         [this, group] { renameFolder(group); });
         menu->addAction(menuIcon(QStringLiteral("image")), tr("Change icon…"), this,
-                        [] { qInfo() << "TODO: change folder icon"; });
+                        [this, group] { changeFolderIcon(group); });
         menu->addSeparator();
         auto* del = menu->addAction(menuIcon(QStringLiteral("trash")), tr("Delete"), this,
                                     [this, group] { deleteFolder(group); });
@@ -185,8 +187,18 @@ void MainWindow::showGroupMenu(const QPoint& pos) {
 void MainWindow::showEntryMenu(const QPoint& pos) {
     const QModelIndex idx = list_->indexAt(pos);
     auto* entry = entryModel_->entry(idx);
-    if (!entry)
+    if (!entry) {
+        // Empty area: offer creating an entry in the current folder.
+        auto* group = treeModel_->group(tree_->currentIndex());
+        if (!group)
+            return;
+        auto* menu = new NlMenu(this);
+        connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
+        menu->addAction(menuIcon(QStringLiteral("file-plus")), tr("New entry"), this,
+                        [this, group] { addEntryTo(group); });
+        menu->popupAt(list_->viewport()->mapToGlobal(pos));
         return;
+    }
     if (idx != list_->currentIndex())
         list_->setCurrentIndex(idx);  // keeps the detail panel in sync
 
@@ -309,6 +321,14 @@ void MainWindow::deleteFolder(nightlock::Group* group) {
         tree_->setCurrentIndex(treeModel_->indexOf(parent));
 }
 
+void MainWindow::changeFolderIcon(nightlock::Group* group) {
+    auto* gallery = new IconGalleryPopup(this);
+    connect(gallery, &IconGalleryPopup::iconSelected, this, [this, group](const QString& path) {
+        treeModel_->setGroupIcon(treeModel_->indexOf(group), path);
+    });
+    gallery->popupAt(QCursor::pos());
+}
+
 void MainWindow::debugMoveGroup(const QString& groupName, const QString& targetName) {
     auto* moving = findGroup(treeModel_->rootGroup(), groupName);
     auto* target = findGroup(treeModel_->rootGroup(), targetName);
@@ -337,6 +357,12 @@ QDialog* MainWindow::openEntryDialogForScreenshot() {
         dialog->setEntry(*entry);
     dialog->show();
     return dialog;
+}
+
+QWidget* MainWindow::openIconGalleryForScreenshot() {
+    auto* gallery = new IconGalleryPopup(this);
+    gallery->popupAt(mapToGlobal(QPoint(260, 160)));
+    return gallery;
 }
 
 void MainWindow::debugFolderOps() {

@@ -30,6 +30,9 @@ public:
     // Debug hook for NIGHTLOCK_SCREENSHOT_DIALOG: opens the edit dialog
     // for the selected entry (or an empty add dialog) non-modally.
     QDialog* openEntryDialogForScreenshot();
+    // Debug hook for NIGHTLOCK_SCREENSHOT_GALLERY: opens the icon pack
+    // gallery popup over the window.
+    QWidget* openIconGalleryForScreenshot();
     // Debug hook for NIGHTLOCK_TEST_MOVE: drops `groupName` onto
     // `targetName` through the same model path a mouse drag uses.
     void debugMoveGroup(const QString& groupName, const QString& targetName);
@@ -51,6 +54,7 @@ private:
     void addFolderTo(nightlock::Group* group);
     void renameFolder(nightlock::Group* group);
     void deleteFolder(nightlock::Group* group);
+    void changeFolderIcon(nightlock::Group* group);
 
     GroupTreeModel* treeModel_;
     EntryListModel* entryModel_;
