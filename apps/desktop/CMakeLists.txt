@@ -28,6 +28,11 @@ target_include_directories(nightlock-desktop PRIVATE src)
 # much to embed as Qt resources. Dev builds read the source tree.
 target_compile_definitions(nightlock-desktop PRIVATE
     NIGHTLOCK_ICONS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/icons")
+
+if(APPLE)
+    target_sources(nightlock-desktop PRIVATE src/platform/macwindow.mm)
+    target_link_libraries(nightlock-desktop PRIVATE "-framework AppKit")
+endif()
 target_link_libraries(nightlock-desktop PRIVATE Qt6::Widgets Qt6::Svg nightlock-core)
 
 set_target_properties(nightlock-desktop PROPERTIES OUTPUT_NAME nightlock)

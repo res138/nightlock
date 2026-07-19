@@ -9,6 +9,10 @@
 #include "demovault.hpp"
 #include "windows/mainwindow.hpp"
 
+#ifdef Q_OS_MACOS
+#include "platform/macwindow.hpp"
+#endif
+
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("Nightlock"));
@@ -22,6 +26,9 @@ int main(int argc, char* argv[]) {
     MainWindow window(vault.get());
     window.resize(1180, 720);
     window.show();
+#ifdef Q_OS_MACOS
+    macwindow::hideTitleBar(&window);
+#endif
     window.selectGroupNamed(QStringLiteral("Personal 2020"));
     window.selectEntryNamed(
         qEnvironmentVariable("NIGHTLOCK_SELECT_ENTRY", QStringLiteral("GitHub")));
@@ -73,6 +80,25 @@ int main(int argc, char* argv[]) {
                         menu->setActiveAction(menu->actions().at(row));
                 }
                 menu->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_MENU"));
+                QApplication::quit();
+            });
+        });
+    }
+
+    // Debug hook: NIGHTLOCK_TEST_REATTACH=1 floats the detail view and
+    // docks it back, exercising both transitions before a screenshot.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_REATTACH")) {
+        QTimer::singleShot(400, &window, [&window] { window.debugDetachDetail(); });
+        QTimer::singleShot(600, &window, [&window] { window.debugReattachDetail(); });
+    }
+
+    // Debug hook: NIGHTLOCK_SCREENSHOT_DETACHED=<path> floats the
+    // detail view, saves it and exits.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_DETACHED")) {
+        QTimer::singleShot(800, &window, [&window] {
+            QWidget* detached = window.debugDetachDetail();
+            QTimer::singleShot(400, detached, [detached] {
+                detached->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_DETACHED"));
                 QApplication::quit();
             });
         });

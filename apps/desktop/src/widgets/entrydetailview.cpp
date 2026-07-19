@@ -4,6 +4,8 @@
 #include <QFrame>
 #include <QIcon>
 #include <QLabel>
+#include <QMouseEvent>
+#include <QPainter>
 #include <QStyle>
 #include <QVBoxLayout>
 
@@ -16,12 +18,65 @@
 namespace {
 
 constexpr int kIconSize = 58;
+constexpr int kDetachThreshold = 12;  // px of grip travel before undocking
 
 QString formatDate(std::chrono::system_clock::time_point tp) {
     const auto secs =
         std::chrono::duration_cast<std::chrono::seconds>(tp.time_since_epoch()).count();
     return QDateTime::fromSecsSinceEpoch(secs).toString(QStringLiteral("dd.MM.yyyy"));
 }
+
+// The six-dot grip (two rows of three) that tears the panel off.
+class DragHandle : public QWidget {
+public:
+    explicit DragHandle(EntryDetailView* view) : QWidget(view), view_(view) {
+        setFixedSize(30, 18);
+        setCursor(Qt::OpenHandCursor);
+        setAttribute(Qt::WA_Hover);
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(underMouse() || pressed_ ? QColor(0x6E, 0x6E, 0x6E)
+                                                  : QColor(0xA6, 0xA6, 0xA6));
+        constexpr qreal kDotRadius = 2.2;
+        constexpr int kStep = 9;
+        const qreal left = width() / 2.0 - kStep;
+        const qreal top = height() / 2.0 - kStep / 2.0;
+        for (int row = 0; row < 2; ++row)
+            for (int column = 0; column < 3; ++column)
+                painter.drawEllipse(QPointF(left + column * kStep, top + row * kStep),
+                                    kDotRadius, kDotRadius);
+    }
+
+    void mousePressEvent(QMouseEvent* event) override {
+        if (event->button() != Qt::LeftButton)
+            return;
+        pressed_ = true;
+        setCursor(Qt::ClosedHandCursor);
+        view_->gripPressed(event->globalPosition().toPoint());
+    }
+
+    void mouseMoveEvent(QMouseEvent* event) override {
+        if (pressed_)
+            view_->gripDragged(event->globalPosition().toPoint());
+    }
+
+    void mouseReleaseEvent(QMouseEvent* event) override {
+        if (!pressed_)
+            return;
+        pressed_ = false;
+        setCursor(Qt::OpenHandCursor);
+        view_->gripReleased(event->globalPosition().toPoint());
+    }
+
+private:
+    EntryDetailView* view_;
+    bool pressed_ = false;
+};
 
 }  // namespace
 
@@ -87,7 +142,42 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     layout->addStretch(1);
 
     setWidget(content_);
+
+    // Overlay child of the scroll area itself (not the content), so it
+    // stays put while scrolling and remains visible with no entry.
+    grip_ = new DragHandle(this);
+    grip_->raise();
+
     setEntry(nullptr);
+}
+
+void EntryDetailView::resizeEvent(QResizeEvent* event) {
+    QScrollArea::resizeEvent(event);
+    grip_->move((width() - grip_->width()) / 2, 6);
+}
+
+void EntryDetailView::gripPressed(const QPoint& globalPos) {
+    pressGlobal_ = globalPos;
+    if (isWindow())
+        grabOffset_ = globalPos - pos();
+}
+
+void EntryDetailView::gripDragged(const QPoint& globalPos) {
+    if (isWindow()) {
+        move(globalPos - grabOffset_);
+        return;
+    }
+    if ((globalPos - pressGlobal_).manhattanLength() > kDetachThreshold)
+        emit detachRequested(globalPos);
+}
+
+void EntryDetailView::gripReleased(const QPoint& globalPos) {
+    if (isWindow())
+        emit dropped(globalPos);
+}
+
+void EntryDetailView::beginFloatingDrag(const QPoint& globalPos) {
+    grabOffset_ = globalPos - pos();
 }
 
 void EntryDetailView::setEntry(const nightlock::Entry* entry) {

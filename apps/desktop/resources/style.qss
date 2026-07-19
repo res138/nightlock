@@ -3,7 +3,7 @@ QMainWindow {
 }
 
 QSplitter::handle {
-    background: #D9D9D9;
+    background: #EAEAEA;
 }
 
 QTreeView#groupTree {
@@ -13,7 +13,9 @@ QTreeView#groupTree {
     font-family: Georgia;
     font-size: 17px;
     font-weight: bold;
-    padding-top: 6px;
+    /* clears the traffic-light buttons that float over this pane now
+       that the title bar strip is gone */
+    padding-top: 40px;
     show-decoration-selected: 1;
 }
 QTreeView#groupTree::item {
@@ -44,7 +46,7 @@ QListView#entryList {
 QFrame#listHeader {
     background: #FFFFFF;
     border: none;
-    border-bottom: 1px solid #E4E4E4;
+    border-bottom: 1px solid #F0F0F0;
 }
 QLabel#itemsCount {
     font-size: 13px;
@@ -82,13 +84,13 @@ QLabel#metaHeader {
 }
 
 QFrame#card {
-    background: #FBF9FB;
-    border: 1px solid #E3E3E3;
+    background: #FDFCFD;
+    border: 1px solid #EFEFEF;
     border-radius: 9px;
 }
 QFrame#fieldRow {
     border: none;
-    border-bottom: 1px solid #EDEDED;
+    border-bottom: 1px solid #F5F5F5;
     background: transparent;
 }
 QFrame#fieldRow[lastVisible="true"] {
@@ -135,7 +137,7 @@ QLabel#dialogFieldLabel {
 QDialog#entryEditDialog QLineEdit,
 QDialog#entryEditDialog QPlainTextEdit {
     background: #FBF9FB;
-    border: 1px solid #E3E3E3;
+    border: 1px solid #EFEFEF;
     border-radius: 7px;
     padding: 7px 10px;
     font-size: 13px;
@@ -150,7 +152,7 @@ QDialog#entryEditDialog QPlainTextEdit:focus {
 }
 QToolButton#iconPickerButton {
     background: #FBF9FB;
-    border: 1px solid #E3E3E3;
+    border: 1px solid #EFEFEF;
     border-radius: 10px;
 }
 QToolButton#iconPickerButton:hover {
@@ -178,7 +180,7 @@ QPushButton#primaryButton:disabled {
 QPushButton#ghostButton {
     background: #FFFFFF;
     color: #111111;
-    border: 1px solid #D9D9D9;
+    border: 1px solid #EAEAEA;
     border-radius: 8px;
     padding: 8px 18px;
     font-size: 13px;
@@ -190,7 +192,7 @@ QPushButton#ghostButton:hover {
 
 QToolButton#iconPickerAdd {
     background: #FFFFFF;
-    border: 1px dashed #C6C6C6;
+    border: 1px dashed #DFDFDF;
     border-radius: 10px;
     font-size: 20px;
     color: #6E6E6E;

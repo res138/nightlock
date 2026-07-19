@@ -85,14 +85,17 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
 
     detail_ = new EntryDetailView;
 
-    auto* splitter = new QSplitter;
-    splitter->setChildrenCollapsible(false);
-    splitter->setHandleWidth(1);
-    splitter->addWidget(tree_);
-    splitter->addWidget(middle);
-    splitter->addWidget(detail_);
-    splitter->setSizes({300, 420, 460});
-    setCentralWidget(splitter);
+    splitter_ = new QSplitter;
+    splitter_->setChildrenCollapsible(false);
+    splitter_->setHandleWidth(1);
+    splitter_->addWidget(tree_);
+    splitter_->addWidget(middle);
+    splitter_->addWidget(detail_);
+    splitter_->setSizes({300, 420, 460});
+    setCentralWidget(splitter_);
+
+    connect(detail_, &EntryDetailView::detachRequested, this, &MainWindow::detachDetail);
+    connect(detail_, &EntryDetailView::dropped, this, &MainWindow::maybeReattachDetail);
 
     connect(tree_->selectionModel(), &QItemSelectionModel::currentChanged, this,
             [this](const QModelIndex& current, const QModelIndex&) { onGroupChanged(current); });
@@ -359,10 +362,41 @@ QDialog* MainWindow::openEntryDialogForScreenshot() {
     return dialog;
 }
 
+QWidget* MainWindow::debugDetachDetail() {
+    detachDetail(mapToGlobal(QPoint(width() / 2, height() / 2)));
+    return detail_;
+}
+
+void MainWindow::debugReattachDetail() {
+    maybeReattachDetail(frameGeometry().center());
+}
+
 QWidget* MainWindow::openIconGalleryForScreenshot() {
     auto* gallery = new IconGalleryPopup(this);
     gallery->popupAt(mapToGlobal(QPoint(260, 160)));
     return gallery;
+}
+
+void MainWindow::detachDetail(const QPoint& globalPos) {
+    if (detail_->isWindow())
+        return;
+    detailSplitterSizes_ = splitter_->sizes();
+    const QSize paneSize = detail_->size();
+    detail_->setParent(nullptr);
+    detail_->setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
+    detail_->resize(paneSize);
+    // Keep the grip (top-center of the panel) under the cursor.
+    detail_->move(globalPos - QPoint(paneSize.width() / 2, 14));
+    detail_->show();
+    detail_->beginFloatingDrag(globalPos);
+}
+
+void MainWindow::maybeReattachDetail(const QPoint& globalPos) {
+    if (!detail_->isWindow() || !frameGeometry().contains(globalPos))
+        return;
+    splitter_->addWidget(detail_);  // rightmost pane — its original slot
+    splitter_->setSizes(detailSplitterSizes_);
+    detail_->show();
 }
 
 void MainWindow::debugSetEntryIcon(const QString& path) {

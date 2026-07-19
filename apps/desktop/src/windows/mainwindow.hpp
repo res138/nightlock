@@ -6,6 +6,7 @@ class QDialog;
 class QLabel;
 class QListView;
 class QMenu;
+class QSplitter;
 class EntryDetailView;
 class EntryListModel;
 class GroupTreeModel;
@@ -42,6 +43,12 @@ public:
     // Debug hook for NIGHTLOCK_TEST_ENTRY_ICON: assigns an icon path to
     // the selected entry (list + detail refresh included).
     void debugSetEntryIcon(const QString& path);
+    // Debug hook for NIGHTLOCK_SCREENSHOT_DETACHED: floats the detail
+    // view as it would after a grip drag; returns it for grabbing.
+    QWidget* debugDetachDetail();
+    // Debug hook for NIGHTLOCK_TEST_REATTACH: docks the floating detail
+    // view back through the regular drop path.
+    void debugReattachDetail();
 
 private:
     void onGroupChanged(const QModelIndex& current);
@@ -59,6 +66,9 @@ private:
     void deleteFolder(nightlock::Group* group);
     void changeFolderIcon(nightlock::Group* group);
 
+    void detachDetail(const QPoint& globalPos);
+    void maybeReattachDetail(const QPoint& globalPos);
+
     GroupTreeModel* treeModel_;
     EntryListModel* entryModel_;
     GroupTreeView* tree_;
@@ -66,4 +76,6 @@ private:
     QLabel* countLabel_;
     QLabel* pathLabel_;
     EntryDetailView* detail_;
+    QSplitter* splitter_;
+    QList<int> detailSplitterSizes_;  // pane widths to restore on re-dock
 };
