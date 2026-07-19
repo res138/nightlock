@@ -7,6 +7,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QStyle>
+#include <QTimer>
 #include <QVBoxLayout>
 
 #include <array>
@@ -267,6 +268,12 @@ void EntryDetailView::debugSpoiler(const QString& state) {
     passwordSpoiler_->reveal();
     if (state == QLatin1String("copied"))
         passwordSpoiler_->copyAndFlash();
+    if (state == QLatin1String("cycle")) {
+        // Repeated transitions with completed animations in between —
+        // the exact path that used to hit a dangling animation pointer.
+        QTimer::singleShot(250, passwordSpoiler_, [this] { passwordSpoiler_->conceal(); });
+        QTimer::singleShot(500, passwordSpoiler_, [this] { passwordSpoiler_->reveal(); });
+    }
 }
 
 void EntryDetailView::setEntry(const nightlock::Entry* entry) {

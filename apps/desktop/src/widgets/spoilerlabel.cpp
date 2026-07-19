@@ -59,30 +59,45 @@ SpoilerLabel::SpoilerLabel(QWidget* parent) : QWidget(parent) {
     timer_->setInterval(kTickMs);
     connect(timer_, &QTimer::timeout, this, [this] { tick(); });
 
+    // One persistent animation per property, retargeted on each
+    // transition (DeleteWhenStopped would leave dangling pointers).
+    revealAnimation_ = new QVariantAnimation(this);
+    revealAnimation_->setDuration(kRevealMs);
+    revealAnimation_->setEasingCurve(QEasingCurve::OutCubic);
+    connect(revealAnimation_, &QVariantAnimation::valueChanged, this,
+            [this](const QVariant& value) {
+                reveal_ = value.toReal();
+                ensureTicking();
+                update();
+            });
+
+    copiedAnimation_ = new QVariantAnimation(this);
+    copiedAnimation_->setDuration(kCopiedFlashMs);
+    connect(copiedAnimation_, &QVariantAnimation::valueChanged, this,
+            [this](const QVariant& value) {
+                copied_ = value.toReal();
+                update();
+            });
+
     copiedHold_ = new QTimer(this);
     copiedHold_->setSingleShot(true);
     copiedHold_->setInterval(kCopiedHoldMs);
     connect(copiedHold_, &QTimer::timeout, this, [this] {
-        if (copiedAnimation_)
-            copiedAnimation_->stop();
-        copiedAnimation_ = new QVariantAnimation(this);
-        copiedAnimation_->setDuration(kCopiedFlashMs);
+        copiedAnimation_->stop();
         copiedAnimation_->setStartValue(copied_);
         copiedAnimation_->setEndValue(0.0);
-        connect(copiedAnimation_, &QVariantAnimation::valueChanged, this,
-                [this](const QVariant& value) {
-                    copied_ = value.toReal();
-                    update();
-                });
-        copiedAnimation_->start(QAbstractAnimation::DeleteWhenStopped);
+        copiedAnimation_->start();
     });
 }
 
 void SpoilerLabel::setSecret(const QString& secret) {
     secret_ = secret;
-    conceal();
-    reveal_ = 0;  // no animation when switching entries
+    // Hard reset, no animation when switching entries.
+    copiedHold_->stop();
+    copiedAnimation_->stop();
+    revealAnimation_->stop();
     copied_ = 0;
+    reveal_ = 0;
     updateGeometry();
     rebuildParticles();
     ensureTicking();
@@ -100,27 +115,16 @@ void SpoilerLabel::reveal() {
 
 void SpoilerLabel::copyAndFlash() {
     QGuiApplication::clipboard()->setText(secret_);
-    if (copiedAnimation_)
-        copiedAnimation_->stop();
-    copiedAnimation_ = new QVariantAnimation(this);
-    copiedAnimation_->setDuration(kCopiedFlashMs);
+    copiedAnimation_->stop();
     copiedAnimation_->setStartValue(copied_);
     copiedAnimation_->setEndValue(1.0);
-    connect(copiedAnimation_, &QVariantAnimation::valueChanged, this,
-            [this](const QVariant& value) {
-                copied_ = value.toReal();
-                update();
-            });
-    copiedAnimation_->start(QAbstractAnimation::DeleteWhenStopped);
+    copiedAnimation_->start();
     copiedHold_->start();
 }
 
 void SpoilerLabel::conceal() {
     copiedHold_->stop();
-    if (copiedAnimation_) {
-        copiedAnimation_->stop();
-        copiedAnimation_ = nullptr;
-    }
+    copiedAnimation_->stop();
     copied_ = 0;
     animateReveal(0.0);
 }
@@ -128,20 +132,10 @@ void SpoilerLabel::conceal() {
 void SpoilerLabel::animateReveal(qreal target) {
     if (qFuzzyCompare(reveal_, target))
         return;
-    if (revealAnimation_)
-        revealAnimation_->stop();
-    revealAnimation_ = new QVariantAnimation(this);
-    revealAnimation_->setDuration(kRevealMs);
-    revealAnimation_->setEasingCurve(QEasingCurve::OutCubic);
+    revealAnimation_->stop();
     revealAnimation_->setStartValue(reveal_);
     revealAnimation_->setEndValue(target);
-    connect(revealAnimation_, &QVariantAnimation::valueChanged, this,
-            [this](const QVariant& value) {
-                reveal_ = value.toReal();
-                ensureTicking();
-                update();
-            });
-    revealAnimation_->start(QAbstractAnimation::DeleteWhenStopped);
+    revealAnimation_->start();
     ensureTicking();
 }
 
@@ -163,7 +157,7 @@ void SpoilerLabel::respawn(Particle& particle, bool randomAge) {
 }
 
 void SpoilerLabel::tick() {
-    if (reveal_ >= 1.0 && !revealAnimation_) {
+    if (reveal_ >= 1.0 && revealAnimation_->state() != QAbstractAnimation::Running) {
         timer_->stop();  // fully revealed: nothing animates
         return;
     }

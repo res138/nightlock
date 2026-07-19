@@ -21,6 +21,7 @@ public:
     // State drivers (also used by the NIGHTLOCK_TEST_SPOILER hook).
     void reveal();
     void copyAndFlash();
+    void conceal();
 
     QSize sizeHint() const override;
 
@@ -41,7 +42,6 @@ private:
         qreal lifetime = 1; // s
     };
 
-    void conceal();
     void animateReveal(qreal target);
     void rebuildParticles();
     void respawn(Particle& particle, bool randomAge);
