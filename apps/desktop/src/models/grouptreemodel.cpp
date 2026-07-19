@@ -6,8 +6,6 @@
 
 #include <nightlock/group.hpp>
 
-#include "iconutils.hpp"
-
 namespace {
 
 constexpr char kGroupMime[] = "application/x-nightlock-group";
@@ -26,7 +24,7 @@ nightlock::Group* decodeGroup(const QMimeData* data) {
 GroupTreeModel::GroupTreeModel(nightlock::Group* root, QObject* parent)
     : QAbstractItemModel(parent),
       root_(root),
-      folderIcon_(iconutils::iconWithWhiteKnockedOut(QStringLiteral(":/icons/folder.jpg"))) {}
+      folderIcon_(QStringLiteral(":/icons/folder.png")) {}
 
 QModelIndex GroupTreeModel::index(int row, int column, const QModelIndex& parent) const {
     if (!hasIndex(row, column, parent))
@@ -68,12 +66,54 @@ QVariant GroupTreeModel::data(const QModelIndex& index, int role) const {
     return {};
 }
 
+bool GroupTreeModel::setData(const QModelIndex& index, const QVariant& value, int role) {
+    auto* g = group(index);
+    if (!g || role != Qt::EditRole)
+        return false;
+    const QString name = value.toString().trimmed();
+    if (name.isEmpty() || name == QString::fromStdString(g->name()))
+        return false;
+    g->setName(name.toStdString());
+    emit dataChanged(index, index, {Qt::DisplayRole});
+    return true;
+}
+
+QModelIndex GroupTreeModel::addGroup(const QModelIndex& parent, const QString& name) {
+    auto* parentGroup = group(parent);
+    if (!parentGroup || name.trimmed().isEmpty())
+        return {};
+    const int row = static_cast<int>(parentGroup->groups().size());
+    beginInsertRows(parent, row, row);
+    auto& created = parentGroup->addGroup(name.trimmed().toStdString());
+    endInsertRows();
+    return indexOf(&created);
+}
+
+bool GroupTreeModel::setGroupIcon(const QModelIndex& index, const QString& path) {
+    auto* g = group(index);
+    if (!g)
+        return false;
+    g->setIcon(path.toStdString());
+    emit dataChanged(index, index, {Qt::DecorationRole});
+    return true;
+}
+
+bool GroupTreeModel::removeGroup(const QModelIndex& index) {
+    auto* g = group(index);
+    if (!g || g == root_)
+        return false;
+    beginRemoveRows(indexOf(g->parent()), g->indexInParent(), g->indexInParent());
+    const bool removed = g->parent()->removeGroup(g);
+    endRemoveRows();
+    return removed;
+}
+
 Qt::ItemFlags GroupTreeModel::flags(const QModelIndex& index) const {
     if (!index.isValid())
         return Qt::ItemIsDropEnabled;  // empty area accepts drops (into Root)
     Qt::ItemFlags f = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDropEnabled;
     if (group(index) != root_)
-        f |= Qt::ItemIsDragEnabled;
+        f |= Qt::ItemIsDragEnabled | Qt::ItemIsEditable;
     return f;
 }
 

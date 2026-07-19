@@ -7,7 +7,8 @@ namespace nightlock {
 class Group;
 }
 
-// Read-only tree of vault directories (entries are not exposed here).
+// Tree of vault directories (entries are not exposed here). Folder
+// names are editable in place; sub-folders can be added and removed.
 class GroupTreeModel : public QAbstractItemModel {
     Q_OBJECT
 public:
@@ -18,6 +19,15 @@ public:
     int rowCount(const QModelIndex& parent = {}) const override;
     int columnCount(const QModelIndex& parent = {}) const override;
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
+    bool setData(const QModelIndex& index, const QVariant& value,
+                 int role = Qt::EditRole) override;
+
+    // Appends a sub-folder under `parent` and returns its index.
+    QModelIndex addGroup(const QModelIndex& parent, const QString& name);
+    // Sets the folder's icon (resource or file path; empty = default).
+    bool setGroupIcon(const QModelIndex& index, const QString& path);
+    // Deletes the folder (with its subtree); the root cannot be removed.
+    bool removeGroup(const QModelIndex& index);
 
     Qt::ItemFlags flags(const QModelIndex& index) const override;
     Qt::DropActions supportedDropActions() const override;

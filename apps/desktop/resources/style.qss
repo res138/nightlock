@@ -3,7 +3,7 @@ QMainWindow {
 }
 
 QSplitter::handle {
-    background: #D9D9D9;
+    background: #EAEAEA;
 }
 
 QTreeView#groupTree {
@@ -13,7 +13,9 @@ QTreeView#groupTree {
     font-family: Georgia;
     font-size: 17px;
     font-weight: bold;
-    padding-top: 6px;
+    /* clears the traffic-light buttons that float over this pane now
+       that the title bar strip is gone */
+    padding-top: 28px;
     show-decoration-selected: 1;
 }
 QTreeView#groupTree::item {
@@ -44,7 +46,7 @@ QListView#entryList {
 QFrame#listHeader {
     background: #FFFFFF;
     border: none;
-    border-bottom: 1px solid #E4E4E4;
+    border-bottom: 1px solid #F0F0F0;
 }
 QLabel#itemsCount {
     font-size: 13px;
@@ -82,13 +84,13 @@ QLabel#metaHeader {
 }
 
 QFrame#card {
-    background: #FBF9FB;
-    border: 1px solid #E3E3E3;
+    background: #FDFCFD;
+    border: 1px solid #EFEFEF;
     border-radius: 9px;
 }
 QFrame#fieldRow {
     border: none;
-    border-bottom: 1px solid #EDEDED;
+    border-bottom: 1px solid #F5F5F5;
     background: transparent;
 }
 QFrame#fieldRow[lastVisible="true"] {
@@ -106,4 +108,184 @@ QLabel#fieldLabel {
 QLabel#fieldValue {
     font-size: 12px;
     color: #3C3C3C;
+}
+
+QTreeView#groupTree QLineEdit {
+    background: #FFFFFF;
+    border: 1px solid #000000;
+    border-radius: 4px;
+    padding-left: 8px;
+    color: #111111;
+    selection-background-color: #000000;
+    selection-color: #FFFFFF;
+}
+
+QDialog#entryEditDialog {
+    background: #FFFFFF;
+}
+QLabel#dialogFieldLabel {
+    font-size: 12px;
+    font-weight: 600;
+    color: #141414;
+}
+QDialog#entryEditDialog QLineEdit,
+QDialog#entryEditDialog QPlainTextEdit {
+    background: #FBF9FB;
+    border: 1px solid #EFEFEF;
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 13px;
+    color: #111111;
+    selection-background-color: #000000;
+    selection-color: #FFFFFF;
+}
+QDialog#entryEditDialog QLineEdit:focus,
+QDialog#entryEditDialog QPlainTextEdit:focus {
+    background: #FFFFFF;
+    border: 1px solid #000000;
+}
+QToolButton#iconPickerButton {
+    background: #FBF9FB;
+    border: 1px solid #EFEFEF;
+    border-radius: 10px;
+}
+QToolButton#iconPickerButton:hover {
+    background: #F1EFF1;
+}
+QToolButton#iconPickerButton:checked {
+    background: #FFFFFF;
+    border: 1px solid #000000;
+}
+QPushButton#primaryButton {
+    background: #000000;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 22px;
+    font-size: 13px;
+    font-weight: 600;
+}
+QPushButton#primaryButton:hover {
+    background: #262626;
+}
+QPushButton#primaryButton:disabled {
+    background: #BDBDBD;
+}
+QPushButton#ghostButton {
+    background: #FFFFFF;
+    color: #111111;
+    border: 1px solid #EAEAEA;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 600;
+}
+QPushButton#ghostButton:hover {
+    background: #F5F5F5;
+}
+
+QToolButton#iconPickerAdd {
+    background: #FFFFFF;
+    border: 1px solid #DFDFDF;
+    border-radius: 10px;
+    font-size: 20px;
+    color: #6E6E6E;
+}
+QToolButton#iconPickerAdd:hover {
+    background: #F5F5F5;
+    color: #111111;
+}
+
+QListView#iconGallery {
+    background: transparent;
+    border: none;
+    outline: none;
+}
+QListView#iconGallery::item {
+    border-radius: 9px;
+}
+QListView#iconGallery::item:hover {
+    background: rgba(0, 0, 0, 0.07);
+}
+
+QScrollArea[floatingWindow="true"] {
+    background: transparent;
+}
+QScrollArea[floatingWindow="true"] > QWidget > QWidget {
+    background: transparent;
+}
+
+QScrollBar:vertical {
+    background: transparent;
+    width: 12px;
+    margin: 3px 3px 3px 3px;
+}
+QScrollBar:horizontal {
+    background: transparent;
+    height: 12px;
+    margin: 3px 3px 3px 3px;
+}
+QScrollBar::handle:vertical {
+    background: #CFCFCF;
+    border-radius: 3px;
+    min-height: 36px;
+}
+QScrollBar::handle:horizontal {
+    background: #CFCFCF;
+    border-radius: 3px;
+    min-width: 36px;
+}
+QScrollBar::handle:vertical:hover,
+QScrollBar::handle:horizontal:hover {
+    background: #A9A9A9;
+}
+QScrollBar::add-line, QScrollBar::sub-line {
+    width: 0;
+    height: 0;
+    background: transparent;
+    border: none;
+}
+QScrollBar::add-page, QScrollBar::sub-page {
+    background: transparent;
+}
+
+QTreeView#groupTree QScrollBar::handle:vertical,
+QTreeView#groupTree QScrollBar::handle:horizontal,
+QListView#entryList QScrollBar::handle:vertical,
+QListView#entryList QScrollBar::handle:horizontal {
+    background: transparent;
+}
+QTreeView#groupTree QScrollBar[scrolling="true"]::handle:vertical,
+QTreeView#groupTree QScrollBar[scrolling="true"]::handle:horizontal,
+QListView#entryList QScrollBar[scrolling="true"]::handle:vertical,
+QListView#entryList QScrollBar[scrolling="true"]::handle:horizontal {
+    background: #CFCFCF;
+}
+QTreeView#groupTree QScrollBar::handle:vertical:hover,
+QTreeView#groupTree QScrollBar::handle:horizontal:hover,
+QListView#entryList QScrollBar::handle:vertical:hover,
+QListView#entryList QScrollBar::handle:horizontal:hover {
+    background: #A9A9A9;
+}
+
+QListView#iconGallery QScrollBar::handle:vertical,
+QListView#iconGallery QScrollBar::handle:horizontal {
+    background: transparent;
+}
+QListView#iconGallery QScrollBar[scrolling="true"]::handle:vertical,
+QListView#iconGallery QScrollBar[scrolling="true"]::handle:horizontal {
+    background: #CFCFCF;
+}
+QListView#iconGallery QScrollBar::handle:vertical:hover,
+QListView#iconGallery QScrollBar::handle:horizontal:hover {
+    background: #A9A9A9;
+}
+
+QListView#iconGallery QScrollBar:vertical {
+    width: 8px;
+    margin: 0;
+}
+QListView#iconGallery QScrollBar::handle:vertical {
+    border-radius: 4px;
+    min-height: 36px;
 }

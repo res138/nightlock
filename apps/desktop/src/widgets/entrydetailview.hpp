@@ -12,12 +12,39 @@ struct Entry;
 }
 
 // Right panel: icon, title, note and the field/meta cards of one entry.
+// A six-dot grip at the top-center lets the panel be dragged out of the
+// main window into an independent floating window and dropped back.
 class EntryDetailView : public QScrollArea {
     Q_OBJECT
 public:
     explicit EntryDetailView(QWidget* parent = nullptr);
 
     void setEntry(const nightlock::Entry* entry);
+
+    // Called by the owner right after reparenting the view into a
+    // floating window mid-drag, so the drag continues seamlessly.
+    void beginFloatingDrag(const QPoint& globalPos);
+
+    // Toggles the floating-window look: transparent base with a
+    // rounded panel and the traffic-light controls in the corner.
+    void setFloatingMode(bool floating);
+
+    // Grip callbacks (used by the internal drag handle).
+    void gripPressed(const QPoint& globalPos);
+    void gripDragged(const QPoint& globalPos);
+    void gripReleased(const QPoint& globalPos);
+
+signals:
+    // The grip was dragged far enough while docked: float me.
+    void detachRequested(const QPoint& globalPos);
+    // The floating window was dropped at globalPos: dock me back if
+    // this lands on the main window.
+    void dropped(const QPoint& globalPos);
+    // The red traffic-light button of the floating window was clicked.
+    void dockRequested();
+
+protected:
+    void resizeEvent(QResizeEvent* event) override;
 
 private:
     struct FieldRow {
@@ -29,6 +56,11 @@ private:
     void refreshLastVisibleRow();
 
     QWidget* content_;
+    QWidget* grip_;
+    QWidget* floatingControls_;
+    QWidget* floatingBackdrop_;
+    QPoint pressGlobal_;
+    QPoint grabOffset_;
     QLabel* iconLabel_;
     QLabel* titleLabel_;
     QLabel* noteLabel_;

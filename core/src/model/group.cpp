@@ -25,6 +25,39 @@ Entry& Group::addEntry(Entry entry) {
     return *entries_.back();
 }
 
+bool Group::removeGroup(Group* child) {
+    const auto it = std::find_if(groups_.begin(), groups_.end(),
+                                 [child](const auto& p) { return p.get() == child; });
+    if (it == groups_.end())
+        return false;
+    groups_.erase(it);
+    return true;
+}
+
+bool Group::removeEntry(Entry* entry) {
+    const auto it = std::find_if(entries_.begin(), entries_.end(),
+                                 [entry](const auto& p) { return p.get() == entry; });
+    if (it == entries_.end())
+        return false;
+    entries_.erase(it);
+    return true;
+}
+
+bool Group::moveEntry(int from, int to) {
+    const int count = static_cast<int>(entries_.size());
+    if (from < 0 || from >= count)
+        return false;
+    if (to < 0 || to > count)
+        to = count;
+    if (to == from || to == from + 1)
+        return false;
+
+    std::unique_ptr<Entry> holder = std::move(entries_[from]);
+    entries_.erase(entries_.begin() + from);
+    entries_.insert(entries_.begin() + (to > from ? to - 1 : to), std::move(holder));
+    return true;
+}
+
 const std::vector<std::unique_ptr<Group>>& Group::groups() const { return groups_; }
 const std::vector<std::unique_ptr<Entry>>& Group::entries() const { return entries_; }
 

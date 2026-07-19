@@ -2,7 +2,10 @@
 
 #include <QDateTime>
 #include <QFrame>
+#include <QIcon>
 #include <QLabel>
+#include <QMouseEvent>
+#include <QPainter>
 #include <QStyle>
 #include <QVBoxLayout>
 
@@ -14,11 +17,118 @@
 
 namespace {
 
+constexpr int kIconSize = 58;
+constexpr int kDetachThreshold = 12;  // px of grip travel before undocking
+constexpr int kGripHeight = 22;
+constexpr int kGripGap = 12;          // equal gap above and below the grip
+constexpr qreal kFloatingRadius = 10;  // matches the main window corners
+
 QString formatDate(std::chrono::system_clock::time_point tp) {
     const auto secs =
         std::chrono::duration_cast<std::chrono::seconds>(tp.time_since_epoch()).count();
     return QDateTime::fromSecsSinceEpoch(secs).toString(QStringLiteral("dd.MM.yyyy"));
 }
+
+// The six-dot grip (two rows of three) that tears the panel off.
+class DragHandle : public QWidget {
+public:
+    explicit DragHandle(EntryDetailView* view) : QWidget(view), view_(view) {
+        setFixedSize(46, kGripHeight);
+        setCursor(Qt::OpenHandCursor);
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(0xA6, 0xA6, 0xA6));
+        constexpr qreal kDotRadius = 2.6;
+        constexpr int kStep = 12;
+        const qreal left = width() / 2.0 - kStep;
+        const qreal top = height() / 2.0 - kStep / 2.0;
+        for (int row = 0; row < 2; ++row)
+            for (int column = 0; column < 3; ++column)
+                painter.drawEllipse(QPointF(left + column * kStep, top + row * kStep),
+                                    kDotRadius, kDotRadius);
+    }
+
+    void mousePressEvent(QMouseEvent* event) override {
+        if (event->button() != Qt::LeftButton)
+            return;
+        pressed_ = true;
+        setCursor(Qt::ClosedHandCursor);
+        view_->gripPressed(event->globalPosition().toPoint());
+    }
+
+    void mouseMoveEvent(QMouseEvent* event) override {
+        if (pressed_)
+            view_->gripDragged(event->globalPosition().toPoint());
+    }
+
+    void mouseReleaseEvent(QMouseEvent* event) override {
+        if (!pressed_)
+            return;
+        pressed_ = false;
+        setCursor(Qt::OpenHandCursor);
+        view_->gripReleased(event->globalPosition().toPoint());
+    }
+
+private:
+    EntryDetailView* view_;
+    bool pressed_ = false;
+};
+
+// Bottom-most layer of the floating window: the rounded white panel
+// (the scroll area itself cannot paint outside its viewport).
+class FloatingBackdrop : public QWidget {
+public:
+    using QWidget::QWidget;
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(QColor(0xEA, 0xEA, 0xEA));
+        painter.setBrush(Qt::white);
+        painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5),
+                                kFloatingRadius, kFloatingRadius);
+    }
+};
+
+// Traffic lights of the floating window: red docks the panel back into
+// the main window, yellow and green are decorative for now.
+class FloatingControls : public QWidget {
+public:
+    explicit FloatingControls(EntryDetailView* view) : QWidget(view), view_(view) {
+        setFixedSize(3 * kDot + 2 * kGap, kDot);
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(Qt::NoPen);
+        const QColor colors[] = {QColor(0xFF, 0x5F, 0x57), QColor(0xFE, 0xBC, 0x2E),
+                                 QColor(0x28, 0xC8, 0x40)};
+        for (int i = 0; i < 3; ++i) {
+            painter.setBrush(colors[i]);
+            painter.drawEllipse(QRectF(i * (kDot + kGap), 0, kDot, kDot));
+        }
+    }
+
+    void mousePressEvent(QMouseEvent* event) override {
+        if (event->button() != Qt::LeftButton)
+            return;
+        if (event->position().x() < kDot)  // the red one
+            emit view_->dockRequested();
+    }
+
+private:
+    static constexpr int kDot = 12;
+    static constexpr int kGap = 8;
+    EntryDetailView* view_;
+};
 
 }  // namespace
 
@@ -27,13 +137,17 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
 
     content_ = new QWidget;
     auto* layout = new QVBoxLayout(content_);
-    layout->setContentsMargins(30, 28, 30, 28);
+    // Top room for the grip strip: the same gap above and below it.
+    layout->setContentsMargins(30, kGripGap * 2 + kGripHeight, 30, 28);
     layout->setSpacing(0);
 
     iconLabel_ = new QLabel;
-    iconLabel_->setAlignment(Qt::AlignHCenter);
+    iconLabel_->setAlignment(Qt::AlignCenter);
+    // Multi-size icons may resolve below 58px (e.g. 48px .ico packs);
+    // a fixed height keeps the header from shifting.
+    iconLabel_->setFixedHeight(kIconSize);
     layout->addWidget(iconLabel_);
-    layout->addSpacing(10);
+    layout->addSpacing(kGripGap);  // same air as between the grip and the icon
 
     titleLabel_ = new QLabel;
     titleLabel_->setObjectName(QStringLiteral("detailTitle"));
@@ -81,7 +195,66 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     layout->addStretch(1);
 
     setWidget(content_);
+
+    // Overlay child of the scroll area itself (not the content), so it
+    // stays put while scrolling and remains visible with no entry.
+    grip_ = new DragHandle(this);
+    grip_->raise();
+
+    floatingControls_ = new FloatingControls(this);
+    floatingControls_->move(12, 12);
+    floatingControls_->raise();
+    floatingControls_->hide();
+
+    floatingBackdrop_ = new FloatingBackdrop(this);
+    floatingBackdrop_->lower();
+    floatingBackdrop_->hide();
+
     setEntry(nullptr);
+}
+
+void EntryDetailView::resizeEvent(QResizeEvent* event) {
+    QScrollArea::resizeEvent(event);
+    grip_->move((width() - grip_->width()) / 2, kGripGap);
+    floatingBackdrop_->setGeometry(rect());
+}
+
+void EntryDetailView::setFloatingMode(bool floating) {
+    setAttribute(Qt::WA_TranslucentBackground, floating);
+    setProperty("floatingWindow", floating);
+    floatingControls_->setVisible(floating);
+    floatingBackdrop_->setGeometry(rect());
+    floatingBackdrop_->setVisible(floating);
+    floatingBackdrop_->lower();
+    // Re-evaluate the [floatingWindow] stylesheet selectors.
+    style()->unpolish(this);
+    style()->polish(this);
+    content_->style()->unpolish(content_);
+    content_->style()->polish(content_);
+}
+
+void EntryDetailView::gripPressed(const QPoint& globalPos) {
+    pressGlobal_ = globalPos;
+    if (isWindow())
+        grabOffset_ = globalPos - pos();
+}
+
+void EntryDetailView::gripDragged(const QPoint& globalPos) {
+    if (isWindow()) {
+        move(globalPos - grabOffset_);
+        return;
+    }
+    if ((globalPos - pressGlobal_).manhattanLength() > kDetachThreshold)
+        emit detachRequested(globalPos);
+}
+
+void EntryDetailView::gripReleased(const QPoint& globalPos) {
+    if (isWindow())
+        emit dropped(globalPos);
+}
+
+void EntryDetailView::beginFloatingDrag(const QPoint& globalPos) {
+    grabOffset_ = globalPos - pos();
 }
 
 void EntryDetailView::setEntry(const nightlock::Entry* entry) {
@@ -89,14 +262,19 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     if (!entry)
         return;
 
-    const QString iconPath = entry->icon.empty() ? QStringLiteral(":/icons/keys.png")
+    const QString iconPath = entry->icon.empty() ? QStringLiteral(":/icons/entry.png")
                                                  : QString::fromStdString(entry->icon);
-    iconLabel_->setPixmap(QPixmap(iconPath).scaledToHeight(58, Qt::SmoothTransformation));
+    // Select the variant through QIcon, exactly like the entry list
+    // does: pack .ico files hold several sizes and color depths, and
+    // QPixmap would load only the first sub-image — often a different
+    // rendition than the one the list shows.
+    iconLabel_->setPixmap(QIcon(iconPath).pixmap(QSize(kIconSize, kIconSize),
+                                                 iconLabel_->devicePixelRatioF()));
 
     titleLabel_->setText(QString::fromStdString(entry->name));
 
     noteLabel_->setVisible(!entry->note.empty());
-    noteLabel_->setText(QStringLiteral("📙 ") + QString::fromStdString(entry->note));
+    noteLabel_->setText(QString::fromStdString(entry->note));
 
     loginRow_.value->setText(QString::fromStdString(entry->login));
     passwordRow_.value->setText(QString(19, QChar('*')));

@@ -17,7 +17,7 @@ void EntryListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
     const bool selected = option.state.testFlag(QStyle::State_Selected);
 
     painter->fillRect(rect, Qt::white);
-    painter->setPen(QColor(0xE4, 0xE4, 0xE4));
+    painter->setPen(QColor(0xF0, 0xF0, 0xF0));
     painter->drawLine(rect.bottomLeft(), rect.bottomRight());
 
     const QRect content = rect.adjusted(10, 4, -10, -6);

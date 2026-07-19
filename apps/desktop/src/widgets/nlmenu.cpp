@@ -8,10 +8,14 @@
 #include <QStyleOptionMenuItem>
 #include <QVariantAnimation>
 
+#include "frostedpanel.hpp"
+
 namespace {
 
-constexpr int kShadow = 12;      // translucent margin reserved for the shadow
-constexpr int kRadius = 10;
+using frosted::kRadius;
+using frosted::kShadow;
+using frosted::panelRect;
+
 constexpr int kItemHeight = 30;
 constexpr int kPadLeft = 12;
 constexpr int kPadRight = 12;
@@ -22,18 +26,20 @@ constexpr int kBandHeight = 5;
 constexpr int kMinItemWidth = 172;
 
 constexpr int kRevealMs = 130;
-constexpr qreal kVeilOpacity = 0.85;  // solid color share over the blurred backdrop
+
+// Hover highlight: a rounded pill inset by the same amount on every
+// side. The menu has no extra vertical padding (PM_MenuVMargin is 0),
+// so the gap stays identical against the panel edges, the separator
+// bands and the sides.
+constexpr int kHoverInset = 4;
+constexpr qreal kHoverRadius = 6.5;
 
 const QColor kTextColor(0x1F, 0x1F, 0x1F);
 const QColor kDangerColor(0xFF, 0x3B, 0x30);
-const QColor kHoverColor(0, 0, 0, 10);
+const QColor kHoverColor(0, 0, 0, 14);
 const QColor kHairlineColor(0, 0, 0, 18);
 const QColor kBandColor(0, 0, 0, 14);
 const QColor kChevronColor(0x8A, 0x8A, 0x8E);
-
-QRect panelRect(const QWidget* widget) {
-    return widget->rect().marginsRemoved(QMargins(kShadow, kShadow, kShadow, kShadow));
-}
 
 class NlMenuStyle : public QProxyStyle {
 public:
@@ -42,9 +48,8 @@ public:
         switch (metric) {
         case PM_MenuPanelWidth:
         case PM_MenuHMargin:
-            return 0;
         case PM_MenuVMargin:
-            return 4;
+            return 0;
         default:
             return QProxyStyle::pixelMetric(metric, option, widget);
         }
@@ -106,10 +111,9 @@ public:
         const bool danger = action && action->property("danger").toBool();
         const bool enabled = item->state & State_Enabled;
 
-        if ((item->state & State_Selected) && enabled)
-            painter->fillRect(rect, kHoverColor);
-
-        // hairline above the item, unless the item opens a group
+        // hairline above the item, unless the item opens a group. Kept
+        // visible under hover too: the pill is inset by kHoverInset, so
+        // every hairline/band/edge sits at the same distance from it.
         if (action) {
             QAction* previous = nullptr;
             for (QAction* a : menu->actions()) {
@@ -125,6 +129,14 @@ public:
         }
 
         painter->setRenderHint(QPainter::Antialiasing);
+
+        if ((item->state & State_Selected) && enabled) {
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(kHoverColor);
+            painter->drawRoundedRect(
+                QRectF(rect).adjusted(kHoverInset, kHoverInset, -kHoverInset, -kHoverInset),
+                kHoverRadius, kHoverRadius);
+        }
 
         const QRect panel = panelRect(widget);
         int x = panel.left() + kPadLeft;
@@ -186,9 +198,8 @@ NlMenu::NlMenu(QWidget* parent) : QMenu(parent) {
     setAttribute(Qt::WA_TranslucentBackground);
     setStyle(sharedStyle());
     setContentsMargins(kShadow, kShadow, kShadow, kShadow);
-    // Same face as the middle-pane items counter ("9 items").
     QFont f = font();
-    f.setPixelSize(13);
+    f.setPixelSize(11);  // 13px of the middle-pane counter, scaled down 1.2×
     f.setWeight(QFont::DemiBold);
     setFont(f);
 }
@@ -206,31 +217,7 @@ QRect NlMenu::currentPanelRect() const {
 }
 
 void NlMenu::paintEvent(QPaintEvent* event) {
-    {
-        QPainter painter(this);
-        painter.setRenderHint(QPainter::Antialiasing);
-        painter.setPen(Qt::NoPen);
-        const QRectF panel = currentPanelRect();
-
-        for (int i = kShadow; i >= 1; --i) {
-            const qreal t = 1.0 - static_cast<qreal>(i) / kShadow;
-            const qreal alpha = (1 + 4 * t * t) * reveal_;
-            painter.setBrush(QColor(0, 0, 0, static_cast<int>(alpha)));
-            painter.drawRoundedRect(panel.adjusted(-i, -i + 2, i, i + 2),
-                                    kRadius + i * 0.6, kRadius + i * 0.6);
-        }
-
-        // Frosted glass: blurred backdrop showing through a white veil.
-        QPainterPath path;
-        path.addRoundedRect(panel, kRadius, kRadius);
-        painter.save();
-        painter.setClipPath(path);
-        painter.fillRect(panel, Qt::white);
-        if (!backdrop_.isNull())
-            painter.drawPixmap(panel.topLeft() + backdropOffset_, backdrop_);
-        painter.fillRect(panel, QColor(255, 255, 255, qRound(kVeilOpacity * 255)));
-        painter.restore();
-    }
+    frosted::paintPanel(this, currentPanelRect(), reveal_, backdrop_, backdropOffset_);
     QMenu::paintEvent(event);
 }
 
@@ -241,36 +228,7 @@ void NlMenu::showEvent(QShowEvent* event) {
 }
 
 void NlMenu::captureBackdrop() {
-    backdrop_ = QPixmap();
-    backdropOffset_ = QPoint();
-
-    // Walk up to the first non-popup window (submenus are parented to
-    // their parent menu, which is itself a popup).
-    QWidget* source = parentWidget();
-    while (source && (!source->isWindow() || source->windowType() == Qt::Popup))
-        source = source->parentWidget();
-    if (!source)
-        return;
-
-    const QRect panel = panelRect(this);
-    const QRect inSource(source->mapFromGlobal(mapToGlobal(panel.topLeft())), panel.size());
-    const QRect clipped = inSource.intersected(source->rect());
-    if (clipped.isEmpty())
-        return;
-
-    const QPixmap grabbed = source->grab(clipped);
-    if (grabbed.isNull())
-        return;
-
-    // Cheap blur: heavy downscale, then smooth upscale.
-    const QSize coarse(qMax(1, grabbed.width() / 12), qMax(1, grabbed.height() / 12));
-    const QImage blurred = grabbed.toImage()
-                               .scaled(coarse, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
-                               .scaled(grabbed.size(), Qt::IgnoreAspectRatio,
-                                       Qt::SmoothTransformation);
-    backdrop_ = QPixmap::fromImage(blurred);
-    backdrop_.setDevicePixelRatio(grabbed.devicePixelRatio());
-    backdropOffset_ = clipped.topLeft() - inSource.topLeft();
+    backdrop_ = frosted::captureBackdrop(this, &backdropOffset_);
 }
 
 void NlMenu::startRevealAnimation() {
