@@ -62,6 +62,14 @@ int main(int argc, char* argv[]) {
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_ENTRY_ICON"))
         window.debugSetEntryIcon(qEnvironmentVariable("NIGHTLOCK_TEST_ENTRY_ICON"));
 
+    // Debug hook: NIGHTLOCK_TEST_SPOILER=reveal|copied drives the
+    // password spoiler states.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_SPOILER")) {
+        const QString state = qEnvironmentVariable("NIGHTLOCK_TEST_SPOILER");
+        QTimer::singleShot(500, &window,
+                           [&window, state] { window.debugSpoiler(state); });
+    }
+
     // Debug hook: NIGHTLOCK_TEST_FOLDERS=1 exercises folder create,
     // rename and delete through the tree model.
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_FOLDERS"))

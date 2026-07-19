@@ -467,6 +467,10 @@ void MainWindow::deleteEntry(nightlock::Entry* entry) {
     onGroupChanged(tree_->currentIndex());  // refreshes the counter
 }
 
+void MainWindow::debugSpoiler(const QString& state) {
+    detail_->debugSpoiler(state);
+}
+
 void MainWindow::debugSetEntryIcon(const QString& path) {
     auto* entry = entryModel_->entry(list_->currentIndex());
     if (!entry)

@@ -43,6 +43,9 @@ public:
     // Debug hook for NIGHTLOCK_TEST_ENTRY_ICON: assigns an icon path to
     // the selected entry (list + detail refresh included).
     void debugSetEntryIcon(const QString& path);
+    // Debug hook for NIGHTLOCK_TEST_SPOILER: drives the password
+    // spoiler ("reveal" or "copied").
+    void debugSpoiler(const QString& state);
     // Debug hook for NIGHTLOCK_SCREENSHOT_DETACHED: floats the detail
     // view as it would after a grip drag; returns it for grabbing.
     QWidget* debugDetachDetail();

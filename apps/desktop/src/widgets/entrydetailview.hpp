@@ -6,6 +6,7 @@ class QFrame;
 class QHBoxLayout;
 class QLabel;
 class QVBoxLayout;
+class SpoilerLabel;
 
 namespace nightlock {
 struct Entry;
@@ -33,6 +34,9 @@ public:
     void gripPressed(const QPoint& globalPos);
     void gripDragged(const QPoint& globalPos);
     void gripReleased(const QPoint& globalPos);
+
+    // Debug hook for NIGHTLOCK_TEST_SPOILER: "reveal" or "copied".
+    void debugSpoiler(const QString& state);
 
 signals:
     // The grip was dragged far enough while docked: float me.
@@ -66,6 +70,7 @@ private:
     QLabel* noteLabel_;
     FieldRow loginRow_;
     FieldRow passwordRow_;
+    SpoilerLabel* passwordSpoiler_;
     FieldRow urlRow_;
     FieldRow codeRow_;
     FieldRow createdRow_;

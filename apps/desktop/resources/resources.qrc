@@ -14,5 +14,6 @@
         <file>icons/menu/file-plus.svg</file>
         <file>icons/menu/folder-plus.svg</file>
         <file>icons/menu/image.svg</file>
+        <file>icons/menu/copy.svg</file>
     </qresource>
 </RCC>

@@ -13,6 +13,7 @@
 
 #include <nightlock/entry.hpp>
 
+#include "spoilerlabel.hpp"
 #include "totpring.hpp"
 
 namespace {
@@ -169,6 +170,11 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     fieldsLayout->setSpacing(0);
     loginRow_ = makeRow(fieldsLayout, tr("Login"));
     passwordRow_ = makeRow(fieldsLayout, tr("Password"));
+    // The password hides behind a Telegram-style particle spoiler
+    // instead of asterisks.
+    passwordRow_.value->hide();
+    passwordSpoiler_ = new SpoilerLabel;
+    passwordRow_.layout->addWidget(passwordSpoiler_);
     urlRow_ = makeRow(fieldsLayout, tr("URL"));
     urlRow_.value->setTextFormat(Qt::RichText);
     urlRow_.value->setTextInteractionFlags(Qt::TextBrowserInteraction);
@@ -257,6 +263,12 @@ void EntryDetailView::beginFloatingDrag(const QPoint& globalPos) {
     grabOffset_ = globalPos - pos();
 }
 
+void EntryDetailView::debugSpoiler(const QString& state) {
+    passwordSpoiler_->reveal();
+    if (state == QLatin1String("copied"))
+        passwordSpoiler_->copyAndFlash();
+}
+
 void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     content_->setVisible(entry != nullptr);
     if (!entry)
@@ -277,7 +289,7 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     noteLabel_->setText(QString::fromStdString(entry->note));
 
     loginRow_.value->setText(QString::fromStdString(entry->login));
-    passwordRow_.value->setText(QString(19, QChar('*')));
+    passwordSpoiler_->setSecret(QString::fromStdString(entry->password));
 
     urlRow_.frame->setVisible(!entry->url.empty());
     const QString url = QString::fromStdString(entry->url);
