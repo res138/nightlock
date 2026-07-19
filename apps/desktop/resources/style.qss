@@ -267,3 +267,16 @@ QListView#entryList QScrollBar::handle:vertical:hover,
 QListView#entryList QScrollBar::handle:horizontal:hover {
     background: #A9A9A9;
 }
+
+QListView#iconGallery QScrollBar::handle:vertical,
+QListView#iconGallery QScrollBar::handle:horizontal {
+    background: transparent;
+}
+QListView#iconGallery QScrollBar[scrolling="true"]::handle:vertical,
+QListView#iconGallery QScrollBar[scrolling="true"]::handle:horizontal {
+    background: #CFCFCF;
+}
+QListView#iconGallery QScrollBar::handle:vertical:hover,
+QListView#iconGallery QScrollBar::handle:horizontal:hover {
+    background: #A9A9A9;
+}

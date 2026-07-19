@@ -15,6 +15,7 @@
 
 #include "standardicons.hpp"
 #include "frostedpanel.hpp"
+#include "scrollbarfader.hpp"
 
 namespace {
 
@@ -115,26 +116,38 @@ IconGalleryPopup::IconGalleryPopup(QWidget* parent) : QWidget(parent) {
     view->viewport()->setAttribute(Qt::WA_TranslucentBackground);
     view->viewport()->setAutoFillBackground(false);
 
-    auto* layout = new QVBoxLayout(this);
-    const int margin = frosted::kShadow + kPadding;
-    layout->setContentsMargins(margin, margin, margin, margin);
-    layout->addWidget(view);
-
     // The viewport must hold kColumns full cells AFTER the scrollbar
     // takes its slice, with slack for the icon-flow wrap math —
     // otherwise a row wraps one column early, leaving a dead white
-    // strip on the right.
+    // strip on the right. The left padding mirrors everything sitting
+    // right of the grid (slack + scrollbar + edge padding), so both
+    // flanks read identically.
     const int scrollBarWidth = view->verticalScrollBar()->sizeHint().width();
-    setFixedSize(kColumns * kCell + scrollBarWidth + 16 + 2 * margin,
-                 kViewHeight + 2 * margin);
+    constexpr int kWrapSlack = 16;
+    constexpr int kRightPad = 2;
+    const int leftPad = kWrapSlack + scrollBarWidth + kRightPad;
+
+    auto* layout = new QVBoxLayout(this);
+    const int vMargin = frosted::kShadow + kPadding;
+    layout->setContentsMargins(frosted::kShadow + leftPad, vMargin,
+                               frosted::kShadow + kRightPad, vMargin);
+    layout->addWidget(view);
+
+    setFixedSize(2 * frosted::kShadow + leftPad + kColumns * kCell + kWrapSlack +
+                     scrollBarWidth + kRightPad,
+                 kViewHeight + 2 * vMargin);
+
+    new ScrollBarFader(view);
 
     // Icons fade out under a gradient at both edges of the grid.
+    const int fadeX = frosted::kShadow + 2;
+    const int fadeWidth = width() - 2 * frosted::kShadow - 4;
     auto* topFade = new EdgeFade(true, this);
-    topFade->setGeometry(margin, margin, width() - 2 * margin, topFade->height());
+    topFade->setGeometry(fadeX, vMargin, fadeWidth, topFade->height());
     topFade->raise();
     auto* bottomFade = new EdgeFade(false, this);
-    bottomFade->setGeometry(margin, height() - margin - bottomFade->height(),
-                            width() - 2 * margin, bottomFade->height());
+    bottomFade->setGeometry(fadeX, height() - vMargin - bottomFade->height(), fadeWidth,
+                            bottomFade->height());
     bottomFade->raise();
 
     connect(view, &QListView::clicked, this, [this, model](const QModelIndex& index) {
