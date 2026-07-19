@@ -6,8 +6,6 @@
 
 #include <nightlock/group.hpp>
 
-#include "iconutils.hpp"
-
 namespace {
 
 constexpr char kGroupMime[] = "application/x-nightlock-group";
@@ -26,7 +24,7 @@ nightlock::Group* decodeGroup(const QMimeData* data) {
 GroupTreeModel::GroupTreeModel(nightlock::Group* root, QObject* parent)
     : QAbstractItemModel(parent),
       root_(root),
-      folderIcon_(iconutils::iconWithWhiteKnockedOut(QStringLiteral(":/icons/folder.jpg"))) {}
+      folderIcon_(QStringLiteral(":/icons/folder.png")) {}
 
 QModelIndex GroupTreeModel::index(int row, int column, const QModelIndex& parent) const {
     if (!hasIndex(row, column, parent))

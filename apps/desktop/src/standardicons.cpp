@@ -7,9 +7,9 @@ namespace standardicons {
 
 const QVector<StandardIcon>& entryIcons() {
     static const QVector<StandardIcon> icons = {
-        {QStringLiteral("keys"),
-         QCoreApplication::translate("standardicons", "Keys"),
-         QStringLiteral(":/icons/keys.png")},
+        {QStringLiteral("default"),
+         QCoreApplication::translate("standardicons", "Default"),
+         QStringLiteral(":/icons/entry.png")},
         {QStringLiteral("globe"),
          QCoreApplication::translate("standardicons", "Website"),
          QStringLiteral(":/icons/entry/globe.svg")},

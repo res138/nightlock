@@ -95,7 +95,7 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     if (!entry)
         return;
 
-    const QString iconPath = entry->icon.empty() ? QStringLiteral(":/icons/keys.png")
+    const QString iconPath = entry->icon.empty() ? QStringLiteral(":/icons/entry.png")
                                                  : QString::fromStdString(entry->icon);
     // Select the variant through QIcon, exactly like the entry list
     // does: pack .ico files hold several sizes and color depths, and

@@ -6,7 +6,6 @@ set(CMAKE_AUTORCC ON)
 qt_add_executable(nightlock-desktop
     src/main.cpp
     src/demovault.cpp
-    src/iconutils.cpp
     src/standardicons.cpp
     src/models/grouptreemodel.cpp
     src/models/entrylistmodel.cpp

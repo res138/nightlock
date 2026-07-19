@@ -3,7 +3,7 @@
 #include <nightlock/group.hpp>
 
 EntryListModel::EntryListModel(QObject* parent)
-    : QAbstractListModel(parent), defaultIcon_(QStringLiteral(":/icons/keys.png")) {}
+    : QAbstractListModel(parent), defaultIcon_(QStringLiteral(":/icons/entry.png")) {}
 
 void EntryListModel::setGroup(nightlock::Group* group) {
     beginResetModel();
