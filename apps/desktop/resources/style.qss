@@ -15,7 +15,7 @@ QTreeView#groupTree {
     font-weight: bold;
     /* clears the traffic-light buttons that float over this pane now
        that the title bar strip is gone */
-    padding-top: 40px;
+    padding-top: 28px;
     show-decoration-selected: 1;
 }
 QTreeView#groupTree::item {

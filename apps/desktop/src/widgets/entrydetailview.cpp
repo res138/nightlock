@@ -30,7 +30,7 @@ QString formatDate(std::chrono::system_clock::time_point tp) {
 class DragHandle : public QWidget {
 public:
     explicit DragHandle(EntryDetailView* view) : QWidget(view), view_(view) {
-        setFixedSize(30, 18);
+        setFixedSize(46, 22);
         setCursor(Qt::OpenHandCursor);
         setAttribute(Qt::WA_Hover);
     }
@@ -42,8 +42,8 @@ protected:
         painter.setPen(Qt::NoPen);
         painter.setBrush(underMouse() || pressed_ ? QColor(0x6E, 0x6E, 0x6E)
                                                   : QColor(0xA6, 0xA6, 0xA6));
-        constexpr qreal kDotRadius = 2.2;
-        constexpr int kStep = 9;
+        constexpr qreal kDotRadius = 2.6;
+        constexpr int kStep = 12;
         const qreal left = width() / 2.0 - kStep;
         const qreal top = height() / 2.0 - kStep / 2.0;
         for (int row = 0; row < 2; ++row)
@@ -85,7 +85,9 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
 
     content_ = new QWidget;
     auto* layout = new QVBoxLayout(content_);
-    layout->setContentsMargins(30, 28, 30, 28);
+    // Extra top room: the six-dot grip lives in the freed title-bar
+    // strip above the icon.
+    layout->setContentsMargins(30, 38, 30, 28);
     layout->setSpacing(0);
 
     iconLabel_ = new QLabel;
@@ -153,7 +155,7 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
 
 void EntryDetailView::resizeEvent(QResizeEvent* event) {
     QScrollArea::resizeEvent(event);
-    grip_->move((width() - grip_->width()) / 2, 6);
+    grip_->move((width() - grip_->width()) / 2, 4);
 }
 
 void EntryDetailView::gripPressed(const QPoint& globalPos) {

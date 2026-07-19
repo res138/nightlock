@@ -24,6 +24,14 @@ int main(int argc, char* argv[]) {
     auto vault = createDemoVault();
 
     MainWindow window(vault.get());
+    // Content extends into the title bar zone: the panes and their
+    // borders run from the very top edge of the window, with only the
+    // traffic-light buttons floating above the directory pane.
+    window.setWindowFlag(Qt::ExpandedClientAreaHint, true);
+    window.setWindowFlag(Qt::NoTitleBarBackgroundHint, true);
+    // Without this the layout still reserves the title-bar safe area,
+    // leaving a 28px white strip the pane borders never reach into.
+    window.setAttribute(Qt::WA_ContentsMarginsRespectsSafeArea, false);
     window.resize(1180, 720);
     window.show();
 #ifdef Q_OS_MACOS
