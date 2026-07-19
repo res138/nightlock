@@ -123,8 +123,8 @@ IconGalleryPopup::IconGalleryPopup(QWidget* parent) : QWidget(parent) {
     // right of the grid (slack + scrollbar + edge padding), so both
     // flanks read identically.
     const int scrollBarWidth = view->verticalScrollBar()->sizeHint().width();
-    constexpr int kWrapSlack = 16;
-    constexpr int kRightPad = 2;
+    constexpr int kWrapSlack = 4;
+    constexpr int kRightPad = 3;
     const int leftPad = kWrapSlack + scrollBarWidth + kRightPad;
 
     auto* layout = new QVBoxLayout(this);

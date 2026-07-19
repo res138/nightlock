@@ -43,36 +43,57 @@ void paintPanel(QWidget* widget, const QRectF& panel, qreal reveal,
 QPixmap captureBackdrop(QWidget* widget, QPoint* offsetOut) {
     *offsetOut = QPoint();
 
-    // Walk up to the first non-popup window (popups may be parented to
-    // other popups, e.g. submenus to their parent menu).
-    QWidget* source = widget->parentWidget();
-    while (source && (!source->isWindow() || source->windowType() == Qt::Popup))
-        source = source->parentWidget();
-    if (!source)
+    // The popup may overhang its nearest window (a gallery over the
+    // edit dialog, a menu at the window edge), so compose the grab
+    // from the whole chain of non-popup ancestor windows: the main
+    // window first, closer windows (e.g. the dialog) painted over it.
+    QList<QWidget*> sources;
+    for (QWidget* w = widget->parentWidget(); w;) {
+        QWidget* window = w->window();
+        if (!window)
+            break;
+        if (window->windowType() != Qt::Popup && !sources.contains(window))
+            sources.append(window);
+        w = window->parentWidget();
+    }
+    if (sources.isEmpty())
         return {};
 
     const QRect panel = panelRect(widget);
-    const QRect inSource(source->mapFromGlobal(widget->mapToGlobal(panel.topLeft())),
-                         panel.size());
-    const QRect clipped = inSource.intersected(source->rect());
-    // A partial grab would sit on the panel as a hard-edged patch (the
-    // popup sticks out of its window); a plain panel looks better.
-    if (clipped != inSource || clipped.isEmpty())
-        return {};
+    const QRect panelGlobal(widget->mapToGlobal(panel.topLeft()), panel.size());
+    const qreal dpr = widget->devicePixelRatioF();
 
-    const QPixmap grabbed = source->grab(clipped);
-    if (grabbed.isNull())
+    QPixmap canvas(panel.size() * dpr);
+    canvas.setDevicePixelRatio(dpr);
+    canvas.fill(Qt::white);
+    bool captured = false;
+    {
+        QPainter compose(&canvas);
+        for (auto it = sources.rbegin(); it != sources.rend(); ++it) {
+            QWidget* source = *it;
+            const QRect sourceGlobal(source->mapToGlobal(QPoint(0, 0)), source->size());
+            const QRect overlap = panelGlobal.intersected(sourceGlobal);
+            if (overlap.isEmpty())
+                continue;
+            const QPixmap grabbed =
+                source->grab(QRect(source->mapFromGlobal(overlap.topLeft()), overlap.size()));
+            if (grabbed.isNull())
+                continue;
+            compose.drawPixmap(overlap.topLeft() - panelGlobal.topLeft(), grabbed);
+            captured = true;
+        }
+    }
+    if (!captured)
         return {};
 
     // Cheap blur: heavy downscale, then smooth upscale.
-    const QSize coarse(qMax(1, grabbed.width() / 12), qMax(1, grabbed.height() / 12));
-    const QImage blurred = grabbed.toImage()
+    const QSize coarse(qMax(1, canvas.width() / 12), qMax(1, canvas.height() / 12));
+    const QImage blurred = canvas.toImage()
                                .scaled(coarse, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
-                               .scaled(grabbed.size(), Qt::IgnoreAspectRatio,
+                               .scaled(canvas.size(), Qt::IgnoreAspectRatio,
                                        Qt::SmoothTransformation);
     QPixmap result = QPixmap::fromImage(blurred);
-    result.setDevicePixelRatio(grabbed.devicePixelRatio());
-    *offsetOut = clipped.topLeft() - inSource.topLeft();
+    result.setDevicePixelRatio(dpr);
     return result;
 }
 

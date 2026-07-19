@@ -280,3 +280,12 @@ QListView#iconGallery QScrollBar::handle:vertical:hover,
 QListView#iconGallery QScrollBar::handle:horizontal:hover {
     background: #A9A9A9;
 }
+
+QListView#iconGallery QScrollBar:vertical {
+    width: 8px;
+    margin: 0;
+}
+QListView#iconGallery QScrollBar::handle:vertical {
+    border-radius: 4px;
+    min-height: 36px;
+}
