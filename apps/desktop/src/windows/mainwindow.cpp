@@ -12,6 +12,9 @@
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QScrollBar>
+#include <QStyle>
+#include <QTimer>
 #include <QWindow>
 #include <QSplitter>
 #include <QTimer>
@@ -58,6 +61,39 @@ protected:
         if (event->button() == Qt::LeftButton && window()->windowHandle())
             window()->windowHandle()->startSystemMove();
     }
+};
+
+// macOS-style transient scrollbars: the handle only shows while
+// scrolling (driven by the [scrolling] stylesheet property) and fades
+// away shortly after the wheel stops.
+class ScrollBarFader : public QObject {
+public:
+    explicit ScrollBarFader(QAbstractScrollArea* area) : QObject(area) {
+        timer_ = new QTimer(this);
+        timer_->setSingleShot(true);
+        timer_->setInterval(900);
+        const auto bars = {area->verticalScrollBar(), area->horizontalScrollBar()};
+        for (QScrollBar* bar : bars)
+            connect(bar, &QAbstractSlider::valueChanged, this, [this, area] {
+                setActive(area, true);
+                timer_->start();
+            });
+        connect(timer_, &QTimer::timeout, this, [this, area] { setActive(area, false); });
+    }
+
+private:
+    void setActive(QAbstractScrollArea* area, bool active) {
+        const auto bars = {area->verticalScrollBar(), area->horizontalScrollBar()};
+        for (QScrollBar* bar : bars) {
+            if (bar->property("scrolling").toBool() == active)
+                continue;
+            bar->setProperty("scrolling", active);
+            bar->style()->unpolish(bar);
+            bar->style()->polish(bar);
+        }
+    }
+
+    QTimer* timer_;
 };
 
 }  // namespace
@@ -123,6 +159,9 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     dragStrip_ = new WindowDragStrip(tree_);
     dragStrip_->setGeometry(0, 0, tree_->width(), 28);
     tree_->installEventFilter(this);
+
+    new ScrollBarFader(tree_);
+    new ScrollBarFader(list_);
 
     connect(tree_->selectionModel(), &QItemSelectionModel::currentChanged, this,
             [this](const QModelIndex& current, const QModelIndex&) { onGroupChanged(current); });

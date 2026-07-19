@@ -147,7 +147,7 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     // a fixed height keeps the header from shifting.
     iconLabel_->setFixedHeight(kIconSize);
     layout->addWidget(iconLabel_);
-    layout->addSpacing(10);
+    layout->addSpacing(kGripGap);  // same air as between the grip and the icon
 
     titleLabel_ = new QLabel;
     titleLabel_->setObjectName(QStringLiteral("detailTitle"));

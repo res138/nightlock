@@ -248,3 +248,22 @@ QScrollBar::add-line, QScrollBar::sub-line {
 QScrollBar::add-page, QScrollBar::sub-page {
     background: transparent;
 }
+
+QTreeView#groupTree QScrollBar::handle:vertical,
+QTreeView#groupTree QScrollBar::handle:horizontal,
+QListView#entryList QScrollBar::handle:vertical,
+QListView#entryList QScrollBar::handle:horizontal {
+    background: transparent;
+}
+QTreeView#groupTree QScrollBar[scrolling="true"]::handle:vertical,
+QTreeView#groupTree QScrollBar[scrolling="true"]::handle:horizontal,
+QListView#entryList QScrollBar[scrolling="true"]::handle:vertical,
+QListView#entryList QScrollBar[scrolling="true"]::handle:horizontal {
+    background: #CFCFCF;
+}
+QTreeView#groupTree QScrollBar::handle:vertical:hover,
+QTreeView#groupTree QScrollBar::handle:horizontal:hover,
+QListView#entryList QScrollBar::handle:vertical:hover,
+QListView#entryList QScrollBar::handle:horizontal:hover {
+    background: #A9A9A9;
+}

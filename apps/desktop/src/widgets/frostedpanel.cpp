@@ -55,7 +55,9 @@ QPixmap captureBackdrop(QWidget* widget, QPoint* offsetOut) {
     const QRect inSource(source->mapFromGlobal(widget->mapToGlobal(panel.topLeft())),
                          panel.size());
     const QRect clipped = inSource.intersected(source->rect());
-    if (clipped.isEmpty())
+    // A partial grab would sit on the panel as a hard-edged patch (the
+    // popup sticks out of its window); a plain panel looks better.
+    if (clipped != inSource || clipped.isEmpty())
         return {};
 
     const QPixmap grabbed = source->grab(clipped);

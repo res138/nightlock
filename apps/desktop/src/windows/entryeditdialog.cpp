@@ -17,11 +17,12 @@ EntryEditDialog::EntryEditDialog(Mode mode, QWidget* parent) : QDialog(parent) {
     setObjectName(QStringLiteral("entryEditDialog"));
     const QString title = mode == Mode::Add ? tr("New Entry") : tr("Edit Entry");
     setWindowTitle(title);
-    setFixedWidth(440);
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(28, 24, 28, 24);
     layout->setSpacing(14);
+    // The dialog cannot be resized: it always hugs its content.
+    layout->setSizeConstraint(QLayout::SetFixedSize);
 
     iconPicker_ = new IconPicker;
     connect(iconPicker_, &IconPicker::addIconRequested, this, [this] {
@@ -33,6 +34,7 @@ EntryEditDialog::EntryEditDialog(Mode mode, QWidget* parent) : QDialog(parent) {
     layout->addWidget(makeField(tr("Icon"), iconPicker_));
 
     nameEdit_ = new QLineEdit;
+    nameEdit_->setMinimumWidth(384);  // keeps the fixed dialog ~440px wide
     layout->addWidget(makeField(tr("Name"), nameEdit_, true));
 
     loginEdit_ = new QLineEdit;
