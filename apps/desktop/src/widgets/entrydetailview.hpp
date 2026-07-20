@@ -2,6 +2,7 @@
 
 #include <QScrollArea>
 
+class CopyLabel;
 class QFrame;
 class QHBoxLayout;
 class QLabel;
@@ -69,6 +70,7 @@ private:
     QLabel* titleLabel_;
     QLabel* noteLabel_;
     FieldRow loginRow_;
+    CopyLabel* loginCopy_;
     FieldRow passwordRow_;
     SpoilerLabel* passwordSpoiler_;
     FieldRow urlRow_;

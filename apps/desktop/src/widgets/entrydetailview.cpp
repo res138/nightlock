@@ -14,6 +14,7 @@
 
 #include <nightlock/entry.hpp>
 
+#include "copylabel.hpp"
 #include "spoilerlabel.hpp"
 #include "totpring.hpp"
 
@@ -170,6 +171,11 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     fieldsLayout->setContentsMargins(16, 2, 16, 2);
     fieldsLayout->setSpacing(0);
     loginRow_ = makeRow(fieldsLayout, tr("Login"));
+    // The login copies on click with the same "Copied" flash as the
+    // password (just without the spoiler).
+    loginRow_.value->hide();
+    loginCopy_ = new CopyLabel;
+    loginRow_.layout->addWidget(loginCopy_);
     passwordRow_ = makeRow(fieldsLayout, tr("Password"));
     // The password hides behind a Telegram-style particle spoiler
     // instead of asterisks.
@@ -274,6 +280,8 @@ void EntryDetailView::debugSpoiler(const QString& state) {
         QTimer::singleShot(250, passwordSpoiler_, [this] { passwordSpoiler_->conceal(); });
         QTimer::singleShot(500, passwordSpoiler_, [this] { passwordSpoiler_->reveal(); });
     }
+    if (state == QLatin1String("login-copied"))
+        loginCopy_->copyAndFlash();
 }
 
 void EntryDetailView::setEntry(const nightlock::Entry* entry) {
@@ -295,7 +303,7 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     noteLabel_->setVisible(!entry->note.empty());
     noteLabel_->setText(QString::fromStdString(entry->note));
 
-    loginRow_.value->setText(QString::fromStdString(entry->login));
+    loginCopy_->setText(QString::fromStdString(entry->login));
     passwordSpoiler_->setSecret(QString::fromStdString(entry->password));
 
     urlRow_.frame->setVisible(!entry->url.empty());
