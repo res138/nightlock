@@ -3,6 +3,8 @@
 #include <QAbstractListModel>
 #include <QIcon>
 
+#include <vector>
+
 namespace nightlock {
 class Group;
 struct Entry;
@@ -18,12 +20,25 @@ public:
         LoginRole,
     };
 
+    // Display order of the list. Custom is the group's own order (the
+    // one drag-reordering edits); the rest are non-destructive views —
+    // the underlying order is untouched and reordering is disabled.
+    enum class SortMode {
+        Custom,
+        Created,   // newest first
+        Modified,  // newest first
+        Site,      // by name, A–Z
+    };
+
     explicit EntryListModel(QObject* parent = nullptr);
 
     void setGroup(nightlock::Group* group);
     nightlock::Group* group() const { return group_; }
     nightlock::Entry* entry(const QModelIndex& index) const;
     QModelIndex indexOf(const nightlock::Entry* entry) const;
+
+    SortMode sortMode() const { return sortMode_; }
+    void setSortMode(SortMode mode);
 
     // Re-reads the group after entries were added or removed.
     void refresh();
@@ -45,6 +60,11 @@ public:
                       const QModelIndex& parent) override;
 
 private:
+    // Refills view_ from the group and applies the sort mode.
+    void rebuildView();
+
     nightlock::Group* group_ = nullptr;
+    SortMode sortMode_ = SortMode::Custom;
+    std::vector<nightlock::Entry*> view_;  // rows in display order
     QIcon defaultIcon_;
 };

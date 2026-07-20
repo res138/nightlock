@@ -5,7 +5,9 @@
 #include <QDebug>
 #include <QDesktopServices>
 #include <QFrame>
+#include <QGraphicsOpacityEffect>
 #include <QGuiApplication>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QListView>
 #include <QMessageBox>
@@ -15,6 +17,8 @@
 #include <QScrollBar>
 #include <QStyle>
 #include <QTimer>
+#include <QToolButton>
+#include <QVariantAnimation>
 #include <QWindow>
 #include <QSplitter>
 #include <QTimer>
@@ -25,7 +29,6 @@
 
 #include <nightlock/group.hpp>
 
-#include "models/entrylistmodel.hpp"
 #include "models/grouptreemodel.hpp"
 #include "standardicons.hpp"
 #include "widgets/entrydetailview.hpp"
@@ -36,7 +39,23 @@
 #include "widgets/scrollbarfader.hpp"
 #include "windows/entryeditdialog.hpp"
 
+#ifdef Q_OS_MACOS
+#include "platform/macwindow.hpp"
+#endif
+
 namespace {
+
+// Height shared by the tree-pane and list-pane toolbar headers, so
+// their bottom borders form one continuous line.
+constexpr int kHeaderHeight = 46;
+// Traffic-light row: left margin and the vertical center inside the
+// tree header (the buttons are repositioned to match on macOS).
+constexpr int kTrafficLeft = 20;
+constexpr int kTrafficSpan = 66;  // 3 buttons, 22pt pitch
+// List-header geometry while the tree pane is hidden: the reopen
+// button sits where the traffic lights end, the labels right after it.
+constexpr int kReopenButtonX = kTrafficLeft + kTrafficSpan + 8;
+constexpr int kHiddenLabelShift = kReopenButtonX + 28 + 4;
 
 nightlock::Group* findGroup(nightlock::Group* group, const QString& name) {
     if (QString::fromStdString(group->name()) == name)
@@ -51,11 +70,11 @@ QIcon menuIcon(const QString& name) {
     return QIcon(QStringLiteral(":/icons/menu/%1.svg").arg(name));
 }
 
-// Invisible strip over the tree's top padding (the traffic-light zone):
-// grabbing it moves the whole window, replacing the old title bar.
-class WindowDragStrip : public QWidget {
+// Toolbar strip at the top of a pane. Empty areas drag the whole
+// window, replacing the old title bar.
+class HeaderBar : public QFrame {
 public:
-    using QWidget::QWidget;
+    using QFrame::QFrame;
 
 protected:
     void mousePressEvent(QMouseEvent* event) override {
@@ -63,6 +82,57 @@ protected:
             window()->windowHandle()->startSystemMove();
     }
 };
+
+// Left pane that can leave like a curtain: while a slide runs, the
+// inner content keeps its full width and hangs onto the pane's right
+// edge, so a narrowing pane pushes it out over the window edge instead
+// of squeezing it. Outside a slide the content simply fills the pane.
+class SlidingPane : public QWidget {
+public:
+    explicit SlidingPane(QWidget* parent = nullptr) : QWidget(parent) {
+        setMinimumWidth(kMinWidth);
+    }
+    void setInner(QWidget* inner) { inner_ = inner; }
+
+    void beginSlide(int innerWidth) {
+        sliding_ = true;
+        setMinimumWidth(0);
+        inner_->resize(innerWidth, height());
+        inner_->move(width() - innerWidth, 0);
+    }
+
+    void endSlide() {
+        sliding_ = false;
+        setMinimumWidth(kMinWidth);
+        inner_->setGeometry(rect());
+    }
+
+protected:
+    void resizeEvent(QResizeEvent*) override {
+        if (!inner_)
+            return;
+        if (sliding_)
+            inner_->move(width() - inner_->width(), 0);
+        else
+            inner_->setGeometry(rect());
+    }
+
+private:
+    static constexpr int kMinWidth = 140;
+    QWidget* inner_ = nullptr;
+    bool sliding_ = false;
+};
+
+QToolButton* headerButton(const QString& iconName, const QString& toolTip) {
+    auto* button = new QToolButton;
+    button->setObjectName(QStringLiteral("headerIconButton"));
+    button->setIcon(menuIcon(iconName));
+    button->setIconSize(QSize(17, 17));
+    button->setFixedSize(28, 28);
+    button->setCursor(Qt::PointingHandCursor);
+    button->setToolTip(toolTip);
+    return button;
+}
 
 }  // namespace
 
@@ -73,6 +143,16 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     tree_ = new GroupTreeView;
     tree_->setModel(treeModel_);
     tree_->expandAll();
+
+    auto* treePane = new SlidingPane;
+    treePane_ = treePane;
+    treeInner_ = new QWidget(treePane_);
+    auto* treePaneLayout = new QVBoxLayout(treeInner_);
+    treePaneLayout->setContentsMargins(0, 0, 0, 0);
+    treePaneLayout->setSpacing(0);
+    treePaneLayout->addWidget(buildTreeHeader());
+    treePaneLayout->addWidget(tree_, 1);
+    treePane->setInner(treeInner_);
 
     entryModel_ = new EntryListModel(this);
     list_ = new QListView;
@@ -89,24 +169,11 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     list_->setDropIndicatorShown(true);
     list_->setDefaultDropAction(Qt::MoveAction);
 
-    countLabel_ = new QLabel;
-    countLabel_->setObjectName(QStringLiteral("itemsCount"));
-    pathLabel_ = new QLabel;
-    pathLabel_->setObjectName(QStringLiteral("itemsPath"));
-
-    auto* header = new QFrame;
-    header->setObjectName(QStringLiteral("listHeader"));
-    auto* headerLayout = new QVBoxLayout(header);
-    headerLayout->setContentsMargins(20, 14, 20, 12);
-    headerLayout->setSpacing(4);
-    headerLayout->addWidget(countLabel_);
-    headerLayout->addWidget(pathLabel_);
-
     auto* middle = new QWidget;
     auto* middleLayout = new QVBoxLayout(middle);
     middleLayout->setContentsMargins(0, 0, 0, 0);
     middleLayout->setSpacing(0);
-    middleLayout->addWidget(header);
+    middleLayout->addWidget(buildListHeader());
     middleLayout->addWidget(list_, 1);
 
     detail_ = new EntryDetailView;
@@ -114,7 +181,7 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     splitter_ = new QSplitter;
     splitter_->setChildrenCollapsible(false);
     splitter_->setHandleWidth(1);
-    splitter_->addWidget(tree_);
+    splitter_->addWidget(treePane_);
     splitter_->addWidget(middle);
     splitter_->addWidget(detail_);
     splitter_->setSizes({300, 420, 460});
@@ -123,10 +190,10 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     connect(detail_, &EntryDetailView::detachRequested, this, &MainWindow::detachDetail);
     connect(detail_, &EntryDetailView::dropped, this, &MainWindow::maybeReattachDetail);
     connect(detail_, &EntryDetailView::dockRequested, this, &MainWindow::dockDetail);
-
-    dragStrip_ = new WindowDragStrip(tree_);
-    dragStrip_->setGeometry(0, 0, tree_->width(), 28);
-    tree_->installEventFilter(this);
+    connect(detail_, &EntryDetailView::editRequested, this, [this] {
+        if (auto* entry = entryModel_->entry(list_->currentIndex()))
+            editEntry(entry);
+    });
 
     new ScrollBarFader(tree_);
     new ScrollBarFader(list_);
@@ -161,6 +228,203 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     detail_->setEntry(nullptr);
 }
 
+// Toolbar over the directory pane: the traffic lights keep their
+// corner (repositioned to the strip's vertical center on macOS), the
+// panel toggle sits right after them, and the folder / graph /
+// settings actions are right-aligned like the list-header icons.
+QWidget* MainWindow::buildTreeHeader() {
+    auto* header = new HeaderBar;
+    header->setObjectName(QStringLiteral("treeHeader"));
+    header->setFixedHeight(kHeaderHeight);
+    auto* layout = new QHBoxLayout(header);
+    layout->setContentsMargins(kTrafficLeft + kTrafficSpan + 8, 0, 14, 0);
+    layout->setSpacing(4);
+
+    auto* closePane = headerButton(QStringLiteral("sidebar"), tr("Hide folder panel"));
+    connect(closePane, &QToolButton::clicked, this, [this] { setTreePaneVisible(false); });
+    layout->addWidget(closePane);
+    layout->addWidget(headerButton(QStringLiteral("search"), tr("Search")));
+    layout->addStretch(1);
+
+    auto* newFolder = headerButton(QStringLiteral("folder-plus"), tr("New folder"));
+    connect(newFolder, &QToolButton::clicked, this, [this] { addFolderTo(currentGroup()); });
+    layout->addWidget(newFolder);
+
+    layout->addWidget(headerButton(QStringLiteral("graph"), tr("Graph")));
+    layout->addWidget(headerButton(QStringLiteral("settings"), tr("Settings")));
+    layout->addWidget(headerButton(QStringLiteral("lock"), tr("Lock vault")));
+    return header;
+}
+
+// Header of the middle pane: the item counter and path on the left,
+// the sort and new-entry actions on the right.
+QWidget* MainWindow::buildListHeader() {
+    auto* header = new HeaderBar;
+    header->setObjectName(QStringLiteral("listHeader"));
+    header->setFixedHeight(kHeaderHeight);
+    listHeaderLayout_ = new QHBoxLayout(header);
+    listHeaderLayout_->setContentsMargins(20, 0, 14, 0);
+    listHeaderLayout_->setSpacing(4);
+
+    // Way back into the hidden tree pane. An overlay outside the layout
+    // flow: it fades in/out without shoving the labels around.
+    reopenTreeButton_ = headerButton(QStringLiteral("sidebar"), tr("Show folder panel"));
+    connect(reopenTreeButton_, &QToolButton::clicked, this,
+            [this] { setTreePaneVisible(true); });
+    reopenTreeButton_->setParent(header);
+    reopenTreeButton_->move(kReopenButtonX, (kHeaderHeight - reopenTreeButton_->height()) / 2);
+    reopenTreeButton_->hide();
+
+    countLabel_ = new QLabel;
+    countLabel_->setObjectName(QStringLiteral("itemsCount"));
+    pathLabel_ = new QLabel;
+    pathLabel_->setObjectName(QStringLiteral("itemsPath"));
+    auto* labels = new QVBoxLayout;
+    labels->setContentsMargins(0, 0, 0, 0);
+    labels->setSpacing(4);
+    labels->addWidget(countLabel_);
+    labels->addWidget(pathLabel_);
+    listHeaderLayout_->addLayout(labels);
+    // Keep the two lines at their natural, tight spacing instead of
+    // letting the column stretch over the full header height.
+    listHeaderLayout_->setAlignment(labels, Qt::AlignVCenter);
+    listHeaderLayout_->addStretch(1);
+
+    filterButton_ = headerButton(QStringLiteral("filter"), tr("Sort entries"));
+    connect(filterButton_, &QToolButton::clicked, this, &MainWindow::showSortMenu);
+    listHeaderLayout_->addWidget(filterButton_);
+
+    auto* newEntry = headerButton(QStringLiteral("key"), tr("New entry"));
+    connect(newEntry, &QToolButton::clicked, this, [this] { addEntryTo(currentGroup()); });
+    listHeaderLayout_->addWidget(newEntry);
+    return header;
+}
+
+nightlock::Group* MainWindow::currentGroup() const {
+    if (auto* group = treeModel_->group(tree_->currentIndex()))
+        return group;
+    return treeModel_->rootGroup();
+}
+
+NlMenu* MainWindow::showSortMenu() {
+    auto* menu = new NlMenu(this);
+    connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
+
+    const auto current = entryModel_->sortMode();
+    const auto addMode = [&](const QString& title, EntryListModel::SortMode mode) {
+        QAction* action = menu->addAction(title, this, [this, mode] { applySortMode(mode); });
+        if (mode == current)
+            action->setIcon(menuIcon(QStringLiteral("check")));
+    };
+    addMode(tr("Custom order"), EntryListModel::SortMode::Custom);
+    addMode(tr("By date created"), EntryListModel::SortMode::Created);
+    addMode(tr("By date modified"), EntryListModel::SortMode::Modified);
+    addMode(tr("By site (A–Z)"), EntryListModel::SortMode::Site);
+
+    menu->popupAt(filterButton_->mapToGlobal(QPoint(0, filterButton_->height() + 4)));
+    return menu;
+}
+
+void MainWindow::applySortMode(EntryListModel::SortMode mode) {
+    auto* entry = entryModel_->entry(list_->currentIndex());
+    entryModel_->setSortMode(mode);
+    if (entry)
+        list_->setCurrentIndex(entryModel_->indexOf(entry));
+
+    // The funnel stays highlighted while a non-default order is on.
+    const bool active = mode != EntryListModel::SortMode::Custom;
+    if (filterButton_->property("active").toBool() != active) {
+        filterButton_->setProperty("active", active);
+        filterButton_->style()->unpolish(filterButton_);
+        filterButton_->style()->polish(filterButton_);
+    }
+}
+
+// Curtain animation: the pane's splitter slot narrows while the inner
+// content, glued to the slot's right edge, slides out over the window
+// edge (and back in when reopening).
+void MainWindow::setTreePaneVisible(bool visible) {
+    if (paneAnimation_ || treePane_->isVisible() == visible)
+        return;
+    auto* pane = static_cast<SlidingPane*>(treePane_);
+
+    int start = 0;
+    int target = 0;
+    if (visible) {
+        target = treeSplitterSizes_.isEmpty() ? 300 : treeSplitterSizes_.first();
+        pane->beginSlide(target);
+        pane->show();
+        // The splitter would hand the reappearing pane its remembered
+        // width in one jump; take it back before anything paints.
+        QList<int> sizes = splitter_->sizes();
+        sizes[1] += sizes[0];
+        sizes[0] = 0;
+        splitter_->setSizes(sizes);
+        fadeReopenButton(false);
+    } else {
+        treeSplitterSizes_ = splitter_->sizes();
+        start = treeSplitterSizes_.first();
+        pane->beginSlide(start);
+    }
+
+    paneAnimation_ = new QVariantAnimation(this);
+    paneAnimation_->setDuration(260);
+    paneAnimation_->setEasingCurve(QEasingCurve::InOutCubic);
+    paneAnimation_->setStartValue(start);
+    paneAnimation_->setEndValue(target);
+    connect(paneAnimation_, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
+        QList<int> sizes = splitter_->sizes();
+        const int width = value.toInt();
+        sizes[1] += sizes[0] - width;  // the middle pane absorbs the change
+        sizes[0] = width;
+        splitter_->setSizes(sizes);
+        // Labels follow the pane's edge until they reach the spot they
+        // hold while it is hidden (right of the traffic lights), then
+        // stay pinned there — no jump when the slide ends.
+        listHeaderLayout_->setContentsMargins(qMax(20, kHiddenLabelShift - width), 0, 14, 0);
+    });
+    connect(paneAnimation_, &QVariantAnimation::finished, this, [this, pane, visible] {
+        paneAnimation_->deleteLater();
+        paneAnimation_ = nullptr;
+        pane->endSlide();
+        if (visible) {
+            if (!treeSplitterSizes_.isEmpty())
+                splitter_->setSizes(treeSplitterSizes_);
+            listHeaderLayout_->setContentsMargins(20, 0, 14, 0);
+        } else {
+            pane->hide();
+            // The labels already rest right of the traffic lights; the
+            // way back fades into the gap reserved before them.
+            fadeReopenButton(true);
+        }
+    });
+    paneAnimation_->start();
+}
+
+// Opacity fade for the overlay reopen button, so it appears in (and
+// leaves) its corner softly instead of popping.
+void MainWindow::fadeReopenButton(bool shown) {
+    auto* effect = qobject_cast<QGraphicsOpacityEffect*>(reopenTreeButton_->graphicsEffect());
+    if (!effect) {
+        effect = new QGraphicsOpacityEffect(reopenTreeButton_);
+        reopenTreeButton_->setGraphicsEffect(effect);
+    }
+    if (shown)
+        reopenTreeButton_->show();
+    auto* fade = new QVariantAnimation(reopenTreeButton_);
+    fade->setDuration(150);
+    fade->setStartValue(shown ? 0.0 : effect->opacity());
+    fade->setEndValue(shown ? 1.0 : 0.0);
+    connect(fade, &QVariantAnimation::valueChanged, effect,
+            [effect](const QVariant& value) { effect->setOpacity(value.toReal()); });
+    connect(fade, &QVariantAnimation::finished, this, [this, fade, shown] {
+        fade->deleteLater();
+        if (!shown)
+            reopenTreeButton_->hide();
+    });
+    fade->start();
+}
+
 void MainWindow::selectGroupNamed(const QString& name) {
     if (auto* group = findGroup(treeModel_->rootGroup(), name))
         tree_->setCurrentIndex(treeModel_->indexOf(group));
@@ -186,7 +450,8 @@ void MainWindow::onGroupChanged(const QModelIndex& current) {
         return;
     }
     const auto count = group->entries().size();
-    countLabel_->setText(QStringLiteral("%1 %2").arg(count).arg(count == 1 ? tr("item") : tr("items")));
+    countLabel_->setText(
+        QStringLiteral("%1 %2").arg(count).arg(count == 1 ? tr("entry") : tr("entries")));
     pathLabel_->setText(QString::fromStdString(group->path()));
 }
 
@@ -203,7 +468,7 @@ void MainWindow::showGroupMenu(const QPoint& pos) {
     auto* menu = new NlMenu(this);
     connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
 
-    menu->addAction(menuIcon(QStringLiteral("file-plus")), tr("New entry"), this,
+    menu->addAction(menuIcon(QStringLiteral("key")), tr("New entry"), this,
                     [this, group] { addEntryTo(group); });
     menu->addAction(menuIcon(QStringLiteral("folder-plus")), tr("New folder"), this,
                     [this, group] { addFolderTo(group); });
@@ -231,7 +496,7 @@ void MainWindow::showEntryMenu(const QPoint& pos) {
             return;
         auto* menu = new NlMenu(this);
         connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
-        menu->addAction(menuIcon(QStringLiteral("file-plus")), tr("New entry"), this,
+        menu->addAction(menuIcon(QStringLiteral("key")), tr("New entry"), this,
                         [this, group] { addEntryTo(group); });
         menu->popupAt(list_->viewport()->mapToGlobal(pos));
         return;
@@ -372,6 +637,8 @@ void MainWindow::editEntry(nightlock::Entry* entry) {
         entry->modified = std::chrono::system_clock::now();
     standardicons::addRecentIconPath(QString::fromStdString(entry->icon));
     entryModel_->notifyEntryChanged(entry);
+    // A sorted view may have moved the row under the edit; follow it.
+    list_->setCurrentIndex(entryModel_->indexOf(entry));
     detail_->setEntry(entry);
 }
 
@@ -434,6 +701,25 @@ void MainWindow::debugMoveEntry(const QString& targetName) {
     auto* target = findGroup(treeModel_->rootGroup(), targetName);
     if (entry && target)
         moveEntryTo(entry, target);
+}
+
+QMenu* MainWindow::popupSortMenuForScreenshot() {
+    return showSortMenu();
+}
+
+void MainWindow::debugSetSort(const QString& mode) {
+    if (mode == QLatin1String("created"))
+        applySortMode(EntryListModel::SortMode::Created);
+    else if (mode == QLatin1String("modified"))
+        applySortMode(EntryListModel::SortMode::Modified);
+    else if (mode == QLatin1String("site"))
+        applySortMode(EntryListModel::SortMode::Site);
+    else
+        applySortMode(EntryListModel::SortMode::Custom);
+}
+
+void MainWindow::debugSetTreePane(const QString& state) {
+    setTreePaneVisible(state != QLatin1String("hide"));
 }
 
 QMenu* MainWindow::popupEntryMenuForScreenshot() {
@@ -499,10 +785,19 @@ void MainWindow::dockDetail() {
     detail_->show();
 }
 
-bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
-    if (watched == tree_ && event->type() == QEvent::Resize)
-        dragStrip_->setGeometry(0, 0, tree_->width(), 28);
-    return QMainWindow::eventFilter(watched, event);
+void MainWindow::resizeEvent(QResizeEvent* event) {
+    QMainWindow::resizeEvent(event);
+#ifdef Q_OS_MACOS
+    // AppKit puts the buttons back into the title-bar corner on its own
+    // relayouts; re-center them on the tree header after every resize.
+    macwindow::layoutTrafficLights(this, kTrafficLeft, kHeaderHeight / 2);
+#endif
+}
+
+// Delays the toggle so NIGHTLOCK_SCREENSHOT (fixed at 800ms) can catch
+// the curtain mid-flight.
+void MainWindow::debugSetTreePaneDelayed(const QString& state, int delayMs) {
+    QTimer::singleShot(delayMs, this, [this, state] { debugSetTreePane(state); });
 }
 
 void MainWindow::deleteEntry(nightlock::Entry* entry) {

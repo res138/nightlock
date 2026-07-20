@@ -8,6 +8,7 @@
 #include <QPainter>
 #include <QStyle>
 #include <QTimer>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 #include <array>
@@ -46,7 +47,8 @@ protected:
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
         painter.setPen(Qt::NoPen);
-        painter.setBrush(QColor(0xA6, 0xA6, 0xA6));
+        // Same near-black as the header icon strokes.
+        painter.setBrush(QColor(0x1F, 0x1F, 0x1F));
         constexpr qreal kDotRadius = 2.6;
         constexpr int kStep = 12;
         const qreal left = width() / 2.0 - kStep;
@@ -222,6 +224,24 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     grip_ = new DragHandle(this);
     grip_->raise();
 
+    // Pencil in the top-right corner, level with the grip, with the
+    // password-generator keys beside it; both hidden together with the
+    // content when no entry is shown.
+    const auto makeCornerButton = [this](const QString& icon, const QString& toolTip) {
+        auto* button = new QToolButton(this);
+        button->setObjectName(QStringLiteral("headerIconButton"));
+        button->setIcon(QIcon(QStringLiteral(":/icons/menu/%1.svg").arg(icon)));
+        button->setIconSize(QSize(17, 17));
+        button->setFixedSize(28, 28);
+        button->setCursor(Qt::PointingHandCursor);
+        button->setToolTip(toolTip);
+        button->raise();
+        return button;
+    };
+    editButton_ = makeCornerButton(QStringLiteral("edit"), tr("Edit entry"));
+    connect(editButton_, &QToolButton::clicked, this, &EntryDetailView::editRequested);
+    generatorButton_ = makeCornerButton(QStringLiteral("keys"), tr("Password generator"));
+
     floatingControls_ = new FloatingControls(this);
     floatingControls_->move(12, 12);
     floatingControls_->raise();
@@ -237,6 +257,10 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
 void EntryDetailView::resizeEvent(QResizeEvent* event) {
     QScrollArea::resizeEvent(event);
     grip_->move((width() - grip_->width()) / 2, kGripGap);
+    // Centered on the grip row, mirroring the floating traffic lights.
+    const int buttonY = kGripGap + (kGripHeight - editButton_->height()) / 2;
+    editButton_->move(width() - editButton_->width() - 14, buttonY);
+    generatorButton_->move(editButton_->x() - generatorButton_->width() - 4, buttonY);
     floatingBackdrop_->setGeometry(rect());
     updatePatternGeometry();
 }
@@ -305,6 +329,8 @@ void EntryDetailView::debugSpoiler(const QString& state) {
 
 void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     content_->setVisible(entry != nullptr);
+    editButton_->setVisible(entry != nullptr);
+    generatorButton_->setVisible(entry != nullptr);
     if (!entry)
         return;
 

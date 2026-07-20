@@ -10,4 +10,10 @@ namespace macwindow {
 // other platforms).
 void hideTitleBar(QWidget* window);
 
+// Moves the floating traffic-light buttons so their row starts at
+// `leftMargin` and is vertically centered on `centerY` (both in points
+// from the window's top-left corner). AppKit re-lays the buttons out
+// on its own occasions, so call this again after window resizes.
+void layoutTrafficLights(QWidget* window, int leftMargin, int centerY);
+
 }  // namespace macwindow

@@ -39,6 +39,9 @@ int main(int argc, char* argv[]) {
     window.show();
 #ifdef Q_OS_MACOS
     macwindow::hideTitleBar(&window);
+    // Center the traffic lights on the tree-pane header (46px tall,
+    // same as MainWindow's kHeaderHeight).
+    macwindow::layoutTrafficLights(&window, 20, 23);
 #endif
 
     // Decode the icon packs up front (background thread), so the
@@ -93,6 +96,35 @@ int main(int argc, char* argv[]) {
     // rename and delete through the tree model.
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_FOLDERS"))
         window.debugFolderOps();
+
+    // Debug hook: NIGHTLOCK_TEST_SORT=custom|created|modified|site
+    // applies a list sort mode through the filter-menu path.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_SORT"))
+        window.debugSetSort(qEnvironmentVariable("NIGHTLOCK_TEST_SORT"));
+
+    // Debug hook: NIGHTLOCK_TEST_TREE_PANE=hide|show[,hide|show…]
+    // drives the folder-panel toggle button, 450ms between steps.
+    // NIGHTLOCK_TEST_TREE_PANE_DELAY=<ms> postpones the first step,
+    // e.g. to screenshot the slide animation mid-flight.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_TREE_PANE")) {
+        const int delay = qEnvironmentVariableIntValue("NIGHTLOCK_TEST_TREE_PANE_DELAY");
+        const QStringList states =
+            qEnvironmentVariable("NIGHTLOCK_TEST_TREE_PANE").split(QLatin1Char(','));
+        for (int i = 0; i < states.size(); ++i)
+            window.debugSetTreePaneDelayed(states[i], delay + i * 450);
+    }
+
+    // Debug hook: NIGHTLOCK_SCREENSHOT_SORT_MENU=<path> saves the
+    // opened sort menu and exits.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_SORT_MENU")) {
+        QTimer::singleShot(800, &window, [&window] {
+            QMenu* menu = window.popupSortMenuForScreenshot();
+            QTimer::singleShot(400, menu, [menu] {
+                menu->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_SORT_MENU"));
+                QApplication::quit();
+            });
+        });
+    }
 
     // Debug hook: NIGHTLOCK_SCREENSHOT=<path> saves a frame and exits.
     if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT")) {
