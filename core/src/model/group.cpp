@@ -58,6 +58,18 @@ bool Group::moveEntry(int from, int to) {
     return true;
 }
 
+bool Group::transferEntry(Entry* entry, Group& target) {
+    const auto it = std::find_if(entries_.begin(), entries_.end(),
+                                 [entry](const auto& p) { return p.get() == entry; });
+    if (it == entries_.end())
+        return false;
+    if (&target == this)
+        return true;
+    target.entries_.push_back(std::move(*it));
+    entries_.erase(it);
+    return true;
+}
+
 const std::vector<std::unique_ptr<Group>>& Group::groups() const { return groups_; }
 const std::vector<std::unique_ptr<Entry>>& Group::entries() const { return entries_; }
 

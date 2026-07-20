@@ -75,6 +75,12 @@ int main(int argc, char* argv[]) {
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_ENTRY_PATTERN"))
         window.debugSetEntryPattern(qEnvironmentVariable("NIGHTLOCK_TEST_ENTRY_PATTERN"));
 
+    // Debug hook: NIGHTLOCK_TEST_MOVE_ENTRY=<folder> moves the selected
+    // entry into the named folder through the same path the "Move to"
+    // context menu uses.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_MOVE_ENTRY"))
+        window.debugMoveEntry(qEnvironmentVariable("NIGHTLOCK_TEST_MOVE_ENTRY"));
+
     // Debug hook: NIGHTLOCK_TEST_SPOILER=reveal|copied drives the
     // password spoiler states.
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_SPOILER")) {
@@ -115,6 +121,24 @@ int main(int argc, char* argv[]) {
                         qEnvironmentVariableIntValue("NIGHTLOCK_SCREENSHOT_MENU_ACTIVE");
                     if (row >= 0 && row < menu->actions().size())
                         menu->setActiveAction(menu->actions().at(row));
+                }
+                // NIGHTLOCK_SCREENSHOT_MENU_SUBMENU=<row> pops the
+                // sub-menu of that item and captures it instead.
+                if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_MENU_SUBMENU")) {
+                    const int row =
+                        qEnvironmentVariableIntValue("NIGHTLOCK_SCREENSHOT_MENU_SUBMENU");
+                    QMenu* sub = row >= 0 && row < menu->actions().size()
+                                     ? menu->actions().at(row)->menu()
+                                     : nullptr;
+                    if (sub) {
+                        sub->popup(menu->pos() + QPoint(menu->width(), 40));
+                        QTimer::singleShot(400, sub, [sub] {
+                            sub->grab().save(
+                                qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_MENU"));
+                            QApplication::quit();
+                        });
+                        return;
+                    }
                 }
                 menu->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_MENU"));
                 QApplication::quit();

@@ -267,7 +267,7 @@ NlMenu* MainWindow::buildEntryMenu(nightlock::Entry* entry) {
     menu->addSeparator();
     menu->addAction(menuIcon(QStringLiteral("edit")), tr("Edit"), this,
                     [this, entry] { editEntry(entry); });
-    auto* moveMenu = buildMoveMenu(treeModel_->rootGroup(), menu);
+    auto* moveMenu = buildMoveMenu(treeModel_->rootGroup(), entry, menu);
     moveMenu->setTitle(tr("Move to"));
     moveMenu->setIcon(menuIcon(QStringLiteral("corner-up-right")));
     menu->addMenu(moveMenu);
@@ -279,22 +279,48 @@ NlMenu* MainWindow::buildEntryMenu(nightlock::Entry* entry) {
     return menu;
 }
 
-NlMenu* MainWindow::buildMoveMenu(nightlock::Group* group, QWidget* parent) {
+// Every folder of the vault is a destination: leaves are plain items,
+// folders with children become sub-menus whose first item ("Move
+// here") targets the folder itself. The entry's current folder stays
+// visible but disabled.
+NlMenu* MainWindow::buildMoveMenu(nightlock::Group* group, nightlock::Entry* entry,
+                                  QWidget* parent) {
     auto* menu = new NlMenu(parent);
     for (const auto& sub : group->groups()) {
         nightlock::Group* target = sub.get();
         const QString name = QString::fromStdString(target->name());
         if (target->groups().empty()) {
-            menu->addAction(name, this, [target] {
-                qInfo() << "TODO: move to" << QString::fromStdString(target->path());
-            });
+            QAction* action = menu->addAction(
+                name, this, [this, entry, target] { moveEntryTo(entry, target); });
+            action->setEnabled(target != entryModel_->group());
         } else {
-            auto* subMenu = buildMoveMenu(target, menu);
+            auto* subMenu = buildMoveMenu(target, entry, menu);
             subMenu->setTitle(name);
+            QAction* first = subMenu->actions().value(0);
+            auto* here = new QAction(tr("Move here"), subMenu);
+            here->setEnabled(target != entryModel_->group());
+            connect(here, &QAction::triggered, this,
+                    [this, entry, target] { moveEntryTo(entry, target); });
+            subMenu->insertAction(first, here);
+            subMenu->insertSeparator(first);
             menu->addMenu(subMenu);
         }
     }
     return menu;
+}
+
+void MainWindow::moveEntryTo(nightlock::Entry* entry, nightlock::Group* target) {
+    nightlock::Group* source = entryModel_->group();
+    if (!source || !target || source == target)
+        return;
+    if (!source->transferEntry(entry, *target))
+        return;
+    // Show where it landed, exactly like adding does: switch to the
+    // target folder and keep the moved entry selected (the pointer
+    // survives the transfer, so the detail view follows seamlessly).
+    tree_->setCurrentIndex(treeModel_->indexOf(target));
+    onGroupChanged(tree_->currentIndex());
+    list_->setCurrentIndex(entryModel_->indexOf(entry));
 }
 
 void MainWindow::addEntryTo(nightlock::Group* group) {
@@ -389,6 +415,13 @@ void MainWindow::debugMoveGroup(const QString& groupName, const QString& targetN
     treeModel_->dropMimeData(mime, Qt::MoveAction, -1, 0, treeModel_->indexOf(target));
     delete mime;
     tree_->expandAll();
+}
+
+void MainWindow::debugMoveEntry(const QString& targetName) {
+    auto* entry = entryModel_->entry(list_->currentIndex());
+    auto* target = findGroup(treeModel_->rootGroup(), targetName);
+    if (entry && target)
+        moveEntryTo(entry, target);
 }
 
 QMenu* MainWindow::popupEntryMenuForScreenshot() {

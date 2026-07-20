@@ -21,6 +21,7 @@ public:
     explicit EntryListModel(QObject* parent = nullptr);
 
     void setGroup(nightlock::Group* group);
+    nightlock::Group* group() const { return group_; }
     nightlock::Entry* entry(const QModelIndex& index) const;
     QModelIndex indexOf(const nightlock::Entry* entry) const;
 
