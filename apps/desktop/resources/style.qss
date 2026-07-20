@@ -13,9 +13,9 @@ QTreeView#groupTree {
     font-family: Georgia;
     font-size: 17px;
     font-weight: bold;
-    /* clears the traffic-light buttons that float over this pane now
-       that the title bar strip is gone */
-    padding-top: 28px;
+    /* the toolbar header above clears the traffic lights; keep a bit
+       of air between its border and the first row */
+    padding-top: 6px;
     show-decoration-selected: 1;
 }
 QTreeView#groupTree::item {
@@ -43,10 +43,22 @@ QListView#entryList {
     outline: none;
 }
 
-QFrame#listHeader {
+QFrame#listHeader,
+QFrame#treeHeader {
     background: #FFFFFF;
     border: none;
     border-bottom: 1px solid #F0F0F0;
+}
+QToolButton#headerIconButton {
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+}
+QToolButton#headerIconButton:pressed {
+    background: rgba(0, 0, 0, 0.11);
+}
+QToolButton#headerIconButton[active="true"] {
+    background: rgba(0, 0, 0, 0.08);
 }
 QLabel#itemsCount {
     font-size: 13px;

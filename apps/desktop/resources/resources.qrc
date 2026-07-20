@@ -15,5 +15,13 @@
         <file>icons/menu/folder-plus.svg</file>
         <file>icons/menu/image.svg</file>
         <file>icons/menu/copy.svg</file>
+        <file>icons/menu/filter.svg</file>
+        <file>icons/menu/settings.svg</file>
+        <file>icons/menu/graph.svg</file>
+        <file>icons/menu/sidebar.svg</file>
+        <file>icons/menu/check.svg</file>
+        <file>icons/menu/search.svg</file>
+        <file>icons/menu/lock.svg</file>
+        <file>icons/menu/keys.svg</file>
     </qresource>
 </RCC>

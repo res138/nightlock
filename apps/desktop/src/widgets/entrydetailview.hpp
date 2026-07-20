@@ -7,6 +7,7 @@ class PatternBackdrop;
 class QFrame;
 class QHBoxLayout;
 class QLabel;
+class QToolButton;
 class QVBoxLayout;
 class SpoilerLabel;
 
@@ -41,6 +42,8 @@ public:
     void debugSpoiler(const QString& state);
 
 signals:
+    // The pencil button in the top-right corner was clicked.
+    void editRequested();
     // The grip was dragged far enough while docked: float me.
     void detachRequested(const QPoint& globalPos);
     // The floating window was dropped at globalPos: dock me back if
@@ -64,6 +67,8 @@ private:
 
     QWidget* content_;
     QWidget* grip_;
+    QToolButton* editButton_;
+    QToolButton* generatorButton_;  // placeholder: no generator yet
     QWidget* floatingControls_;
     QWidget* floatingBackdrop_;
     QPoint pressGlobal_;

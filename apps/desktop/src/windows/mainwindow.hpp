@@ -2,13 +2,17 @@
 
 #include <QMainWindow>
 
+#include "models/entrylistmodel.hpp"
+
 class QDialog;
+class QHBoxLayout;
 class QLabel;
 class QListView;
 class QMenu;
 class QSplitter;
+class QToolButton;
+class QVariantAnimation;
 class EntryDetailView;
-class EntryListModel;
 class GroupTreeModel;
 class GroupTreeView;
 class NlMenu;
@@ -28,6 +32,18 @@ public:
 
     // Debug hook for NIGHTLOCK_SCREENSHOT_MENU.
     QMenu* popupEntryMenuForScreenshot();
+    // Debug hook for NIGHTLOCK_SCREENSHOT_SORT_MENU: drops the sort
+    // menu from the list-header funnel button.
+    QMenu* popupSortMenuForScreenshot();
+    // Debug hook for NIGHTLOCK_TEST_SORT: applies a sort mode
+    // ("custom" | "created" | "modified" | "site").
+    void debugSetSort(const QString& mode);
+    // Debug hook for NIGHTLOCK_TEST_TREE_PANE: "hide" or "show" drives
+    // the folder-panel toggle.
+    void debugSetTreePane(const QString& state);
+    // Same, after a delay — lets NIGHTLOCK_SCREENSHOT catch the curtain
+    // animation mid-flight.
+    void debugSetTreePaneDelayed(const QString& state, int delayMs);
     // Debug hook for NIGHTLOCK_SCREENSHOT_DIALOG: opens the edit dialog
     // for the selected entry (or an empty add dialog) non-modally.
     QDialog* openEntryDialogForScreenshot();
@@ -67,6 +83,14 @@ private:
     void onGroupChanged(const QModelIndex& current);
     void onEntryChanged(const QModelIndex& current);
 
+    QWidget* buildTreeHeader();
+    QWidget* buildListHeader();
+    nightlock::Group* currentGroup() const;
+    NlMenu* showSortMenu();
+    void applySortMode(EntryListModel::SortMode mode);
+    void setTreePaneVisible(bool visible);
+    void fadeReopenButton(bool shown);
+
     void showGroupMenu(const QPoint& pos);
     void showEntryMenu(const QPoint& pos);
     NlMenu* buildEntryMenu(nightlock::Entry* entry);
@@ -91,14 +115,21 @@ private:
     GroupTreeModel* treeModel_;
     EntryListModel* entryModel_;
     GroupTreeView* tree_;
+    QWidget* treePane_;               // the leftmost splitter pane (a SlidingPane)
+    QWidget* treeInner_;              // header + tree; slides inside treePane_
+    QVariantAnimation* paneAnimation_ = nullptr;
     QListView* list_;
     QLabel* countLabel_;
     QLabel* pathLabel_;
+    QHBoxLayout* listHeaderLayout_;
+    QToolButton* filterButton_;
+    QToolButton* reopenTreeButton_;   // lives in the list header, shown
+                                      // only while the tree pane is hidden
     EntryDetailView* detail_;
     QSplitter* splitter_;
     QList<int> detailSplitterSizes_;  // pane widths to restore on re-dock
-    QWidget* dragStrip_;              // window-drag zone over the tree top
+    QList<int> treeSplitterSizes_;    // pane widths to restore on reopen
 
 protected:
-    bool eventFilter(QObject* watched, QEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
 };

@@ -3,6 +3,7 @@
 #include <QIODevice>
 #include <QMimeData>
 
+#include <algorithm>
 #include <cstring>
 
 #include <nightlock/group.hpp>
@@ -28,30 +29,76 @@ EntryListModel::EntryListModel(QObject* parent)
 void EntryListModel::setGroup(nightlock::Group* group) {
     beginResetModel();
     group_ = group;
+    rebuildView();
     endResetModel();
 }
 
+void EntryListModel::setSortMode(SortMode mode) {
+    if (mode == sortMode_)
+        return;
+    beginResetModel();
+    sortMode_ = mode;
+    rebuildView();
+    endResetModel();
+}
+
+// Ties keep the group's own order (stable sort), so switching modes
+// back and forth is deterministic.
+void EntryListModel::rebuildView() {
+    view_.clear();
+    if (!group_)
+        return;
+    view_.reserve(group_->entries().size());
+    for (const auto& e : group_->entries())
+        view_.push_back(e.get());
+    switch (sortMode_) {
+    case SortMode::Custom:
+        break;
+    case SortMode::Created:
+        std::stable_sort(view_.begin(), view_.end(),
+                         [](const auto* a, const auto* b) { return a->created > b->created; });
+        break;
+    case SortMode::Modified:
+        std::stable_sort(view_.begin(), view_.end(),
+                         [](const auto* a, const auto* b) { return a->modified > b->modified; });
+        break;
+    case SortMode::Site:
+        std::stable_sort(view_.begin(), view_.end(), [](const auto* a, const auto* b) {
+            return QString::compare(QString::fromStdString(a->name),
+                                    QString::fromStdString(b->name), Qt::CaseInsensitive) < 0;
+        });
+        break;
+    }
+}
+
 nightlock::Entry* EntryListModel::entry(const QModelIndex& index) const {
-    if (!group_ || !index.isValid() || index.row() >= rowCount())
+    if (!index.isValid() || index.row() >= rowCount())
         return nullptr;
-    return group_->entries()[index.row()].get();
+    return view_[index.row()];
 }
 
 QModelIndex EntryListModel::indexOf(const nightlock::Entry* entry) const {
-    if (!group_ || !entry)
+    if (!entry)
         return {};
     for (int row = 0; row < rowCount(); ++row)
-        if (group_->entries()[row].get() == entry)
+        if (view_[row] == entry)
             return index(row, 0);
     return {};
 }
 
 void EntryListModel::refresh() {
     beginResetModel();
+    rebuildView();
     endResetModel();
 }
 
 void EntryListModel::notifyEntryChanged(nightlock::Entry* entry) {
+    if (sortMode_ != SortMode::Custom) {
+        // The edit may have moved the row (new name or Modified date);
+        // re-sort. Callers re-select by pointer afterwards.
+        refresh();
+        return;
+    }
     const QModelIndex idx = indexOf(entry);
     if (idx.isValid())
         emit dataChanged(idx, idx);
@@ -63,6 +110,7 @@ bool EntryListModel::removeEntry(nightlock::Entry* entry) {
         return false;
     beginRemoveRows({}, idx.row(), idx.row());
     const bool removed = group_->removeEntry(entry);
+    rebuildView();
     endRemoveRows();
     return removed;
 }
@@ -70,7 +118,10 @@ bool EntryListModel::removeEntry(nightlock::Entry* entry) {
 Qt::ItemFlags EntryListModel::flags(const QModelIndex& index) const {
     if (!index.isValid())
         return Qt::ItemIsDropEnabled;  // drops land between rows
-    return Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDragEnabled;
+    Qt::ItemFlags flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+    if (sortMode_ == SortMode::Custom)  // sorted views are read-only orders
+        flags |= Qt::ItemIsDragEnabled;
+    return flags;
 }
 
 Qt::DropActions EntryListModel::supportedDropActions() const {
@@ -97,7 +148,7 @@ QMimeData* EntryListModel::mimeData(const QModelIndexList& indexes) const {
 
 bool EntryListModel::canDropMimeData(const QMimeData* data, Qt::DropAction action, int /*row*/,
                                      int /*column*/, const QModelIndex& parent) const {
-    return group_ && action == Qt::MoveAction && data &&
+    return group_ && sortMode_ == SortMode::Custom && action == Qt::MoveAction && data &&
            data->hasFormat(QLatin1String(kEntryMime)) && !parent.isValid() &&
            decodeEntry(data);
 }
@@ -117,15 +168,17 @@ bool EntryListModel::dropMimeData(const QMimeData* data, Qt::DropAction action, 
 
     if (!beginMoveRows({}, from, from, {}, to))
         return false;
+    // Only reachable in Custom mode, where view rows equal group rows.
     group_->moveEntry(from, to);
+    rebuildView();
     endMoveRows();
     return true;
 }
 
 int EntryListModel::rowCount(const QModelIndex& parent) const {
-    if (parent.isValid() || !group_)
+    if (parent.isValid())
         return 0;
-    return static_cast<int>(group_->entries().size());
+    return static_cast<int>(view_.size());
 }
 
 QVariant EntryListModel::data(const QModelIndex& index, int role) const {
