@@ -17,6 +17,7 @@ constexpr qreal kGlowSoftAlpha = 0.17;   // blob center alpha, "barely there"
 constexpr qreal kGlowBoldAlpha = 0.36;   // blob center alpha, "noticeable"
 constexpr int kGlowBlobs = 5;
 constexpr qreal kTileAlpha = 0.09;
+constexpr qreal kTileAlphaV2 = kTileAlpha * 1.25;  // v2 reads a notch stronger
 constexpr qreal kTileMaxTilt = 0.35;     // radians of per-tile jitter (v1)
 constexpr qreal kTileScaleMin = 0.70;    // per-tile size range of v3
 constexpr qreal kTileScaleMax = 1.4;
@@ -128,14 +129,15 @@ void paintGlow(QPainter& painter, const QSizeF& size, const QVector<QColor>& pal
 // tile by ±maxTilt, v2 keeps them straight, v3 keeps them straight but
 // scales each one somewhere in [scaleMin, scaleMax] of the base size.
 void paintIconTile(QPainter& painter, const QSizeF& size, const QPixmap& icon,
-                   SeededRng& rng, qreal maxTilt, qreal scaleMin, qreal scaleMax) {
+                   SeededRng& rng, qreal maxTilt, qreal scaleMin, qreal scaleMax,
+                   qreal alpha) {
     const qreal tile = rng.real(26, 34);
     const qreal stepX = tile * rng.real(1.8, 2.4);
     const qreal stepY = tile * rng.real(1.6, 2.1);
     const qreal phaseX = rng.real(0, stepX);
     const qreal phaseY = rng.real(0, stepY);
 
-    painter.setOpacity(kTileAlpha);
+    painter.setOpacity(alpha);
     int row = 0;
     for (qreal y = -phaseY; y < size.height() + tile; y += stepY, ++row) {
         // Every second row slides half a step, like brickwork.
@@ -358,15 +360,15 @@ QPixmap PatternBackdrop::generate() const {
         break;
     case nightlock::Pattern::IconTile:
         paintIconTile(painter, zone, icon.pixmap(QSize(48, 48), dpr), rng,
-                      kTileMaxTilt, 1.0, 1.0);
+                      kTileMaxTilt, 1.0, 1.0, kTileAlpha);
         break;
     case nightlock::Pattern::IconTileV2:
         paintIconTile(painter, zone, icon.pixmap(QSize(48, 48), dpr), rng,
-                      0.0, 1.0, 1.0);
+                      0.0, 1.0, 1.0, kTileAlphaV2);
         break;
     case nightlock::Pattern::IconTileV3:
         paintIconTile(painter, zone, icon.pixmap(QSize(48, 48), dpr), rng,
-                      0.0, kTileScaleMin, kTileScaleMax);
+                      0.0, kTileScaleMin, kTileScaleMax, kTileAlpha);
         break;
     case nightlock::Pattern::Ripple:
         paintRipple(painter, zone, palette, rng, iconCenterY_);
