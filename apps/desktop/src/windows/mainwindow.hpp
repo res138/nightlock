@@ -46,6 +46,9 @@ public:
     // Debug hook for NIGHTLOCK_TEST_SPOILER: drives the password
     // spoiler ("reveal" or "copied").
     void debugSpoiler(const QString& state);
+    // Debug hook for NIGHTLOCK_TEST_ADD_ENTRY: creates an entry in the
+    // current folder with fresh Created/Modified timestamps.
+    void debugAddEntry(const QString& name);
     // Debug hook for NIGHTLOCK_SCREENSHOT_DETACHED: floats the detail
     // view as it would after a grip drag; returns it for grabbing.
     QWidget* debugDetachDetail();
@@ -63,6 +66,7 @@ private:
     NlMenu* buildMoveMenu(nightlock::Group* group, QWidget* parent);
 
     void addEntryTo(nightlock::Group* group);
+    void insertEntry(nightlock::Group* group, nightlock::Entry entry);
     void editEntry(nightlock::Entry* entry);
     void addFolderTo(nightlock::Group* group);
     void renameFolder(nightlock::Group* group);

@@ -62,6 +62,11 @@ int main(int argc, char* argv[]) {
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_ENTRY_ICON"))
         window.debugSetEntryIcon(qEnvironmentVariable("NIGHTLOCK_TEST_ENTRY_ICON"));
 
+    // Debug hook: NIGHTLOCK_TEST_ADD_ENTRY=<name> creates an entry in
+    // the current folder (fresh Created/Modified).
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_ADD_ENTRY"))
+        window.debugAddEntry(qEnvironmentVariable("NIGHTLOCK_TEST_ADD_ENTRY"));
+
     // Debug hook: NIGHTLOCK_TEST_SPOILER=reveal|copied drives the
     // password spoiler states.
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_SPOILER")) {

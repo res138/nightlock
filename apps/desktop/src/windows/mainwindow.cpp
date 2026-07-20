@@ -306,8 +306,11 @@ void MainWindow::addEntryTo(nightlock::Group* group) {
     dialog.applyTo(entry);
     entry.created = entry.modified = std::chrono::system_clock::now();
     standardicons::addRecentIconPath(QString::fromStdString(entry.icon));
-    auto& added = group->addEntry(std::move(entry));
+    insertEntry(group, std::move(entry));
+}
 
+void MainWindow::insertEntry(nightlock::Group* group, nightlock::Entry entry) {
+    auto& added = group->addEntry(std::move(entry));
     tree_->setCurrentIndex(treeModel_->indexOf(group));
     onGroupChanged(tree_->currentIndex());  // re-reads the list and the header
     list_->setCurrentIndex(entryModel_->indexOf(&added));
@@ -319,8 +322,15 @@ void MainWindow::editEntry(nightlock::Entry* entry) {
     if (dialog.exec() != QDialog::Accepted)
         return;
 
+    const nightlock::Entry before = *entry;
     dialog.applyTo(*entry);
-    entry->modified = std::chrono::system_clock::now();
+    // Modified only moves when some field actually changed — saving
+    // an untouched dialog keeps the old date.
+    const bool changed = entry->name != before.name || entry->login != before.login ||
+                         entry->password != before.password || entry->url != before.url ||
+                         entry->note != before.note || entry->icon != before.icon;
+    if (changed)
+        entry->modified = std::chrono::system_clock::now();
     standardicons::addRecentIconPath(QString::fromStdString(entry->icon));
     entryModel_->notifyEntryChanged(entry);
     detail_->setEntry(entry);
@@ -469,6 +479,18 @@ void MainWindow::deleteEntry(nightlock::Entry* entry) {
 
 void MainWindow::debugSpoiler(const QString& state) {
     detail_->debugSpoiler(state);
+}
+
+void MainWindow::debugAddEntry(const QString& name) {
+    auto* group = treeModel_->group(tree_->currentIndex());
+    if (!group)
+        return;
+    nightlock::Entry entry;
+    entry.name = name.toStdString();
+    entry.login = "debug@nightlock.app";
+    entry.password = "debug";
+    entry.created = entry.modified = std::chrono::system_clock::now();
+    insertEntry(group, std::move(entry));
 }
 
 void MainWindow::debugSetEntryIcon(const QString& path) {
