@@ -224,9 +224,8 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     grip_ = new DragHandle(this);
     grip_->raise();
 
-    // Pencil in the top-right corner, level with the grip, with the
-    // password-generator keys beside it; both hidden together with the
-    // content when no entry is shown.
+    // Pencil in the top-right corner, level with the grip; hidden
+    // together with the content when no entry is shown.
     const auto makeCornerButton = [this](const QString& icon, const QString& toolTip) {
         auto* button = new QToolButton(this);
         button->setObjectName(QStringLiteral("headerIconButton"));
@@ -240,7 +239,6 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     };
     editButton_ = makeCornerButton(QStringLiteral("edit"), tr("Edit entry"));
     connect(editButton_, &QToolButton::clicked, this, &EntryDetailView::editRequested);
-    generatorButton_ = makeCornerButton(QStringLiteral("keys"), tr("Password generator"));
 
     floatingControls_ = new FloatingControls(this);
     floatingControls_->move(12, 12);
@@ -260,7 +258,6 @@ void EntryDetailView::resizeEvent(QResizeEvent* event) {
     // Centered on the grip row, mirroring the floating traffic lights.
     const int buttonY = kGripGap + (kGripHeight - editButton_->height()) / 2;
     editButton_->move(width() - editButton_->width() - 14, buttonY);
-    generatorButton_->move(editButton_->x() - generatorButton_->width() - 4, buttonY);
     floatingBackdrop_->setGeometry(rect());
     updatePatternGeometry();
 }
@@ -330,7 +327,6 @@ void EntryDetailView::debugSpoiler(const QString& state) {
 void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     content_->setVisible(entry != nullptr);
     editButton_->setVisible(entry != nullptr);
-    generatorButton_->setVisible(entry != nullptr);
     if (!entry)
         return;
 

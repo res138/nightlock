@@ -97,6 +97,14 @@ int main(int argc, char* argv[]) {
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_FOLDERS"))
         window.debugFolderOps();
 
+    // Debug hook: NIGHTLOCK_TEST_RENAME=<folder> opens the inline
+    // rename editor on the named folder, as the context menu would.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_RENAME")) {
+        const QString name = qEnvironmentVariable("NIGHTLOCK_TEST_RENAME");
+        QTimer::singleShot(300, &window,
+                           [&window, name] { window.debugRenameFolder(name); });
+    }
+
     // Debug hook: NIGHTLOCK_TEST_SORT=custom|created|modified|site
     // applies a list sort mode through the filter-menu path.
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_SORT"))

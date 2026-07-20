@@ -230,8 +230,9 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
 
 // Toolbar over the directory pane: the traffic lights keep their
 // corner (repositioned to the strip's vertical center on macOS), the
-// panel toggle sits right after them, and the folder / graph /
-// settings actions are right-aligned like the list-header icons.
+// panel toggle sits right after them on its own, and every other
+// action — folder / search / graph / lock / settings — is
+// right-aligned like the list-header icons.
 QWidget* MainWindow::buildTreeHeader() {
     auto* header = new HeaderBar;
     header->setObjectName(QStringLiteral("treeHeader"));
@@ -243,16 +244,16 @@ QWidget* MainWindow::buildTreeHeader() {
     auto* closePane = headerButton(QStringLiteral("sidebar"), tr("Hide folder panel"));
     connect(closePane, &QToolButton::clicked, this, [this] { setTreePaneVisible(false); });
     layout->addWidget(closePane);
-    layout->addWidget(headerButton(QStringLiteral("search"), tr("Search")));
     layout->addStretch(1);
 
     auto* newFolder = headerButton(QStringLiteral("folder-plus"), tr("New folder"));
     connect(newFolder, &QToolButton::clicked, this, [this] { addFolderTo(currentGroup()); });
     layout->addWidget(newFolder);
 
+    layout->addWidget(headerButton(QStringLiteral("search"), tr("Search")));
     layout->addWidget(headerButton(QStringLiteral("graph"), tr("Graph")));
-    layout->addWidget(headerButton(QStringLiteral("settings"), tr("Settings")));
     layout->addWidget(headerButton(QStringLiteral("lock"), tr("Lock vault")));
+    layout->addWidget(headerButton(QStringLiteral("settings"), tr("Settings")));
     return header;
 }
 
@@ -883,6 +884,11 @@ void MainWindow::debugSetEntryPattern(const QString& spec) {
             entry->pattern = kindOf(kind);
     }
     detail_->setEntry(entryModel_->entry(list_->currentIndex()));
+}
+
+void MainWindow::debugRenameFolder(const QString& name) {
+    if (auto* group = findGroup(treeModel_->rootGroup(), name))
+        renameFolder(group);
 }
 
 void MainWindow::debugFolderOps() {

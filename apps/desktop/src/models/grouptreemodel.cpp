@@ -57,6 +57,7 @@ QVariant GroupTreeModel::data(const QModelIndex& index, int role) const {
         return {};
     switch (role) {
     case Qt::DisplayRole:
+    case Qt::EditRole:  // prefills the inline rename editor
         return QString::fromStdString(g->name());
     case Qt::DecorationRole:
         if (!g->icon().empty())

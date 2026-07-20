@@ -68,7 +68,6 @@ private:
     QWidget* content_;
     QWidget* grip_;
     QToolButton* editButton_;
-    QToolButton* generatorButton_;  // placeholder: no generator yet
     QWidget* floatingControls_;
     QWidget* floatingBackdrop_;
     QPoint pressGlobal_;

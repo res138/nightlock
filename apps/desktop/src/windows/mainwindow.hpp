@@ -59,6 +59,9 @@ public:
     // Debug hook for NIGHTLOCK_TEST_FOLDERS: exercises folder create,
     // rename and delete through the tree model.
     void debugFolderOps();
+    // Debug hook for NIGHTLOCK_TEST_RENAME: opens the inline rename
+    // editor on the named folder, like the context menu does.
+    void debugRenameFolder(const QString& name);
     // Debug hook for NIGHTLOCK_TEST_ENTRY_ICON: assigns an icon path to
     // the selected entry (list + detail refresh included).
     void debugSetEntryIcon(const QString& path);
