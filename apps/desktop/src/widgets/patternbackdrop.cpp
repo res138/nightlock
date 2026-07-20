@@ -1,11 +1,14 @@
 #include "patternbackdrop.hpp"
 
 #include <QIcon>
+#include <QLineF>
 #include <QPainter>
+#include <QPainterPath>
 #include <QRadialGradient>
 #include <QtMath>
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 
 namespace {
@@ -21,6 +24,14 @@ constexpr int kRippleRings = 9;
 constexpr qreal kRippleAlpha = 0.18;     // first ring, then × kRippleDecay
 constexpr qreal kRippleDecay = 0.82;
 constexpr qreal kRippleWidth = 1.4;
+constexpr int kStars = 16;
+constexpr qreal kLinkAlpha = 0.13;       // constellation edges
+constexpr qreal kStarAlpha = 0.55;
+constexpr int kGlowStars = 3;            // bigger soft "stars"
+constexpr int kRibbons = 3;
+constexpr qreal kRibbonAlpha = 0.13;
+constexpr qreal kHaloDotAlpha = 0.38;
+constexpr int kHaloStep = 13;            // dot grid pitch
 
 // Deterministic splitmix64: the same seed must reproduce the same
 // geometry on every run (std::rand would depend on global state).
@@ -163,6 +174,114 @@ void paintRipple(QPainter& painter, const QSizeF& size, const QVector<QColor>& p
     }
 }
 
+// A tiny night sky: seeded stars, each linked to its two nearest
+// neighbors with a hairline, plus a few larger soft glows. Some edges
+// draw twice (A→B and B→A) — the doubled alpha reads as depth.
+void paintConstellation(QPainter& painter, const QSizeF& size,
+                        const QVector<QColor>& palette, SeededRng& rng) {
+    QVector<QPointF> stars;
+    stars.reserve(kStars);
+    for (int i = 0; i < kStars; ++i)
+        stars.append(QPointF(rng.real(0.06, 0.94) * size.width(),
+                             rng.real(0.05, 0.95) * size.height()));
+
+    QColor link = *std::min_element(
+        palette.begin(), palette.end(),
+        [](const QColor& a, const QColor& b) { return a.value() < b.value(); });
+    link.setAlphaF(kLinkAlpha);
+    painter.setPen(QPen(link, 1.0));
+    for (const QPointF& star : stars) {
+        QVector<QPointF> others = stars;
+        others.removeOne(star);
+        std::partial_sort(others.begin(), others.begin() + 2, others.end(),
+                          [&](const QPointF& a, const QPointF& b) {
+                              return QLineF(star, a).length() < QLineF(star, b).length();
+                          });
+        painter.drawLine(star, others[0]);
+        painter.drawLine(star, others[1]);
+    }
+
+    painter.setPen(Qt::NoPen);
+    for (int i = 0; i < stars.size(); ++i) {
+        QColor c = palette[i % palette.size()];
+        c.setAlphaF(kStarAlpha);
+        painter.setBrush(c);
+        const qreal radius = rng.real(1.2, 2.6);
+        painter.drawEllipse(stars[i], radius, radius);
+    }
+
+    for (int i = 0; i < kGlowStars; ++i) {
+        const QPointF center(rng.real(0.15, 0.85) * size.width(),
+                             rng.real(0.10, 0.80) * size.height());
+        const qreal radius = rng.real(10, 20);
+        QRadialGradient glow(center, radius);
+        QColor c = palette[i % qMin<qsizetype>(2, palette.size())];
+        c.setAlphaF(0.22);
+        glow.setColorAt(0.0, c);
+        c.setAlphaF(0.0);
+        glow.setColorAt(1.0, c);
+        painter.setBrush(glow);
+        painter.drawEllipse(center, radius, radius);
+    }
+}
+
+// Wide translucent bezier ribbons flowing left to right, each stroked
+// with a gradient between two neighboring palette colors.
+void paintAurora(QPainter& painter, const QSizeF& size,
+                 const QVector<QColor>& palette, SeededRng& rng) {
+    painter.setBrush(Qt::NoBrush);
+    for (int k = 0; k < kRibbons; ++k) {
+        const qreal y0 = rng.real(0.15, 0.80) * size.height();
+        const qreal y1 = y0 + rng.real(-0.20, 0.20) * size.height();
+        const qreal y2 = y0 + rng.real(-0.20, 0.20) * size.height();
+        const qreal y3 = y0 + rng.real(-0.25, 0.25) * size.height();
+
+        QLinearGradient silk(QPointF(0, 0), QPointF(size.width(), 0));
+        QColor c = palette[k % palette.size()];
+        c.setAlphaF(kRibbonAlpha);
+        silk.setColorAt(0.0, c);
+        c = palette[(k + 1) % palette.size()];
+        c.setAlphaF(kRibbonAlpha);
+        silk.setColorAt(1.0, c);
+
+        QPen pen(QBrush(silk), rng.real(16, 30));
+        pen.setCapStyle(Qt::RoundCap);
+        painter.setPen(pen);
+        // Ends start off-canvas so the caps never show inside the zone.
+        QPainterPath ribbon(QPointF(-24, y0));
+        ribbon.cubicTo(QPointF(size.width() * 0.30, y1),
+                       QPointF(size.width() * 0.62, y2),
+                       QPointF(size.width() + 24, y3));
+        painter.drawPath(ribbon);
+    }
+}
+
+// Halftone dot grid whose dot size follows a gaussian of the distance
+// to the icon center — the dots swell on a ring around the icon and
+// vanish elsewhere. The two dominant colors alternate checkerboard.
+void paintHalo(QPainter& painter, const QSizeF& size, const QVector<QColor>& palette,
+               SeededRng& rng, qreal centerY) {
+    const qreal ring = rng.real(58, 76);   // radius the dots peak at
+    const qreal soft = rng.real(28, 38);   // gaussian width of the swell
+    const QPointF center(size.width() / 2, centerY);
+
+    painter.setPen(Qt::NoPen);
+    int row = 0;
+    for (qreal y = 6; y < size.height(); y += kHaloStep, ++row) {
+        int col = 0;
+        for (qreal x = 6; x < size.width(); x += kHaloStep, ++col) {
+            const qreal d = QLineF(QPointF(x, y), center).length();
+            const qreal radius = 3.1 * std::exp(-(d - ring) * (d - ring) / (2 * soft * soft));
+            if (radius < 0.55)
+                continue;
+            QColor c = palette[(row + col) % qMin<qsizetype>(2, palette.size())];
+            c.setAlphaF(kHaloDotAlpha);
+            painter.setBrush(c);
+            painter.drawEllipse(QPointF(x, y), radius, radius);
+        }
+    }
+}
+
 }  // namespace
 
 PatternBackdrop::PatternBackdrop(QWidget* parent) : QWidget(parent) {
@@ -251,6 +370,15 @@ QPixmap PatternBackdrop::generate() const {
         break;
     case nightlock::Pattern::Ripple:
         paintRipple(painter, zone, palette, rng, iconCenterY_);
+        break;
+    case nightlock::Pattern::Constellation:
+        paintConstellation(painter, zone, palette, rng);
+        break;
+    case nightlock::Pattern::Aurora:
+        paintAurora(painter, zone, palette, rng);
+        break;
+    case nightlock::Pattern::Halo:
+        paintHalo(painter, zone, palette, rng, iconCenterY_);
         break;
     case nightlock::Pattern::None:
         break;

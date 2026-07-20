@@ -517,6 +517,12 @@ void MainWindow::debugSetEntryPattern(const QString& spec) {
             return nightlock::Pattern::IconTileV3;
         if (kind == QLatin1String("ripple"))
             return nightlock::Pattern::Ripple;
+        if (kind == QLatin1String("constellation"))
+            return nightlock::Pattern::Constellation;
+        if (kind == QLatin1String("aurora"))
+            return nightlock::Pattern::Aurora;
+        if (kind == QLatin1String("halo"))
+            return nightlock::Pattern::Halo;
         return nightlock::Pattern::None;
     };
     for (const QString& part : spec.split(QLatin1Char(','), Qt::SkipEmptyParts)) {

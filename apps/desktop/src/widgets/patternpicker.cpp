@@ -29,7 +29,7 @@ struct PatternOption {
     const char* title;
 };
 
-constexpr std::array<PatternOption, 7> kOptions = {{
+constexpr std::array<PatternOption, 10> kOptions = {{
     {nightlock::Pattern::None, QT_TRANSLATE_NOOP("PatternPicker", "None")},
     {nightlock::Pattern::GlowSoft, QT_TRANSLATE_NOOP("PatternPicker", "Glow · soft")},
     {nightlock::Pattern::GlowBold, QT_TRANSLATE_NOOP("PatternPicker", "Glow · bold")},
@@ -37,6 +37,9 @@ constexpr std::array<PatternOption, 7> kOptions = {{
     {nightlock::Pattern::IconTileV2, QT_TRANSLATE_NOOP("PatternPicker", "Icon tile · v2")},
     {nightlock::Pattern::IconTileV3, QT_TRANSLATE_NOOP("PatternPicker", "Icon tile · v3")},
     {nightlock::Pattern::Ripple, QT_TRANSLATE_NOOP("PatternPicker", "Ripple")},
+    {nightlock::Pattern::Constellation, QT_TRANSLATE_NOOP("PatternPicker", "Constellation")},
+    {nightlock::Pattern::Aurora, QT_TRANSLATE_NOOP("PatternPicker", "Aurora")},
+    {nightlock::Pattern::Halo, QT_TRANSLATE_NOOP("PatternPicker", "Halo")},
 }};
 
 QString titleFor(nightlock::Pattern kind) {
