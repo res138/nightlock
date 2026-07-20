@@ -14,7 +14,9 @@ constexpr qreal kGlowSoftAlpha = 0.17;   // blob center alpha, "barely there"
 constexpr qreal kGlowBoldAlpha = 0.36;   // blob center alpha, "noticeable"
 constexpr int kGlowBlobs = 5;
 constexpr qreal kTileAlpha = 0.09;
-constexpr qreal kTileMaxTilt = 0.35;     // radians of per-tile jitter
+constexpr qreal kTileMaxTilt = 0.35;     // radians of per-tile jitter (v1)
+constexpr qreal kTileScaleMin = 0.70;    // per-tile size range of v3
+constexpr qreal kTileScaleMax = 1.4;
 constexpr int kRippleRings = 9;
 constexpr qreal kRippleAlpha = 0.18;     // first ring, then × kRippleDecay
 constexpr qreal kRippleDecay = 0.82;
@@ -111,8 +113,11 @@ void paintGlow(QPainter& painter, const QSizeF& size, const QVector<QColor>& pal
     }
 }
 
+// The three tile versions share one brickwork walk: v1 tilts every
+// tile by ±maxTilt, v2 keeps them straight, v3 keeps them straight but
+// scales each one somewhere in [scaleMin, scaleMax] of the base size.
 void paintIconTile(QPainter& painter, const QSizeF& size, const QPixmap& icon,
-                   SeededRng& rng) {
+                   SeededRng& rng, qreal maxTilt, qreal scaleMin, qreal scaleMax) {
     const qreal tile = rng.real(26, 34);
     const qreal stepX = tile * rng.real(1.8, 2.4);
     const qreal stepY = tile * rng.real(1.6, 2.1);
@@ -127,8 +132,11 @@ void paintIconTile(QPainter& painter, const QSizeF& size, const QPixmap& icon,
         for (qreal x = -phaseX + rowShift; x < size.width() + tile; x += stepX) {
             painter.save();
             painter.translate(x, y);
-            painter.rotate(qRadiansToDegrees(rng.real(-kTileMaxTilt, kTileMaxTilt)));
-            painter.drawPixmap(QRectF(-tile / 2, -tile / 2, tile, tile), icon,
+            if (maxTilt > 0)
+                painter.rotate(qRadiansToDegrees(rng.real(-maxTilt, maxTilt)));
+            const qreal drawn =
+                scaleMin < scaleMax ? tile * rng.real(scaleMin, scaleMax) : tile;
+            painter.drawPixmap(QRectF(-drawn / 2, -drawn / 2, drawn, drawn), icon,
                                icon.rect());
             painter.restore();
         }
@@ -230,7 +238,16 @@ QPixmap PatternBackdrop::generate() const {
         paintGlow(painter, zone, palette, rng, kGlowBoldAlpha);
         break;
     case nightlock::Pattern::IconTile:
-        paintIconTile(painter, zone, icon.pixmap(QSize(48, 48), dpr), rng);
+        paintIconTile(painter, zone, icon.pixmap(QSize(48, 48), dpr), rng,
+                      kTileMaxTilt, 1.0, 1.0);
+        break;
+    case nightlock::Pattern::IconTileV2:
+        paintIconTile(painter, zone, icon.pixmap(QSize(48, 48), dpr), rng,
+                      0.0, 1.0, 1.0);
+        break;
+    case nightlock::Pattern::IconTileV3:
+        paintIconTile(painter, zone, icon.pixmap(QSize(48, 48), dpr), rng,
+                      0.0, kTileScaleMin, kTileScaleMax);
         break;
     case nightlock::Pattern::Ripple:
         paintRipple(painter, zone, palette, rng, iconCenterY_);

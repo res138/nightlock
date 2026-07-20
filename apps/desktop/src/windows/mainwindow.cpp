@@ -511,6 +511,10 @@ void MainWindow::debugSetEntryPattern(const QString& spec) {
             return nightlock::Pattern::GlowBold;
         if (kind == QLatin1String("icon-tile"))
             return nightlock::Pattern::IconTile;
+        if (kind == QLatin1String("icon-tile-v2"))
+            return nightlock::Pattern::IconTileV2;
+        if (kind == QLatin1String("icon-tile-v3"))
+            return nightlock::Pattern::IconTileV3;
         if (kind == QLatin1String("ripple"))
             return nightlock::Pattern::Ripple;
         return nightlock::Pattern::None;

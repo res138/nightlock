@@ -11,10 +11,12 @@ namespace nightlock {
 // from the entry's icon palette and creation date.
 enum class Pattern {
     None = 0,
-    GlowSoft,  // 5 soft radial color blobs, barely-there alpha
-    GlowBold,  // same blobs, twice the presence
-    IconTile,  // the icon itself, tiled with jittered rotation
-    Ripple,    // concentric rings radiating from the icon center
+    GlowSoft,    // 5 soft radial color blobs, barely-there alpha
+    GlowBold,    // same blobs, twice the presence
+    IconTile,    // v1: the icon itself, tiled with jittered rotation
+    IconTileV2,  // v2: tiled straight, no rotation
+    IconTileV3,  // v3: straight and each tile 0.70–1.4× the base size
+    Ripple,      // concentric rings radiating from the icon center
 };
 
 // Classic password entry. name, login, password and both dates are

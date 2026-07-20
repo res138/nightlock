@@ -69,8 +69,9 @@ int main(int argc, char* argv[]) {
         window.debugAddEntry(qEnvironmentVariable("NIGHTLOCK_TEST_ADD_ENTRY"));
 
     // Debug hook: NIGHTLOCK_TEST_ENTRY_PATTERN="[name:]kind[,name:kind…]"
-    // assigns background patterns (glow-soft|glow-bold|icon-tile|ripple|
-    // none); an omitted name targets the selected entry.
+    // assigns background patterns (glow-soft|glow-bold|icon-tile|
+    // icon-tile-v2|icon-tile-v3|ripple|none); an omitted name targets
+    // the selected entry.
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_ENTRY_PATTERN"))
         window.debugSetEntryPattern(qEnvironmentVariable("NIGHTLOCK_TEST_ENTRY_PATTERN"));
 
