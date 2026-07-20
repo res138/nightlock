@@ -17,6 +17,8 @@ qt_add_executable(nightlock-desktop
     src/widgets/icongallerypopup.cpp
     src/widgets/iconpicker.cpp
     src/widgets/nlmenu.cpp
+    src/widgets/patternbackdrop.cpp
+    src/widgets/patternpicker.cpp
     src/widgets/scrollbarfader.cpp
     src/widgets/spoilerlabel.cpp
     src/widgets/totpring.cpp

@@ -3,7 +3,9 @@
 #include <QDialog>
 
 class IconPicker;
+class PatternPicker;
 class QLineEdit;
+class QMenu;
 class QPlainTextEdit;
 class QPushButton;
 
@@ -27,10 +29,15 @@ public:
     // Writes the form back into `entry`; timestamps are the caller's job.
     void applyTo(nightlock::Entry& entry) const;
 
+    // Debug hook for NIGHTLOCK_SCREENSHOT_PATTERN_MENU: opens the
+    // pattern dropdown and returns it for grabbing.
+    QMenu* openPatternMenuForScreenshot();
+
 private:
     QWidget* makeField(const QString& label, QWidget* editor, bool required = false);
 
     IconPicker* iconPicker_;
+    PatternPicker* patternPicker_;
     QLineEdit* nameEdit_;
     QLineEdit* loginEdit_;
     QLineEdit* passwordEdit_;

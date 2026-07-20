@@ -8,6 +8,7 @@
 
 #include "demovault.hpp"
 #include "standardicons.hpp"
+#include "windows/entryeditdialog.hpp"
 #include "windows/mainwindow.hpp"
 
 #ifdef Q_OS_MACOS
@@ -67,6 +68,19 @@ int main(int argc, char* argv[]) {
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_ADD_ENTRY"))
         window.debugAddEntry(qEnvironmentVariable("NIGHTLOCK_TEST_ADD_ENTRY"));
 
+    // Debug hook: NIGHTLOCK_TEST_ENTRY_PATTERN="[name:]kind[,name:kind…]"
+    // assigns background patterns (glow-soft|glow-bold|icon-tile|
+    // icon-tile-v2|icon-tile-v3|ripple|constellation|aurora|halo|none);
+    // an omitted name targets the selected entry.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_ENTRY_PATTERN"))
+        window.debugSetEntryPattern(qEnvironmentVariable("NIGHTLOCK_TEST_ENTRY_PATTERN"));
+
+    // Debug hook: NIGHTLOCK_TEST_MOVE_ENTRY=<folder> moves the selected
+    // entry into the named folder through the same path the "Move to"
+    // context menu uses.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_MOVE_ENTRY"))
+        window.debugMoveEntry(qEnvironmentVariable("NIGHTLOCK_TEST_MOVE_ENTRY"));
+
     // Debug hook: NIGHTLOCK_TEST_SPOILER=reveal|copied drives the
     // password spoiler states.
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_SPOILER")) {
@@ -108,6 +122,24 @@ int main(int argc, char* argv[]) {
                     if (row >= 0 && row < menu->actions().size())
                         menu->setActiveAction(menu->actions().at(row));
                 }
+                // NIGHTLOCK_SCREENSHOT_MENU_SUBMENU=<row> pops the
+                // sub-menu of that item and captures it instead.
+                if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_MENU_SUBMENU")) {
+                    const int row =
+                        qEnvironmentVariableIntValue("NIGHTLOCK_SCREENSHOT_MENU_SUBMENU");
+                    QMenu* sub = row >= 0 && row < menu->actions().size()
+                                     ? menu->actions().at(row)->menu()
+                                     : nullptr;
+                    if (sub) {
+                        sub->popup(menu->pos() + QPoint(menu->width(), 40));
+                        QTimer::singleShot(400, sub, [sub] {
+                            sub->grab().save(
+                                qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_MENU"));
+                            QApplication::quit();
+                        });
+                        return;
+                    }
+                }
                 menu->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_MENU"));
                 QApplication::quit();
             });
@@ -140,6 +172,20 @@ int main(int argc, char* argv[]) {
             QWidget* gallery = window.openIconGalleryForScreenshot();
             QTimer::singleShot(400, gallery, [gallery] {
                 gallery->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_GALLERY"));
+                QApplication::quit();
+            });
+        });
+    }
+
+    // Debug hook: NIGHTLOCK_SCREENSHOT_PATTERN_MENU=<path> opens the
+    // entry dialog, drops its pattern menu, saves the menu and exits.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_PATTERN_MENU")) {
+        QTimer::singleShot(800, &window, [&window] {
+            auto* dialog =
+                qobject_cast<EntryEditDialog*>(window.openEntryDialogForScreenshot());
+            QMenu* menu = dialog->openPatternMenuForScreenshot();
+            QTimer::singleShot(400, menu, [menu] {
+                menu->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_PATTERN_MENU"));
                 QApplication::quit();
             });
         });

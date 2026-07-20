@@ -267,9 +267,12 @@ NlMenu* MainWindow::buildEntryMenu(nightlock::Entry* entry) {
     menu->addSeparator();
     menu->addAction(menuIcon(QStringLiteral("edit")), tr("Edit"), this,
                     [this, entry] { editEntry(entry); });
-    auto* moveMenu = buildMoveMenu(treeModel_->rootGroup(), menu);
+    auto* moveMenu = buildMoveMenu(treeModel_->rootGroup(), entry, menu);
     moveMenu->setTitle(tr("Move to"));
     moveMenu->setIcon(menuIcon(QStringLiteral("corner-up-right")));
+    // The vault root is a destination too, listed under its own name.
+    prependMoveTarget(moveMenu, treeModel_->rootGroup(), entry,
+                      QString::fromStdString(treeModel_->rootGroup()->name()));
     menu->addMenu(moveMenu);
 
     menu->addSeparator();
@@ -279,22 +282,57 @@ NlMenu* MainWindow::buildEntryMenu(nightlock::Entry* entry) {
     return menu;
 }
 
-NlMenu* MainWindow::buildMoveMenu(nightlock::Group* group, QWidget* parent) {
+// Every folder of the vault is a destination: leaves are plain items,
+// folders with children become sub-menus whose first item ("Move
+// here") targets the folder itself. The entry's current folder stays
+// visible but disabled.
+NlMenu* MainWindow::buildMoveMenu(nightlock::Group* group, nightlock::Entry* entry,
+                                  QWidget* parent) {
     auto* menu = new NlMenu(parent);
     for (const auto& sub : group->groups()) {
         nightlock::Group* target = sub.get();
         const QString name = QString::fromStdString(target->name());
         if (target->groups().empty()) {
-            menu->addAction(name, this, [target] {
-                qInfo() << "TODO: move to" << QString::fromStdString(target->path());
-            });
+            QAction* action = menu->addAction(
+                name, this, [this, entry, target] { moveEntryTo(entry, target); });
+            action->setEnabled(target != entryModel_->group());
         } else {
-            auto* subMenu = buildMoveMenu(target, menu);
+            auto* subMenu = buildMoveMenu(target, entry, menu);
             subMenu->setTitle(name);
+            prependMoveTarget(subMenu, target, entry, tr("Move here"));
             menu->addMenu(subMenu);
         }
     }
     return menu;
+}
+
+// Inserts a "move into this very folder" item (plus a band below it)
+// at the top of `menu`, disabled when the folder already holds the
+// entry.
+void MainWindow::prependMoveTarget(NlMenu* menu, nightlock::Group* target,
+                                   nightlock::Entry* entry, const QString& title) {
+    QAction* first = menu->actions().value(0);
+    auto* action = new QAction(title, menu);
+    action->setEnabled(target != entryModel_->group());
+    connect(action, &QAction::triggered, this,
+            [this, entry, target] { moveEntryTo(entry, target); });
+    menu->insertAction(first, action);
+    if (first)
+        menu->insertSeparator(first);
+}
+
+void MainWindow::moveEntryTo(nightlock::Entry* entry, nightlock::Group* target) {
+    nightlock::Group* source = entryModel_->group();
+    if (!source || !target || source == target)
+        return;
+    if (!source->transferEntry(entry, *target))
+        return;
+    // Show where it landed, exactly like adding does: switch to the
+    // target folder and keep the moved entry selected (the pointer
+    // survives the transfer, so the detail view follows seamlessly).
+    tree_->setCurrentIndex(treeModel_->indexOf(target));
+    onGroupChanged(tree_->currentIndex());
+    list_->setCurrentIndex(entryModel_->indexOf(entry));
 }
 
 void MainWindow::addEntryTo(nightlock::Group* group) {
@@ -328,7 +366,8 @@ void MainWindow::editEntry(nightlock::Entry* entry) {
     // an untouched dialog keeps the old date.
     const bool changed = entry->name != before.name || entry->login != before.login ||
                          entry->password != before.password || entry->url != before.url ||
-                         entry->note != before.note || entry->icon != before.icon;
+                         entry->note != before.note || entry->icon != before.icon ||
+                         entry->pattern != before.pattern;
     if (changed)
         entry->modified = std::chrono::system_clock::now();
     standardicons::addRecentIconPath(QString::fromStdString(entry->icon));
@@ -388,6 +427,13 @@ void MainWindow::debugMoveGroup(const QString& groupName, const QString& targetN
     treeModel_->dropMimeData(mime, Qt::MoveAction, -1, 0, treeModel_->indexOf(target));
     delete mime;
     tree_->expandAll();
+}
+
+void MainWindow::debugMoveEntry(const QString& targetName) {
+    auto* entry = entryModel_->entry(list_->currentIndex());
+    auto* target = findGroup(treeModel_->rootGroup(), targetName);
+    if (entry && target)
+        moveEntryTo(entry, target);
 }
 
 QMenu* MainWindow::popupEntryMenuForScreenshot() {
@@ -500,6 +546,48 @@ void MainWindow::debugSetEntryIcon(const QString& path) {
     entry->icon = path.toStdString();
     entryModel_->notifyEntryChanged(entry);
     detail_->setEntry(entry);
+}
+
+void MainWindow::debugSetEntryPattern(const QString& spec) {
+    const auto kindOf = [](const QString& kind) {
+        if (kind == QLatin1String("glow-soft"))
+            return nightlock::Pattern::GlowSoft;
+        if (kind == QLatin1String("glow-bold"))
+            return nightlock::Pattern::GlowBold;
+        if (kind == QLatin1String("icon-tile"))
+            return nightlock::Pattern::IconTile;
+        if (kind == QLatin1String("icon-tile-v2"))
+            return nightlock::Pattern::IconTileV2;
+        if (kind == QLatin1String("icon-tile-v3"))
+            return nightlock::Pattern::IconTileV3;
+        if (kind == QLatin1String("ripple"))
+            return nightlock::Pattern::Ripple;
+        if (kind == QLatin1String("constellation"))
+            return nightlock::Pattern::Constellation;
+        if (kind == QLatin1String("aurora"))
+            return nightlock::Pattern::Aurora;
+        if (kind == QLatin1String("halo"))
+            return nightlock::Pattern::Halo;
+        return nightlock::Pattern::None;
+    };
+    for (const QString& part : spec.split(QLatin1Char(','), Qt::SkipEmptyParts)) {
+        const int colon = part.lastIndexOf(QLatin1Char(':'));
+        const QString name = colon < 0 ? QString() : part.left(colon);
+        const QString kind = colon < 0 ? part : part.mid(colon + 1);
+        nightlock::Entry* entry = nullptr;
+        if (name.isEmpty()) {
+            entry = entryModel_->entry(list_->currentIndex());
+        } else {
+            for (int row = 0; row < entryModel_->rowCount() && !entry; ++row) {
+                const QModelIndex idx = entryModel_->index(row, 0);
+                if (idx.data(EntryListModel::NameRole).toString() == name)
+                    entry = entryModel_->entry(idx);
+            }
+        }
+        if (entry)
+            entry->pattern = kindOf(kind);
+    }
+    detail_->setEntry(entryModel_->entry(list_->currentIndex()));
 }
 
 void MainWindow::debugFolderOps() {

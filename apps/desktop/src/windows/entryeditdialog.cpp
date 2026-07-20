@@ -12,6 +12,8 @@
 
 #include "widgets/icongallerypopup.hpp"
 #include "widgets/iconpicker.hpp"
+#include "widgets/nlmenu.hpp"
+#include "widgets/patternpicker.hpp"
 
 EntryEditDialog::EntryEditDialog(Mode mode, QWidget* parent) : QDialog(parent) {
     setObjectName(QStringLiteral("entryEditDialog"));
@@ -32,6 +34,10 @@ EntryEditDialog::EntryEditDialog(Mode mode, QWidget* parent) : QDialog(parent) {
         gallery->popupAt(QCursor::pos());
     });
     layout->addWidget(makeField(tr("Icon"), iconPicker_));
+
+    // Optional detail-view background pattern; entries start without one.
+    patternPicker_ = new PatternPicker;
+    layout->addWidget(makeField(tr("Pattern"), patternPicker_));
 
     nameEdit_ = new QLineEdit;
     nameEdit_->setMinimumWidth(384);  // keeps the fixed dialog ~440px wide
@@ -86,6 +92,7 @@ void EntryEditDialog::setEntry(const nightlock::Entry& entry) {
     urlEdit_->setText(QString::fromStdString(entry.url));
     noteEdit_->setPlainText(QString::fromStdString(entry.note));
     iconPicker_->setSelectedIconValue(QString::fromStdString(entry.icon));
+    patternPicker_->setValue(entry.pattern);
 }
 
 void EntryEditDialog::applyTo(nightlock::Entry& entry) const {
@@ -95,6 +102,11 @@ void EntryEditDialog::applyTo(nightlock::Entry& entry) const {
     entry.url = urlEdit_->text().trimmed().toStdString();
     entry.note = noteEdit_->toPlainText().trimmed().toStdString();
     entry.icon = iconPicker_->selectedIconValue().toStdString();
+    entry.pattern = patternPicker_->value();
+}
+
+QMenu* EntryEditDialog::openPatternMenuForScreenshot() {
+    return patternPicker_->openMenu();
 }
 
 QWidget* EntryEditDialog::makeField(const QString& label, QWidget* editor, bool required) {

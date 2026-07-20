@@ -35,6 +35,11 @@ public:
     // like reparent()).
     bool moveEntry(int from, int to);
 
+    // Moves `entry` to the end of `target`, keeping the object (and
+    // pointers to it) alive. Fails when it does not belong to this
+    // group; moving into the same group is a no-op success.
+    bool transferEntry(Entry* entry, Group& target);
+
     const std::vector<std::unique_ptr<Group>>& groups() const;
     const std::vector<std::unique_ptr<Entry>>& entries() const;
 
