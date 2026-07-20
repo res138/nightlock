@@ -71,6 +71,8 @@ private:
     void showEntryMenu(const QPoint& pos);
     NlMenu* buildEntryMenu(nightlock::Entry* entry);
     NlMenu* buildMoveMenu(nightlock::Group* group, nightlock::Entry* entry, QWidget* parent);
+    void prependMoveTarget(NlMenu* menu, nightlock::Group* target, nightlock::Entry* entry,
+                           const QString& title);
     void moveEntryTo(nightlock::Entry* entry, nightlock::Group* target);
 
     void addEntryTo(nightlock::Group* group);

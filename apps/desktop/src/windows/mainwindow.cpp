@@ -270,6 +270,9 @@ NlMenu* MainWindow::buildEntryMenu(nightlock::Entry* entry) {
     auto* moveMenu = buildMoveMenu(treeModel_->rootGroup(), entry, menu);
     moveMenu->setTitle(tr("Move to"));
     moveMenu->setIcon(menuIcon(QStringLiteral("corner-up-right")));
+    // The vault root is a destination too, listed under its own name.
+    prependMoveTarget(moveMenu, treeModel_->rootGroup(), entry,
+                      QString::fromStdString(treeModel_->rootGroup()->name()));
     menu->addMenu(moveMenu);
 
     menu->addSeparator();
@@ -296,17 +299,26 @@ NlMenu* MainWindow::buildMoveMenu(nightlock::Group* group, nightlock::Entry* ent
         } else {
             auto* subMenu = buildMoveMenu(target, entry, menu);
             subMenu->setTitle(name);
-            QAction* first = subMenu->actions().value(0);
-            auto* here = new QAction(tr("Move here"), subMenu);
-            here->setEnabled(target != entryModel_->group());
-            connect(here, &QAction::triggered, this,
-                    [this, entry, target] { moveEntryTo(entry, target); });
-            subMenu->insertAction(first, here);
-            subMenu->insertSeparator(first);
+            prependMoveTarget(subMenu, target, entry, tr("Move here"));
             menu->addMenu(subMenu);
         }
     }
     return menu;
+}
+
+// Inserts a "move into this very folder" item (plus a band below it)
+// at the top of `menu`, disabled when the folder already holds the
+// entry.
+void MainWindow::prependMoveTarget(NlMenu* menu, nightlock::Group* target,
+                                   nightlock::Entry* entry, const QString& title) {
+    QAction* first = menu->actions().value(0);
+    auto* action = new QAction(title, menu);
+    action->setEnabled(target != entryModel_->group());
+    connect(action, &QAction::triggered, this,
+            [this, entry, target] { moveEntryTo(entry, target); });
+    menu->insertAction(first, action);
+    if (first)
+        menu->insertSeparator(first);
 }
 
 void MainWindow::moveEntryTo(nightlock::Entry* entry, nightlock::Group* target) {
