@@ -43,6 +43,10 @@ public:
     // Debug hook for NIGHTLOCK_TEST_ENTRY_ICON: assigns an icon path to
     // the selected entry (list + detail refresh included).
     void debugSetEntryIcon(const QString& path);
+    // Debug hook for NIGHTLOCK_TEST_ENTRY_PATTERN: assigns background
+    // patterns from a "[name:]kind[,name:kind…]" spec; an omitted name
+    // targets the selected entry.
+    void debugSetEntryPattern(const QString& spec);
     // Debug hook for NIGHTLOCK_TEST_SPOILER: drives the password
     // spoiler ("reveal" or "copied").
     void debugSpoiler(const QString& state);

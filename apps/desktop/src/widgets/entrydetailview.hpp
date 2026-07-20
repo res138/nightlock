@@ -3,6 +3,7 @@
 #include <QScrollArea>
 
 class CopyLabel;
+class PatternBackdrop;
 class QFrame;
 class QHBoxLayout;
 class QLabel;
@@ -59,6 +60,7 @@ private:
     };
     FieldRow makeRow(QVBoxLayout* cardLayout, const QString& label, bool last = false);
     void refreshLastVisibleRow();
+    void updatePatternGeometry();
 
     QWidget* content_;
     QWidget* grip_;
@@ -69,6 +71,8 @@ private:
     QLabel* iconLabel_;
     QLabel* titleLabel_;
     QLabel* noteLabel_;
+    QFrame* fieldsCard_;
+    PatternBackdrop* patternBackdrop_;
     FieldRow loginRow_;
     CopyLabel* loginCopy_;
     FieldRow passwordRow_;

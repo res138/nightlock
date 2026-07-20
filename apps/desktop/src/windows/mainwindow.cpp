@@ -328,7 +328,8 @@ void MainWindow::editEntry(nightlock::Entry* entry) {
     // an untouched dialog keeps the old date.
     const bool changed = entry->name != before.name || entry->login != before.login ||
                          entry->password != before.password || entry->url != before.url ||
-                         entry->note != before.note || entry->icon != before.icon;
+                         entry->note != before.note || entry->icon != before.icon ||
+                         entry->pattern != before.pattern;
     if (changed)
         entry->modified = std::chrono::system_clock::now();
     standardicons::addRecentIconPath(QString::fromStdString(entry->icon));
@@ -500,6 +501,38 @@ void MainWindow::debugSetEntryIcon(const QString& path) {
     entry->icon = path.toStdString();
     entryModel_->notifyEntryChanged(entry);
     detail_->setEntry(entry);
+}
+
+void MainWindow::debugSetEntryPattern(const QString& spec) {
+    const auto kindOf = [](const QString& kind) {
+        if (kind == QLatin1String("glow-soft"))
+            return nightlock::Pattern::GlowSoft;
+        if (kind == QLatin1String("glow-bold"))
+            return nightlock::Pattern::GlowBold;
+        if (kind == QLatin1String("icon-tile"))
+            return nightlock::Pattern::IconTile;
+        if (kind == QLatin1String("ripple"))
+            return nightlock::Pattern::Ripple;
+        return nightlock::Pattern::None;
+    };
+    for (const QString& part : spec.split(QLatin1Char(','), Qt::SkipEmptyParts)) {
+        const int colon = part.lastIndexOf(QLatin1Char(':'));
+        const QString name = colon < 0 ? QString() : part.left(colon);
+        const QString kind = colon < 0 ? part : part.mid(colon + 1);
+        nightlock::Entry* entry = nullptr;
+        if (name.isEmpty()) {
+            entry = entryModel_->entry(list_->currentIndex());
+        } else {
+            for (int row = 0; row < entryModel_->rowCount() && !entry; ++row) {
+                const QModelIndex idx = entryModel_->index(row, 0);
+                if (idx.data(EntryListModel::NameRole).toString() == name)
+                    entry = entryModel_->entry(idx);
+            }
+        }
+        if (entry)
+            entry->pattern = kindOf(kind);
+    }
+    detail_->setEntry(entryModel_->entry(list_->currentIndex()));
 }
 
 void MainWindow::debugFolderOps() {

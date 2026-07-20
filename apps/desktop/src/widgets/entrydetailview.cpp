@@ -15,6 +15,7 @@
 #include <nightlock/entry.hpp>
 
 #include "copylabel.hpp"
+#include "patternbackdrop.hpp"
 #include "spoilerlabel.hpp"
 #include "totpring.hpp"
 
@@ -165,9 +166,9 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     layout->addWidget(noteLabel_);
     layout->addSpacing(20);
 
-    auto* fieldsCard = new QFrame;
-    fieldsCard->setObjectName(QStringLiteral("card"));
-    auto* fieldsLayout = new QVBoxLayout(fieldsCard);
+    fieldsCard_ = new QFrame;
+    fieldsCard_->setObjectName(QStringLiteral("card"));
+    auto* fieldsLayout = new QVBoxLayout(fieldsCard_);
     fieldsLayout->setContentsMargins(16, 2, 16, 2);
     fieldsLayout->setSpacing(0);
     loginRow_ = makeRow(fieldsLayout, tr("Login"));
@@ -188,7 +189,7 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     urlRow_.value->setOpenExternalLinks(true);
     codeRow_ = makeRow(fieldsLayout, tr("Code"));
     codeRow_.layout->insertWidget(codeRow_.layout->count() - 1, new TotpRing);
-    layout->addWidget(fieldsCard);
+    layout->addWidget(fieldsCard_);
     layout->addSpacing(26);
 
     auto* metaHeader = new QLabel(tr("Meta"));
@@ -206,6 +207,13 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     layout->addWidget(metaCard);
 
     layout->addStretch(1);
+
+    // Child of the content (not the scroll area): in docked mode the
+    // content paints the white panel, so a sibling below the viewport
+    // would never show through. Lowered under every field widget, the
+    // pattern sits behind the icon and scrolls with the entry.
+    patternBackdrop_ = new PatternBackdrop(content_);
+    patternBackdrop_->lower();
 
     setWidget(content_);
 
@@ -230,6 +238,17 @@ void EntryDetailView::resizeEvent(QResizeEvent* event) {
     QScrollArea::resizeEvent(event);
     grip_->move((width() - grip_->width()) / 2, kGripGap);
     floatingBackdrop_->setGeometry(rect());
+    updatePatternGeometry();
+}
+
+// The pattern zone runs from the very top of the panel (the grip strip)
+// down to the fields card; the card position depends on the optional
+// note, so this is re-run after every setEntry as well as on resize.
+void EntryDetailView::updatePatternGeometry() {
+    if (auto* layout = content_->layout())
+        layout->activate();  // the card must sit at its final position
+    patternBackdrop_->setGeometry(0, 0, content_->width(), fieldsCard_->geometry().top());
+    patternBackdrop_->setIconCenterY(iconLabel_->geometry().center().y());
 }
 
 void EntryDetailView::setFloatingMode(bool floating) {
@@ -318,6 +337,9 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     modifiedRow_.value->setText(formatDate(entry->modified));
 
     refreshLastVisibleRow();
+
+    patternBackdrop_->setEntry(entry);
+    updatePatternGeometry();
 }
 
 // The last visible row of the fields card must not draw its bottom
