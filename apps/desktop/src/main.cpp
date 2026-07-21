@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
     // Without this the layout still reserves the title-bar safe area,
     // leaving a 28px white strip the pane borders never reach into.
     window.setAttribute(Qt::WA_ContentsMarginsRespectsSafeArea, false);
-    window.resize(1180, 720);
+    window.resize(843, 617);
     window.show();
 #ifdef Q_OS_MACOS
     macwindow::hideTitleBar(&window);
@@ -200,6 +200,40 @@ int main(int argc, char* argv[]) {
             QWidget* detached = window.debugDetachDetail();
             QTimer::singleShot(400, detached, [detached] {
                 detached->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_DETACHED"));
+                QApplication::quit();
+            });
+        });
+    }
+
+    // Debug hook: NIGHTLOCK_SCREENSHOT_GRAPH=<path> opens the graph
+    // window, lets the force layout settle and saves it.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_GRAPH")) {
+        QTimer::singleShot(800, &window, [&window] {
+            QWidget* graph = window.openGraphForScreenshot();
+            QTimer::singleShot(2800, graph, [graph] {
+                graph->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_GRAPH"));
+                QApplication::quit();
+            });
+        });
+    }
+
+    // Debug hook: NIGHTLOCK_TEST_GRAPH_REFRESH=<name> adds an entry
+    // after the graph window has opened, exercising its live refresh.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_GRAPH_REFRESH")) {
+        QTimer::singleShot(1600, &window, [&window] {
+            window.debugAddEntry(qEnvironmentVariable("NIGHTLOCK_TEST_GRAPH_REFRESH"));
+        });
+    }
+
+    // Debug hook: NIGHTLOCK_SCREENSHOT_SEARCH=<path> opens the search
+    // popup (pre-filled from NIGHTLOCK_SEARCH_QUERY when set), saves
+    // it and exits.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_SEARCH")) {
+        QTimer::singleShot(800, &window, [&window] {
+            QWidget* popup = window.openSearchForScreenshot(
+                qEnvironmentVariable("NIGHTLOCK_SEARCH_QUERY"));
+            QTimer::singleShot(400, popup, [popup] {
+                popup->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_SEARCH"));
                 QApplication::quit();
             });
         });

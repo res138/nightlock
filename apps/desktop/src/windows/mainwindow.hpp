@@ -13,9 +13,11 @@ class QSplitter;
 class QToolButton;
 class QVariantAnimation;
 class EntryDetailView;
+class GraphWindow;
 class GroupTreeModel;
 class GroupTreeView;
 class NlMenu;
+class SearchWindow;
 
 namespace nightlock {
 class Group;
@@ -78,6 +80,12 @@ public:
     // Debug hook for NIGHTLOCK_SCREENSHOT_DETACHED: floats the detail
     // view as it would after a grip drag; returns it for grabbing.
     QWidget* debugDetachDetail();
+    // Debug hook for NIGHTLOCK_SCREENSHOT_GRAPH: opens the graph
+    // window and returns it for grabbing.
+    QWidget* openGraphForScreenshot();
+    // Debug hook for NIGHTLOCK_SCREENSHOT_SEARCH: opens the search
+    // popup, pre-fills `query` and returns it for grabbing.
+    QWidget* openSearchForScreenshot(const QString& query);
     // Debug hook for NIGHTLOCK_TEST_REATTACH: docks the floating detail
     // view back through the regular drop path.
     void debugReattachDetail();
@@ -97,10 +105,12 @@ private:
     void showGroupMenu(const QPoint& pos);
     void showEntryMenu(const QPoint& pos);
     NlMenu* buildEntryMenu(nightlock::Entry* entry);
-    NlMenu* buildMoveMenu(nightlock::Group* group, nightlock::Entry* entry, QWidget* parent);
-    void prependMoveTarget(NlMenu* menu, nightlock::Group* target, nightlock::Entry* entry,
-                           const QString& title);
-    void moveEntryTo(nightlock::Entry* entry, nightlock::Group* target);
+    NlMenu* buildMoveMenu(nightlock::Group* group, const QList<nightlock::Entry*>& entries,
+                          QWidget* parent);
+    void prependMoveTarget(NlMenu* menu, nightlock::Group* target,
+                           const QList<nightlock::Entry*>& entries, const QString& title);
+    void moveEntriesTo(const QList<nightlock::Entry*>& entries, nightlock::Group* target);
+    void deleteEntries(const QList<nightlock::Entry*>& entries);
 
     void addEntryTo(nightlock::Group* group);
     void insertEntry(nightlock::Group* group, nightlock::Entry entry);
@@ -108,12 +118,18 @@ private:
     void addFolderTo(nightlock::Group* group);
     void renameFolder(nightlock::Group* group);
     void deleteFolder(nightlock::Group* group);
-    void changeFolderIcon(nightlock::Group* group);
+    void deleteFolders(const QList<nightlock::Group*>& groups);
+    void changeFolderIcon(const QList<nightlock::Group*>& groups);
 
     void detachDetail(const QPoint& globalPos);
     void maybeReattachDetail(const QPoint& globalPos);
     void dockDetail();
     void deleteEntry(nightlock::Entry* entry);
+
+    void openGraph();
+    void refreshGraph();
+    SearchWindow* openSearch();
+    void revealInVault(nightlock::Group* group, nightlock::Entry* entry);
 
     GroupTreeModel* treeModel_;
     EntryListModel* entryModel_;
@@ -129,6 +145,8 @@ private:
     QToolButton* reopenTreeButton_;   // lives in the list header, shown
                                       // only while the tree pane is hidden
     EntryDetailView* detail_;
+    GraphWindow* graph_ = nullptr;     // the one graph window, if open
+    SearchWindow* search_ = nullptr;   // the one search window, if open
     QSplitter* splitter_;
     QList<int> detailSplitterSizes_;  // pane widths to restore on re-dock
     QList<int> treeSplitterSizes_;    // pane widths to restore on reopen

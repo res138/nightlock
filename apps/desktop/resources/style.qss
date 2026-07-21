@@ -54,9 +54,6 @@ QToolButton#headerIconButton {
     border: none;
     border-radius: 7px;
 }
-QToolButton#headerIconButton:pressed {
-    background: rgba(0, 0, 0, 0.11);
-}
 QToolButton#headerIconButton[active="true"] {
     background: rgba(0, 0, 0, 0.08);
 }
@@ -163,15 +160,11 @@ QDialog#entryEditDialog QPlainTextEdit:focus {
     border: 1px solid #000000;
 }
 QToolButton#iconPickerButton {
-    background: #FBF9FB;
-    border: 1px solid #EFEFEF;
+    background: transparent;
+    border: none;
     border-radius: 10px;
 }
-QToolButton#iconPickerButton:hover {
-    background: #F1EFF1;
-}
 QToolButton#iconPickerButton:checked {
-    background: #FFFFFF;
     border: 1px solid #000000;
 }
 QPushButton#primaryButton {
@@ -203,15 +196,37 @@ QPushButton#ghostButton:hover {
 }
 
 QToolButton#iconPickerAdd {
-    background: #FFFFFF;
-    border: 1px solid #DFDFDF;
-    border-radius: 10px;
+    background: transparent;
+    border: none;
     font-size: 20px;
-    color: #6E6E6E;
+    color: #000000;
 }
-QToolButton#iconPickerAdd:hover {
-    background: #F5F5F5;
+
+QWidget#searchWindow {
+    background: #FFFFFF;
+}
+QWidget#searchWindow QLineEdit#searchField {
+    background: #FBF9FB;
+    border: 1px solid #EFEFEF;
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 13px;
     color: #111111;
+    selection-background-color: #000000;
+    selection-color: #FFFFFF;
+}
+QWidget#searchWindow QLineEdit#searchField:focus {
+    background: #FFFFFF;
+    border: 1px solid #D9D7DC;
+}
+QListWidget#searchResults {
+    background: transparent;
+    border: none;
+}
+QLabel#searchEmpty {
+    font-size: 12px;
+    color: #8A8792;
+    padding: 8px 0;
 }
 
 QListView#iconGallery {
@@ -235,23 +250,23 @@ QScrollArea[floatingWindow="true"] > QWidget > QWidget {
 
 QScrollBar:vertical {
     background: transparent;
-    width: 12px;
-    margin: 3px 3px 3px 3px;
+    width: 8px;
+    margin: 2px 2px 2px 2px;
 }
 QScrollBar:horizontal {
     background: transparent;
-    height: 12px;
-    margin: 3px 3px 3px 3px;
+    height: 8px;
+    margin: 2px 2px 2px 2px;
 }
 QScrollBar::handle:vertical {
     background: #CFCFCF;
-    border-radius: 3px;
-    min-height: 36px;
+    border-radius: 2px;
+    min-height: 22px;
 }
 QScrollBar::handle:horizontal {
     background: #CFCFCF;
-    border-radius: 3px;
-    min-width: 36px;
+    border-radius: 2px;
+    min-width: 22px;
 }
 QScrollBar::handle:vertical:hover,
 QScrollBar::handle:horizontal:hover {
@@ -267,43 +282,26 @@ QScrollBar::add-page, QScrollBar::sub-page {
     background: transparent;
 }
 
-QTreeView#groupTree QScrollBar::handle:vertical,
-QTreeView#groupTree QScrollBar::handle:horizontal,
-QListView#entryList QScrollBar::handle:vertical,
-QListView#entryList QScrollBar::handle:horizontal {
-    background: transparent;
+QToolButton#graphZoomButton {
+    background: #FFFFFF;
+    border: 1px solid #E6E4E8;
+    border-radius: 14px;
+    font-size: 16px;
+    color: #111111;
 }
-QTreeView#groupTree QScrollBar[scrolling="true"]::handle:vertical,
-QTreeView#groupTree QScrollBar[scrolling="true"]::handle:horizontal,
-QListView#entryList QScrollBar[scrolling="true"]::handle:vertical,
-QListView#entryList QScrollBar[scrolling="true"]::handle:horizontal {
-    background: #CFCFCF;
+QToolButton#graphZoomButton:hover {
+    background: #F5F3F6;
 }
-QTreeView#groupTree QScrollBar::handle:vertical:hover,
-QTreeView#groupTree QScrollBar::handle:horizontal:hover,
-QListView#entryList QScrollBar::handle:vertical:hover,
-QListView#entryList QScrollBar::handle:horizontal:hover {
-    background: #A9A9A9;
+QToolButton#graphZoomButton:pressed {
+    background: #EDEBEF;
 }
 
-QListView#iconGallery QScrollBar::handle:vertical,
-QListView#iconGallery QScrollBar::handle:horizontal {
-    background: transparent;
-}
-QListView#iconGallery QScrollBar[scrolling="true"]::handle:vertical,
-QListView#iconGallery QScrollBar[scrolling="true"]::handle:horizontal {
-    background: #CFCFCF;
-}
-QListView#iconGallery QScrollBar::handle:vertical:hover,
-QListView#iconGallery QScrollBar::handle:horizontal:hover {
-    background: #A9A9A9;
-}
-
-QListView#iconGallery QScrollBar:vertical {
-    width: 8px;
-    margin: 0;
-}
-QListView#iconGallery QScrollBar::handle:vertical {
-    border-radius: 4px;
-    min-height: 36px;
+QPushButton#showInGraph {
+    background: #000000;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 0;
+    font-size: 13px;
+    font-weight: 600;
 }

@@ -25,4 +25,6 @@ protected:
 private:
     QPixmap backdrop_;
     QPoint backdropOffset_;
+    QWidget* topFade_;     // blur bands over the grid's top and
+    QWidget* bottomFade_;  // bottom rims
 };

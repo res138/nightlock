@@ -7,6 +7,7 @@ class PatternBackdrop;
 class QFrame;
 class QHBoxLayout;
 class QLabel;
+class QPushButton;
 class QToolButton;
 class QVBoxLayout;
 class SpoilerLabel;
@@ -44,6 +45,8 @@ public:
 signals:
     // The pencil button in the top-right corner was clicked.
     void editRequested();
+    // The "Показать в графе" button under the meta card was clicked.
+    void graphRequested();
     // The grip was dragged far enough while docked: float me.
     void detachRequested(const QPoint& globalPos);
     // The floating window was dropped at globalPos: dock me back if
@@ -85,4 +88,5 @@ private:
     FieldRow codeRow_;
     FieldRow createdRow_;
     FieldRow modifiedRow_;
+    QPushButton* graphButton_;
 };

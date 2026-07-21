@@ -12,6 +12,9 @@ namespace frosted {
 
 inline constexpr int kShadow = 12;  // translucent margin reserved for the shadow
 inline constexpr int kRadius = 10;
+// Solid color share over the blurred backdrop; low enough that the
+// blurred app behind the panel clearly shows through the glass.
+inline constexpr qreal kVeil = 0.72;
 
 // The visible panel area: widget rect minus the shadow margin.
 QRect panelRect(const QWidget* widget);
