@@ -24,6 +24,11 @@ int main(int argc, char* argv[]) {
     if (qss.open(QIODevice::ReadOnly))
         app.setStyleSheet(QString::fromUtf8(qss.readAll()));
 
+    // Dock icon for the running process (the squircle render of the
+    // logo); resources/nightlock.icns carries the same art for a
+    // future .app bundle.
+    QApplication::setWindowIcon(QIcon(QStringLiteral(NIGHTLOCK_ICONS_DIR "/appicon.png")));
+
     auto vault = createDemoVault();
 
     MainWindow window(vault.get());
@@ -35,7 +40,7 @@ int main(int argc, char* argv[]) {
     // Without this the layout still reserves the title-bar safe area,
     // leaving a 28px white strip the pane borders never reach into.
     window.setAttribute(Qt::WA_ContentsMarginsRespectsSafeArea, false);
-    window.resize(1180, 720);
+    window.resize(843, 617);
     window.show();
 #ifdef Q_OS_MACOS
     macwindow::hideTitleBar(&window);
@@ -96,6 +101,14 @@ int main(int argc, char* argv[]) {
     // rename and delete through the tree model.
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_FOLDERS"))
         window.debugFolderOps();
+
+    // Debug hook: NIGHTLOCK_TEST_RENAME=<folder> opens the inline
+    // rename editor on the named folder, as the context menu would.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_RENAME")) {
+        const QString name = qEnvironmentVariable("NIGHTLOCK_TEST_RENAME");
+        QTimer::singleShot(300, &window,
+                           [&window, name] { window.debugRenameFolder(name); });
+    }
 
     // Debug hook: NIGHTLOCK_TEST_SORT=custom|created|modified|site
     // applies a list sort mode through the filter-menu path.
@@ -192,6 +205,53 @@ int main(int argc, char* argv[]) {
             QWidget* detached = window.debugDetachDetail();
             QTimer::singleShot(400, detached, [detached] {
                 detached->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_DETACHED"));
+                QApplication::quit();
+            });
+        });
+    }
+
+    // Debug hook: NIGHTLOCK_SCREENSHOT_GRAPH=<path> opens the graph
+    // window, lets the force layout settle and saves it.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_GRAPH")) {
+        QTimer::singleShot(800, &window, [&window] {
+            QWidget* graph = window.openGraphForScreenshot();
+            QTimer::singleShot(2800, graph, [graph] {
+                graph->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_GRAPH"));
+                QApplication::quit();
+            });
+        });
+    }
+
+    // Debug hook: NIGHTLOCK_TEST_GRAPH_REFRESH=<name> adds an entry
+    // after the graph window has opened, exercising its live refresh.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_GRAPH_REFRESH")) {
+        QTimer::singleShot(1600, &window, [&window] {
+            window.debugAddEntry(qEnvironmentVariable("NIGHTLOCK_TEST_GRAPH_REFRESH"));
+        });
+    }
+
+    // Debug hook: NIGHTLOCK_SCREENSHOT_SEARCH=<path> opens the search
+    // popup (pre-filled from NIGHTLOCK_SEARCH_QUERY when set), saves
+    // it and exits.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_SEARCH")) {
+        QTimer::singleShot(800, &window, [&window] {
+            QWidget* popup = window.openSearchForScreenshot(
+                qEnvironmentVariable("NIGHTLOCK_SEARCH_QUERY"));
+            QTimer::singleShot(400, popup, [popup] {
+                popup->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_SEARCH"));
+                QApplication::quit();
+            });
+        });
+    }
+
+    // Debug hook: NIGHTLOCK_SCREENSHOT_LOCK=<path> locks the vault,
+    // saves the window and exits. NIGHTLOCK_LOCK_FAIL=1 first submits
+    // a wrong password to capture the error state.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_LOCK")) {
+        QTimer::singleShot(800, &window, [&window] {
+            window.debugLock(qEnvironmentVariableIsSet("NIGHTLOCK_LOCK_FAIL"));
+            QTimer::singleShot(600, &window, [&window] {
+                window.grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_LOCK"));
                 QApplication::quit();
             });
         });

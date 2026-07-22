@@ -41,7 +41,7 @@ IconPicker::IconPicker(QWidget* parent)
     defaultButton->setToolTip(fallback.title);
     buttons_->addButton(defaultButton, 0);
 
-    // The user's ten most recent gallery picks.
+    // The user's fifteen most recent gallery picks.
     for (const QString& path : standardicons::recentIconPaths()) {
         auto* button = makeIconButton();
         button->setIcon(QIcon(path));

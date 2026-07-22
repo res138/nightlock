@@ -15,6 +15,7 @@
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QScrollBar>
+#include <QShortcut>
 #include <QStyle>
 #include <QTimer>
 #include <QToolButton>
@@ -36,8 +37,11 @@
 #include "widgets/grouptreeview.hpp"
 #include "widgets/icongallerypopup.hpp"
 #include "widgets/nlmenu.hpp"
-#include "widgets/scrollbarfader.hpp"
+#include "widgets/overlayscrollbar.hpp"
+#include "widgets/searchwindow.hpp"
 #include "windows/entryeditdialog.hpp"
+#include "windows/graphwindow.hpp"
+#include "windows/lockscreen.hpp"
 
 #ifdef Q_OS_MACOS
 #include "platform/macwindow.hpp"
@@ -143,6 +147,10 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     tree_ = new GroupTreeView;
     tree_->setModel(treeModel_);
     tree_->expandAll();
+    // Folder renames and deletions ripple into an open graph window;
+    // entry edits call refreshGraph() from their mutation paths.
+    connect(treeModel_, &QAbstractItemModel::dataChanged, this, &MainWindow::refreshGraph);
+    connect(treeModel_, &QAbstractItemModel::rowsRemoved, this, &MainWindow::refreshGraph);
 
     auto* treePane = new SlidingPane;
     treePane_ = treePane;
@@ -160,6 +168,7 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     list_->setModel(entryModel_);
     list_->setItemDelegate(new EntryListDelegate(list_));
     list_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    list_->setSelectionMode(QAbstractItemView::ExtendedSelection);
     list_->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     // Entries reorder by drag within the group.
@@ -184,19 +193,52 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     splitter_->addWidget(treePane_);
     splitter_->addWidget(middle);
     splitter_->addWidget(detail_);
-    splitter_->setSizes({300, 420, 460});
+    splitter_->setSizes({375, 420, 460});
     setCentralWidget(splitter_);
+
+    // ⌘F / ⌘G / ⌘L / ⌘N / ⌘T / ⌘D land here as Ctrl on other
+    // platforms. Vault-touching ones stay dead while locked.
+    new QShortcut(QKeySequence::Find, this, [this] { openSearch(); });
+    new QShortcut(QKeySequence(QStringLiteral("Ctrl+G")), this, [this] { openGraph(); });
+    new QShortcut(QKeySequence(QStringLiteral("Ctrl+L")), this, [this] { lockVault(); });
+    new QShortcut(QKeySequence::New, this, [this] {  // ⌘N: new entry
+        if (!lockScreen_->isVisible())
+            addEntryTo(currentGroup() ? currentGroup() : treeModel_->rootGroup());
+    });
+    new QShortcut(QKeySequence(QStringLiteral("Ctrl+T")), this, [this] {  // ⌘T: new folder
+        if (!lockScreen_->isVisible())
+            addFolderTo(currentGroup() ? currentGroup() : treeModel_->rootGroup());
+    });
+    new QShortcut(QKeySequence(QStringLiteral("Ctrl+D")), this, [this] {  // ⌘D: fold the panel
+        if (!lockScreen_->isVisible())
+            setTreePaneVisible(!treePane_->isVisible());
+    });
+
+    lockScreen_ = new LockScreen(this);
+    lockScreen_->hide();
+    connect(lockScreen_, &LockScreen::unlocked, this, [this] {
+        lockScreen_->hide();
+        // The Dock loses its lock badge together with the screen.
+        QGuiApplication::setWindowIcon(
+            QIcon(QStringLiteral(NIGHTLOCK_ICONS_DIR "/appicon.png")));
+    });
 
     connect(detail_, &EntryDetailView::detachRequested, this, &MainWindow::detachDetail);
     connect(detail_, &EntryDetailView::dropped, this, &MainWindow::maybeReattachDetail);
     connect(detail_, &EntryDetailView::dockRequested, this, &MainWindow::dockDetail);
+    connect(detail_, &EntryDetailView::graphRequested, this, [this] {
+        auto* entry = entryModel_->entry(list_->currentIndex());
+        openGraph();
+        if (graph_ && entry)
+            graph_->focusEntry(entry);
+    });
     connect(detail_, &EntryDetailView::editRequested, this, [this] {
         if (auto* entry = entryModel_->entry(list_->currentIndex()))
             editEntry(entry);
     });
 
-    new ScrollBarFader(tree_);
-    new ScrollBarFader(list_);
+    new OverlayScrollBar(tree_);
+    new OverlayScrollBar(list_);
 
     connect(tree_->selectionModel(), &QItemSelectionModel::currentChanged, this,
             [this](const QModelIndex& current, const QModelIndex&) { onGroupChanged(current); });
@@ -230,29 +272,36 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
 
 // Toolbar over the directory pane: the traffic lights keep their
 // corner (repositioned to the strip's vertical center on macOS), the
-// panel toggle sits right after them, and the folder / graph /
-// settings actions are right-aligned like the list-header icons.
+// panel toggle sits right after them on its own, and every other
+// action — folder / search / graph / lock / settings — is
+// right-aligned like the list-header icons.
 QWidget* MainWindow::buildTreeHeader() {
     auto* header = new HeaderBar;
     header->setObjectName(QStringLiteral("treeHeader"));
     header->setFixedHeight(kHeaderHeight);
     auto* layout = new QHBoxLayout(header);
-    layout->setContentsMargins(kTrafficLeft + kTrafficSpan + 8, 0, 14, 0);
+    layout->setContentsMargins(kTrafficLeft + kTrafficSpan + 4, 0, 14, 0);
     layout->setSpacing(4);
 
     auto* closePane = headerButton(QStringLiteral("sidebar"), tr("Hide folder panel"));
     connect(closePane, &QToolButton::clicked, this, [this] { setTreePaneVisible(false); });
     layout->addWidget(closePane);
-    layout->addWidget(headerButton(QStringLiteral("search"), tr("Search")));
     layout->addStretch(1);
 
     auto* newFolder = headerButton(QStringLiteral("folder-plus"), tr("New folder"));
     connect(newFolder, &QToolButton::clicked, this, [this] { addFolderTo(currentGroup()); });
     layout->addWidget(newFolder);
 
-    layout->addWidget(headerButton(QStringLiteral("graph"), tr("Graph")));
+    auto* searchButton = headerButton(QStringLiteral("search"), tr("Search"));
+    connect(searchButton, &QToolButton::clicked, this, &MainWindow::openSearch);
+    layout->addWidget(searchButton);
+    auto* graphButton = headerButton(QStringLiteral("graph"), tr("Graph"));
+    connect(graphButton, &QToolButton::clicked, this, &MainWindow::openGraph);
+    layout->addWidget(graphButton);
+    auto* lockButton = headerButton(QStringLiteral("lock"), tr("Lock vault"));
+    connect(lockButton, &QToolButton::clicked, this, &MainWindow::lockVault);
+    layout->addWidget(lockButton);
     layout->addWidget(headerButton(QStringLiteral("settings"), tr("Settings")));
-    layout->addWidget(headerButton(QStringLiteral("lock"), tr("Lock vault")));
     return header;
 }
 
@@ -351,7 +400,7 @@ void MainWindow::setTreePaneVisible(bool visible) {
     int start = 0;
     int target = 0;
     if (visible) {
-        target = treeSplitterSizes_.isEmpty() ? 300 : treeSplitterSizes_.first();
+        target = treeSplitterSizes_.isEmpty() ? 375 : treeSplitterSizes_.first();
         pane->beginSlide(target);
         pane->show();
         // The splitter would hand the reappearing pane its remembered
@@ -440,6 +489,111 @@ void MainWindow::selectEntryNamed(const QString& name) {
     }
 }
 
+// One graph window at a time: a second click just brings it forward.
+// The window is rebuilt from scratch on every open, so it always
+// shows a fresh snapshot of the vault.
+void MainWindow::openGraph() {
+    if (lockScreen_->isVisible())
+        return;
+    if (graph_) {
+        graph_->raise();
+        graph_->activateWindow();
+        return;
+    }
+    graph_ = new GraphWindow(treeModel_->rootGroup());
+    graph_->setAttribute(Qt::WA_DeleteOnClose);
+    connect(graph_, &QObject::destroyed, this, [this] { graph_ = nullptr; });
+    connect(graph_, &GraphWindow::nodeActivated, this, &MainWindow::revealInVault);
+    graph_->resize(900, 640);
+    graph_->show();
+}
+
+// Jump to a spot in the vault — from a graph-node click or a search
+// pick. Both hand over a snapshot; pointers into a since-edited vault
+// are dropped instead of followed.
+void MainWindow::revealInVault(nightlock::Group* group, nightlock::Entry* entry) {
+    auto* root = treeModel_->rootGroup();
+    if (!group || (group != root && !root->isAncestorOf(group)))
+        return;
+    tree_->setCurrentIndex(treeModel_->indexOf(group));
+    if (entry) {
+        const QModelIndex index = entryModel_->indexOf(entry);
+        if (!index.isValid())
+            return;
+        list_->setCurrentIndex(index);
+    }
+    raise();
+    activateWindow();
+}
+
+void MainWindow::refreshGraph() {
+    if (graph_)
+        graph_->refresh();
+}
+
+// The standalone "Search Entry" window, centered over the main
+// window. One at a time: a second call just brings it forward.
+SearchWindow* MainWindow::openSearch() {
+    if (lockScreen_->isVisible())
+        return nullptr;
+    if (search_) {
+        search_->raise();
+        search_->activateWindow();
+        return search_;
+    }
+    search_ = new SearchWindow(treeModel_->rootGroup());
+    connect(search_, &QObject::destroyed, this, [this] { search_ = nullptr; });
+    connect(search_, &SearchWindow::entryChosen, this, &MainWindow::revealInVault);
+    search_->move(geometry().center() - QPoint(search_->width() / 2, search_->height() / 2));
+    search_->show();
+    return search_;
+}
+
+QWidget* MainWindow::openGraphForScreenshot() {
+    openGraph();
+    // NIGHTLOCK_GRAPH_FOCUS=<entry name> replays the Show-in-Graph
+    // jump for screenshots.
+    const QString focus = qEnvironmentVariable("NIGHTLOCK_GRAPH_FOCUS");
+    if (!focus.isEmpty()) {
+        selectEntryNamed(focus);
+        if (auto* entry = entryModel_->entry(list_->currentIndex()))
+            graph_->focusEntry(entry);
+    }
+    return graph_;
+}
+
+QWidget* MainWindow::openSearchForScreenshot(const QString& query) {
+    SearchWindow* window = openSearch();
+    if (window)
+        window->setQuery(query);
+    return window;
+}
+
+// The lock icon / ⌘L: windows showing vault data close, the floating
+// detail docks back, and the lock screen covers everything until the
+// right password comes in.
+void MainWindow::lockVault() {
+    if (graph_)
+        graph_->close();
+    if (search_)
+        search_->close();
+    if (detail_->isWindow())
+        dockDetail();
+    lockScreen_->setGeometry(rect());
+    lockScreen_->reset();
+    lockScreen_->show();
+    lockScreen_->raise();
+    // Keynote-style: the Dock icon wears a padlock while locked.
+    QGuiApplication::setWindowIcon(
+        QIcon(QStringLiteral(NIGHTLOCK_ICONS_DIR "/appicon-locked.png")));
+}
+
+void MainWindow::debugLock(bool fail) {
+    lockVault();
+    if (fail)
+        lockScreen_->debugFail();
+}
+
 void MainWindow::onGroupChanged(const QModelIndex& current) {
     auto* group = treeModel_->group(current);
     entryModel_->setGroup(group);
@@ -465,6 +619,25 @@ void MainWindow::showGroupMenu(const QPoint& pos) {
     if (!group)
         group = treeModel_->rootGroup();  // empty area acts on the vault root
 
+    // A multi-selection gets a reduced menu acting on every selected
+    // folder at once (the root never joins a batch).
+    QList<nightlock::Group*> selected;
+    for (const QModelIndex& i : tree_->selectionModel()->selectedIndexes())
+        if (auto* g = treeModel_->group(i); g && g != treeModel_->rootGroup())
+            selected << g;
+    if (selected.size() > 1 && selected.contains(group)) {
+        auto* menu = new NlMenu(this);
+        connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
+        menu->addAction(menuIcon(QStringLiteral("image")), tr("Change icons…"), this,
+                        [this, selected] { changeFolderIcon(selected); });
+        menu->addSeparator();
+        auto* del = menu->addAction(menuIcon(QStringLiteral("trash")), tr("Delete"), this,
+                                    [this, selected] { deleteFolders(selected); });
+        del->setProperty("danger", true);
+        menu->popupAt(tree_->viewport()->mapToGlobal(pos));
+        return;
+    }
+
     auto* menu = new NlMenu(this);
     connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
 
@@ -477,7 +650,7 @@ void MainWindow::showGroupMenu(const QPoint& pos) {
         menu->addAction(menuIcon(QStringLiteral("edit-3")), tr("Rename"), this,
                         [this, group] { renameFolder(group); });
         menu->addAction(menuIcon(QStringLiteral("image")), tr("Change icon…"), this,
-                        [this, group] { changeFolderIcon(group); });
+                        [this, group] { changeFolderIcon({group}); });
         menu->addSeparator();
         auto* del = menu->addAction(menuIcon(QStringLiteral("trash")), tr("Delete"), this,
                                     [this, group] { deleteFolder(group); });
@@ -501,6 +674,28 @@ void MainWindow::showEntryMenu(const QPoint& pos) {
         menu->popupAt(list_->viewport()->mapToGlobal(pos));
         return;
     }
+    // A multi-selection gets a reduced menu: move or delete them all.
+    QList<nightlock::Entry*> selected;
+    for (const QModelIndex& i : list_->selectionModel()->selectedIndexes())
+        if (auto* e = entryModel_->entry(i))
+            selected << e;
+    if (selected.size() > 1 && selected.contains(entry)) {
+        auto* menu = new NlMenu(this);
+        connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
+        auto* moveMenu = buildMoveMenu(treeModel_->rootGroup(), selected, menu);
+        moveMenu->setTitle(tr("Move to"));
+        moveMenu->setIcon(menuIcon(QStringLiteral("corner-up-right")));
+        prependMoveTarget(moveMenu, treeModel_->rootGroup(), selected,
+                          QString::fromStdString(treeModel_->rootGroup()->name()));
+        menu->addMenu(moveMenu);
+        menu->addSeparator();
+        auto* del = menu->addAction(menuIcon(QStringLiteral("trash")), tr("Delete"), this,
+                                    [this, selected] { deleteEntries(selected); });
+        del->setProperty("danger", true);
+        menu->popupAt(list_->viewport()->mapToGlobal(pos));
+        return;
+    }
+
     if (idx != list_->currentIndex())
         list_->setCurrentIndex(idx);  // keeps the detail panel in sync
 
@@ -532,11 +727,11 @@ NlMenu* MainWindow::buildEntryMenu(nightlock::Entry* entry) {
     menu->addSeparator();
     menu->addAction(menuIcon(QStringLiteral("edit")), tr("Edit"), this,
                     [this, entry] { editEntry(entry); });
-    auto* moveMenu = buildMoveMenu(treeModel_->rootGroup(), entry, menu);
+    auto* moveMenu = buildMoveMenu(treeModel_->rootGroup(), {entry}, menu);
     moveMenu->setTitle(tr("Move to"));
     moveMenu->setIcon(menuIcon(QStringLiteral("corner-up-right")));
     // The vault root is a destination too, listed under its own name.
-    prependMoveTarget(moveMenu, treeModel_->rootGroup(), entry,
+    prependMoveTarget(moveMenu, treeModel_->rootGroup(), {entry},
                       QString::fromStdString(treeModel_->rootGroup()->name()));
     menu->addMenu(moveMenu);
 
@@ -551,7 +746,8 @@ NlMenu* MainWindow::buildEntryMenu(nightlock::Entry* entry) {
 // folders with children become sub-menus whose first item ("Move
 // here") targets the folder itself. The entry's current folder stays
 // visible but disabled.
-NlMenu* MainWindow::buildMoveMenu(nightlock::Group* group, nightlock::Entry* entry,
+NlMenu* MainWindow::buildMoveMenu(nightlock::Group* group,
+                                  const QList<nightlock::Entry*>& entries,
                                   QWidget* parent) {
     auto* menu = new NlMenu(parent);
     for (const auto& sub : group->groups()) {
@@ -559,12 +755,12 @@ NlMenu* MainWindow::buildMoveMenu(nightlock::Group* group, nightlock::Entry* ent
         const QString name = QString::fromStdString(target->name());
         if (target->groups().empty()) {
             QAction* action = menu->addAction(
-                name, this, [this, entry, target] { moveEntryTo(entry, target); });
+                name, this, [this, entries, target] { moveEntriesTo(entries, target); });
             action->setEnabled(target != entryModel_->group());
         } else {
-            auto* subMenu = buildMoveMenu(target, entry, menu);
+            auto* subMenu = buildMoveMenu(target, entries, menu);
             subMenu->setTitle(name);
-            prependMoveTarget(subMenu, target, entry, tr("Move here"));
+            prependMoveTarget(subMenu, target, entries, tr("Move here"));
             menu->addMenu(subMenu);
         }
     }
@@ -573,31 +769,35 @@ NlMenu* MainWindow::buildMoveMenu(nightlock::Group* group, nightlock::Entry* ent
 
 // Inserts a "move into this very folder" item (plus a band below it)
 // at the top of `menu`, disabled when the folder already holds the
-// entry.
+// entries.
 void MainWindow::prependMoveTarget(NlMenu* menu, nightlock::Group* target,
-                                   nightlock::Entry* entry, const QString& title) {
+                                   const QList<nightlock::Entry*>& entries,
+                                   const QString& title) {
     QAction* first = menu->actions().value(0);
     auto* action = new QAction(title, menu);
     action->setEnabled(target != entryModel_->group());
     connect(action, &QAction::triggered, this,
-            [this, entry, target] { moveEntryTo(entry, target); });
+            [this, entries, target] { moveEntriesTo(entries, target); });
     menu->insertAction(first, action);
     if (first)
         menu->insertSeparator(first);
 }
 
-void MainWindow::moveEntryTo(nightlock::Entry* entry, nightlock::Group* target) {
+void MainWindow::moveEntriesTo(const QList<nightlock::Entry*>& entries,
+                               nightlock::Group* target) {
     nightlock::Group* source = entryModel_->group();
     if (!source || !target || source == target)
         return;
-    if (!source->transferEntry(entry, *target))
-        return;
-    // Show where it landed, exactly like adding does: switch to the
-    // target folder and keep the moved entry selected (the pointer
-    // survives the transfer, so the detail view follows seamlessly).
+    for (nightlock::Entry* entry : entries)
+        source->transferEntry(entry, *target);
+    // Show where they landed, exactly like adding does: switch to the
+    // target folder and keep the first moved entry selected (pointers
+    // survive the transfer, so the detail view follows seamlessly).
     tree_->setCurrentIndex(treeModel_->indexOf(target));
     onGroupChanged(tree_->currentIndex());
-    list_->setCurrentIndex(entryModel_->indexOf(entry));
+    if (!entries.isEmpty())
+        list_->setCurrentIndex(entryModel_->indexOf(entries.first()));
+    refreshGraph();
 }
 
 void MainWindow::addEntryTo(nightlock::Group* group) {
@@ -617,6 +817,7 @@ void MainWindow::insertEntry(nightlock::Group* group, nightlock::Entry entry) {
     tree_->setCurrentIndex(treeModel_->indexOf(group));
     onGroupChanged(tree_->currentIndex());  // re-reads the list and the header
     list_->setCurrentIndex(entryModel_->indexOf(&added));
+    refreshGraph();
 }
 
 void MainWindow::editEntry(nightlock::Entry* entry) {
@@ -640,6 +841,7 @@ void MainWindow::editEntry(nightlock::Entry* entry) {
     // A sorted view may have moved the row under the edit; follow it.
     list_->setCurrentIndex(entryModel_->indexOf(entry));
     detail_->setEntry(entry);
+    refreshGraph();
 }
 
 void MainWindow::addFolderTo(nightlock::Group* group) {
@@ -676,13 +878,43 @@ void MainWindow::deleteFolder(nightlock::Group* group) {
         tree_->setCurrentIndex(treeModel_->indexOf(parent));
 }
 
-void MainWindow::changeFolderIcon(nightlock::Group* group) {
+// One gallery pick assigns the icon to every group in the batch.
+void MainWindow::changeFolderIcon(const QList<nightlock::Group*>& groups) {
     auto* gallery = new IconGalleryPopup(this);
-    connect(gallery, &IconGalleryPopup::iconSelected, this, [this, group](const QString& path) {
-        treeModel_->setGroupIcon(treeModel_->indexOf(group), path);
+    connect(gallery, &IconGalleryPopup::iconSelected, this, [this, groups](const QString& path) {
+        for (nightlock::Group* group : groups)
+            treeModel_->setGroupIcon(treeModel_->indexOf(group), path);
         standardicons::addRecentIconPath(path);
     });
     gallery->popupAt(QCursor::pos());
+}
+
+// Batch folder delete: one confirmation, then the top-most selected
+// folders go (a selected descendant of another selected folder dies
+// with its ancestor anyway).
+void MainWindow::deleteFolders(const QList<nightlock::Group*>& groups) {
+    QList<nightlock::Group*> tops;
+    for (nightlock::Group* group : groups) {
+        bool covered = false;
+        for (nightlock::Group* other : groups)
+            covered = covered || (other != group && other->isAncestorOf(group));
+        if (!covered)
+            tops << group;
+    }
+    QMessageBox box(QMessageBox::Warning, tr("Delete Folders"),
+                    tr("Delete %1 folders and everything inside them?").arg(groups.size()),
+                    QMessageBox::NoButton, this);
+    box.setInformativeText(tr("This cannot be undone."));
+    QAbstractButton* deleteButton = box.addButton(tr("Delete"), QMessageBox::DestructiveRole);
+    box.addButton(QMessageBox::Cancel);
+    box.setDefaultButton(QMessageBox::Cancel);
+    box.exec();
+    if (box.clickedButton() != deleteButton)
+        return;
+
+    for (nightlock::Group* group : tops)
+        treeModel_->removeGroup(treeModel_->indexOf(group));
+    tree_->setCurrentIndex(treeModel_->indexOf(treeModel_->rootGroup()));
 }
 
 void MainWindow::debugMoveGroup(const QString& groupName, const QString& targetName) {
@@ -700,7 +932,7 @@ void MainWindow::debugMoveEntry(const QString& targetName) {
     auto* entry = entryModel_->entry(list_->currentIndex());
     auto* target = findGroup(treeModel_->rootGroup(), targetName);
     if (entry && target)
-        moveEntryTo(entry, target);
+        moveEntriesTo({entry}, target);
 }
 
 QMenu* MainWindow::popupSortMenuForScreenshot() {
@@ -787,6 +1019,8 @@ void MainWindow::dockDetail() {
 
 void MainWindow::resizeEvent(QResizeEvent* event) {
     QMainWindow::resizeEvent(event);
+    if (lockScreen_ && lockScreen_->isVisible())
+        lockScreen_->setGeometry(rect());
 #ifdef Q_OS_MACOS
     // AppKit puts the buttons back into the title-bar corner on its own
     // relayouts; re-center them on the tree header after every resize.
@@ -816,6 +1050,26 @@ void MainWindow::deleteEntry(nightlock::Entry* entry) {
         detail_->setEntry(nullptr);
     entryModel_->removeEntry(entry);
     onGroupChanged(tree_->currentIndex());  // refreshes the counter
+    refreshGraph();
+}
+
+void MainWindow::deleteEntries(const QList<nightlock::Entry*>& entries) {
+    QMessageBox box(QMessageBox::Warning, tr("Delete Entries"),
+                    tr("Delete %1 entries?").arg(entries.size()), QMessageBox::NoButton, this);
+    box.setInformativeText(tr("This cannot be undone."));
+    QAbstractButton* deleteButton = box.addButton(tr("Delete"), QMessageBox::DestructiveRole);
+    box.addButton(QMessageBox::Cancel);
+    box.setDefaultButton(QMessageBox::Cancel);
+    box.exec();
+    if (box.clickedButton() != deleteButton)
+        return;
+
+    if (detail_->isWindow())
+        detail_->setEntry(nullptr);
+    for (nightlock::Entry* entry : entries)
+        entryModel_->removeEntry(entry);
+    onGroupChanged(tree_->currentIndex());  // refreshes the counter
+    refreshGraph();
 }
 
 void MainWindow::debugSpoiler(const QString& state) {
@@ -883,6 +1137,11 @@ void MainWindow::debugSetEntryPattern(const QString& spec) {
             entry->pattern = kindOf(kind);
     }
     detail_->setEntry(entryModel_->entry(list_->currentIndex()));
+}
+
+void MainWindow::debugRenameFolder(const QString& name) {
+    if (auto* group = findGroup(treeModel_->rootGroup(), name))
+        renameFolder(group);
 }
 
 void MainWindow::debugFolderOps() {

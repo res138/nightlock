@@ -54,9 +54,6 @@ QToolButton#headerIconButton {
     border: none;
     border-radius: 7px;
 }
-QToolButton#headerIconButton:pressed {
-    background: rgba(0, 0, 0, 0.11);
-}
 QToolButton#headerIconButton[active="true"] {
     background: rgba(0, 0, 0, 0.08);
 }
@@ -122,13 +119,19 @@ QLabel#fieldValue {
     color: #3C3C3C;
 }
 
+/* Folder renaming happens in place: the editor melts into the black
+   selected row (black on black, white text), so it reads as editing
+   the row's own text rather than a popped-up input panel. */
 QTreeView#groupTree QLineEdit {
-    background: #FFFFFF;
+    background: #000000;
     border: 1px solid #000000;
     border-radius: 4px;
-    padding-left: 8px;
-    color: #111111;
-    selection-background-color: #000000;
+    /* lines the editor text up with the row text it replaces */
+    padding-left: 1px;
+    color: #FFFFFF;
+    /* the select-all highlight stays a soft band instead of flipping
+       the text back to a white block */
+    selection-background-color: rgba(255, 255, 255, 0.3);
     selection-color: #FFFFFF;
 }
 
@@ -157,15 +160,11 @@ QDialog#entryEditDialog QPlainTextEdit:focus {
     border: 1px solid #000000;
 }
 QToolButton#iconPickerButton {
-    background: #FBF9FB;
-    border: 1px solid #EFEFEF;
+    background: transparent;
+    border: none;
     border-radius: 10px;
 }
-QToolButton#iconPickerButton:hover {
-    background: #F1EFF1;
-}
 QToolButton#iconPickerButton:checked {
-    background: #FFFFFF;
     border: 1px solid #000000;
 }
 QPushButton#primaryButton {
@@ -197,15 +196,37 @@ QPushButton#ghostButton:hover {
 }
 
 QToolButton#iconPickerAdd {
-    background: #FFFFFF;
-    border: 1px solid #DFDFDF;
-    border-radius: 10px;
+    background: transparent;
+    border: none;
     font-size: 20px;
-    color: #6E6E6E;
+    color: #000000;
 }
-QToolButton#iconPickerAdd:hover {
-    background: #F5F5F5;
+
+QWidget#searchWindow {
+    background: #FFFFFF;
+}
+QWidget#searchWindow QLineEdit#searchField {
+    background: #FBF9FB;
+    border: 1px solid #EFEFEF;
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 13px;
     color: #111111;
+    selection-background-color: #000000;
+    selection-color: #FFFFFF;
+}
+QWidget#searchWindow QLineEdit#searchField:focus {
+    background: #FFFFFF;
+    border: 1px solid #D9D7DC;
+}
+QListWidget#searchResults {
+    background: transparent;
+    border: none;
+}
+QLabel#searchEmpty {
+    font-size: 12px;
+    color: #8A8792;
+    padding: 8px 0;
 }
 
 QListView#iconGallery {
@@ -229,23 +250,23 @@ QScrollArea[floatingWindow="true"] > QWidget > QWidget {
 
 QScrollBar:vertical {
     background: transparent;
-    width: 12px;
-    margin: 3px 3px 3px 3px;
+    width: 8px;
+    margin: 2px 2px 2px 2px;
 }
 QScrollBar:horizontal {
     background: transparent;
-    height: 12px;
-    margin: 3px 3px 3px 3px;
+    height: 8px;
+    margin: 2px 2px 2px 2px;
 }
 QScrollBar::handle:vertical {
     background: #CFCFCF;
-    border-radius: 3px;
-    min-height: 36px;
+    border-radius: 2px;
+    min-height: 22px;
 }
 QScrollBar::handle:horizontal {
     background: #CFCFCF;
-    border-radius: 3px;
-    min-width: 36px;
+    border-radius: 2px;
+    min-width: 22px;
 }
 QScrollBar::handle:vertical:hover,
 QScrollBar::handle:horizontal:hover {
@@ -261,43 +282,66 @@ QScrollBar::add-page, QScrollBar::sub-page {
     background: transparent;
 }
 
-QTreeView#groupTree QScrollBar::handle:vertical,
-QTreeView#groupTree QScrollBar::handle:horizontal,
-QListView#entryList QScrollBar::handle:vertical,
-QListView#entryList QScrollBar::handle:horizontal {
-    background: transparent;
+QToolButton#graphZoomButton {
+    background: #FFFFFF;
+    border: 1px solid #E6E4E8;
+    border-radius: 14px;
+    font-size: 16px;
+    color: #111111;
 }
-QTreeView#groupTree QScrollBar[scrolling="true"]::handle:vertical,
-QTreeView#groupTree QScrollBar[scrolling="true"]::handle:horizontal,
-QListView#entryList QScrollBar[scrolling="true"]::handle:vertical,
-QListView#entryList QScrollBar[scrolling="true"]::handle:horizontal {
-    background: #CFCFCF;
+QToolButton#graphZoomButton:hover {
+    background: #F5F3F6;
 }
-QTreeView#groupTree QScrollBar::handle:vertical:hover,
-QTreeView#groupTree QScrollBar::handle:horizontal:hover,
-QListView#entryList QScrollBar::handle:vertical:hover,
-QListView#entryList QScrollBar::handle:horizontal:hover {
-    background: #A9A9A9;
+QToolButton#graphZoomButton:pressed {
+    background: #EDEBEF;
 }
 
-QListView#iconGallery QScrollBar::handle:vertical,
-QListView#iconGallery QScrollBar::handle:horizontal {
-    background: transparent;
+QWidget#lockScreen {
+    background: #FFFFFF;
 }
-QListView#iconGallery QScrollBar[scrolling="true"]::handle:vertical,
-QListView#iconGallery QScrollBar[scrolling="true"]::handle:horizontal {
-    background: #CFCFCF;
+QLabel#lockTitle {
+    font-size: 20px;
+    font-weight: 700;
+    color: #111111;
 }
-QListView#iconGallery QScrollBar::handle:vertical:hover,
-QListView#iconGallery QScrollBar::handle:horizontal:hover {
-    background: #A9A9A9;
+QLineEdit#lockField {
+    background: #FBF9FB;
+    border: 1px solid #EFEFEF;
+    border-radius: 10px;
+    padding: 0 14px;
+    font-size: 14px;
+    color: #111111;
+    selection-background-color: #000000;
+    selection-color: #FFFFFF;
+}
+QLineEdit#lockField:focus {
+    background: #FFFFFF;
+    border: 1px solid #D9D7DC;
+}
+QLineEdit#lockField[error="true"] {
+    border: 1px solid #D2605E;
+}
+QToolButton#lockUnlock {
+    background: #000000;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 10px;
+    font-size: 18px;
+}
+QLabel#lockError {
+    font-size: 12px;
+    color: #D2605E;
+}
+QLabel#lockLink {
+    font-size: 12px;
 }
 
-QListView#iconGallery QScrollBar:vertical {
-    width: 8px;
-    margin: 0;
-}
-QListView#iconGallery QScrollBar::handle:vertical {
-    border-radius: 4px;
-    min-height: 36px;
+QPushButton#showInGraph {
+    background: #000000;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 0;
+    font-size: 13px;
+    font-weight: 600;
 }

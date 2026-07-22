@@ -70,7 +70,7 @@ std::atomic<bool> g_stopPreload{false};
 std::thread g_preloadThread;
 
 constexpr int kGalleryDecodeSize = 64;  // 32px cells on a 2x display
-constexpr int kMaxRecentIcons = 10;
+constexpr int kMaxRecentIcons = 15;
 const QLatin1String kRecentIconsKey("recentIcons");
 
 }  // namespace

@@ -6,9 +6,6 @@
 
 namespace frosted {
 
-namespace {
-constexpr qreal kVeilOpacity = 0.85;  // solid color share over the blurred backdrop
-}
 
 QRect panelRect(const QWidget* widget) {
     return widget->rect().marginsRemoved(QMargins(kShadow, kShadow, kShadow, kShadow));
@@ -36,7 +33,7 @@ void paintPanel(QWidget* widget, const QRectF& panel, qreal reveal,
     painter.fillRect(panel, Qt::white);
     if (!backdrop.isNull())
         painter.drawPixmap(panel.topLeft() + backdropOffset, backdrop);
-    painter.fillRect(panel, QColor(255, 255, 255, qRound(kVeilOpacity * 255)));
+    painter.fillRect(panel, QColor(255, 255, 255, qRound(kVeil * 255)));
     painter.restore();
 }
 
@@ -87,7 +84,7 @@ QPixmap captureBackdrop(QWidget* widget, QPoint* offsetOut) {
         return {};
 
     // Cheap blur: heavy downscale, then smooth upscale.
-    const QSize coarse(qMax(1, canvas.width() / 12), qMax(1, canvas.height() / 12));
+    const QSize coarse(qMax(1, canvas.width() / 16), qMax(1, canvas.height() / 16));
     const QImage blurred = canvas.toImage()
                                .scaled(coarse, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
                                .scaled(canvas.size(), Qt::IgnoreAspectRatio,

@@ -6,6 +6,7 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPushButton>
 #include <QStyle>
 #include <QTimer>
 #include <QToolButton>
@@ -16,6 +17,7 @@
 #include <nightlock/entry.hpp>
 
 #include "copylabel.hpp"
+#include "overlayscrollbar.hpp"
 #include "patternbackdrop.hpp"
 #include "spoilerlabel.hpp"
 #include "totpring.hpp"
@@ -26,6 +28,7 @@ constexpr int kIconSize = 58;
 constexpr int kDetachThreshold = 12;  // px of grip travel before undocking
 constexpr int kGripHeight = 22;
 constexpr int kGripGap = 12;          // equal gap above and below the grip
+constexpr int kSectionGap = 14;       // one vertical rhythm between all sections
 constexpr qreal kFloatingRadius = 10;  // matches the main window corners
 
 QString formatDate(std::chrono::system_clock::time_point tp) {
@@ -140,6 +143,7 @@ private:
 
 EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     setWidgetResizable(true);
+    new OverlayScrollBar(this);
 
     content_ = new QWidget;
     auto* layout = new QVBoxLayout(content_);
@@ -153,7 +157,7 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     // a fixed height keeps the header from shifting.
     iconLabel_->setFixedHeight(kIconSize);
     layout->addWidget(iconLabel_);
-    layout->addSpacing(kGripGap);  // same air as between the grip and the icon
+    layout->addSpacing(kSectionGap);
 
     titleLabel_ = new QLabel;
     titleLabel_->setObjectName(QStringLiteral("detailTitle"));
@@ -166,7 +170,7 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     noteLabel_->setAlignment(Qt::AlignHCenter);
     noteLabel_->setWordWrap(true);
     layout->addWidget(noteLabel_);
-    layout->addSpacing(20);
+    layout->addSpacing(kSectionGap);
 
     fieldsCard_ = new QFrame;
     fieldsCard_->setObjectName(QStringLiteral("card"));
@@ -192,7 +196,7 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     codeRow_ = makeRow(fieldsLayout, tr("Code"));
     codeRow_.layout->insertWidget(codeRow_.layout->count() - 1, new TotpRing);
     layout->addWidget(fieldsCard_);
-    layout->addSpacing(26);
+    layout->addSpacing(kSectionGap);
 
     auto* metaHeader = new QLabel(tr("Meta"));
     metaHeader->setObjectName(QStringLiteral("metaHeader"));
@@ -207,6 +211,24 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     createdRow_ = makeRow(metaLayout, tr("Created"));
     modifiedRow_ = makeRow(metaLayout, tr("Modified"), true);
     layout->addWidget(metaCard);
+    layout->addSpacing(kSectionGap);
+
+    // Full-width black pill jumping to this entry's node in the graph.
+    graphButton_ = new QPushButton(tr("Show in Graph"));
+    graphButton_->setObjectName(QStringLiteral("showInGraph"));
+    graphButton_->setCursor(Qt::PointingHandCursor);
+    // The toolbar's graph glyph, recolored white for the dark pill.
+    QPixmap glyph = QIcon(QStringLiteral(":/icons/menu/graph.svg")).pixmap(QSize(34, 34));
+    {
+        QPainter tint(&glyph);
+        tint.setCompositionMode(QPainter::CompositionMode_SourceIn);
+        tint.fillRect(glyph.rect(), Qt::white);
+    }
+    glyph.setDevicePixelRatio(2.0);
+    graphButton_->setIcon(QIcon(glyph));
+    graphButton_->setIconSize(QSize(17, 17));
+    connect(graphButton_, &QPushButton::clicked, this, &EntryDetailView::graphRequested);
+    layout->addWidget(graphButton_);
 
     layout->addStretch(1);
 
@@ -224,9 +246,8 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     grip_ = new DragHandle(this);
     grip_->raise();
 
-    // Pencil in the top-right corner, level with the grip, with the
-    // password-generator keys beside it; both hidden together with the
-    // content when no entry is shown.
+    // Pencil in the top-right corner, level with the grip; hidden
+    // together with the content when no entry is shown.
     const auto makeCornerButton = [this](const QString& icon, const QString& toolTip) {
         auto* button = new QToolButton(this);
         button->setObjectName(QStringLiteral("headerIconButton"));
@@ -240,7 +261,6 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     };
     editButton_ = makeCornerButton(QStringLiteral("edit"), tr("Edit entry"));
     connect(editButton_, &QToolButton::clicked, this, &EntryDetailView::editRequested);
-    generatorButton_ = makeCornerButton(QStringLiteral("keys"), tr("Password generator"));
 
     floatingControls_ = new FloatingControls(this);
     floatingControls_->move(12, 12);
@@ -260,7 +280,6 @@ void EntryDetailView::resizeEvent(QResizeEvent* event) {
     // Centered on the grip row, mirroring the floating traffic lights.
     const int buttonY = kGripGap + (kGripHeight - editButton_->height()) / 2;
     editButton_->move(width() - editButton_->width() - 14, buttonY);
-    generatorButton_->move(editButton_->x() - generatorButton_->width() - 4, buttonY);
     floatingBackdrop_->setGeometry(rect());
     updatePatternGeometry();
 }
@@ -330,7 +349,6 @@ void EntryDetailView::debugSpoiler(const QString& state) {
 void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     content_->setVisible(entry != nullptr);
     editButton_->setVisible(entry != nullptr);
-    generatorButton_->setVisible(entry != nullptr);
     if (!entry)
         return;
 
