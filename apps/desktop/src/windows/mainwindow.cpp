@@ -41,6 +41,7 @@
 #include "widgets/searchwindow.hpp"
 #include "windows/entryeditdialog.hpp"
 #include "windows/graphwindow.hpp"
+#include "windows/lockscreen.hpp"
 
 #ifdef Q_OS_MACOS
 #include "platform/macwindow.hpp"
@@ -195,9 +196,32 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     splitter_->setSizes({375, 420, 460});
     setCentralWidget(splitter_);
 
-    // ⌘F / ⌘G land here as Ctrl on other platforms.
+    // ⌘F / ⌘G / ⌘L / ⌘N / ⌘T / ⌘D land here as Ctrl on other
+    // platforms. Vault-touching ones stay dead while locked.
     new QShortcut(QKeySequence::Find, this, [this] { openSearch(); });
     new QShortcut(QKeySequence(QStringLiteral("Ctrl+G")), this, [this] { openGraph(); });
+    new QShortcut(QKeySequence(QStringLiteral("Ctrl+L")), this, [this] { lockVault(); });
+    new QShortcut(QKeySequence::New, this, [this] {  // ⌘N: new entry
+        if (!lockScreen_->isVisible())
+            addEntryTo(currentGroup() ? currentGroup() : treeModel_->rootGroup());
+    });
+    new QShortcut(QKeySequence(QStringLiteral("Ctrl+T")), this, [this] {  // ⌘T: new folder
+        if (!lockScreen_->isVisible())
+            addFolderTo(currentGroup() ? currentGroup() : treeModel_->rootGroup());
+    });
+    new QShortcut(QKeySequence(QStringLiteral("Ctrl+D")), this, [this] {  // ⌘D: fold the panel
+        if (!lockScreen_->isVisible())
+            setTreePaneVisible(!treePane_->isVisible());
+    });
+
+    lockScreen_ = new LockScreen(this);
+    lockScreen_->hide();
+    connect(lockScreen_, &LockScreen::unlocked, this, [this] {
+        lockScreen_->hide();
+        // The Dock loses its lock badge together with the screen.
+        QGuiApplication::setWindowIcon(
+            QIcon(QStringLiteral(NIGHTLOCK_ICONS_DIR "/appicon.png")));
+    });
 
     connect(detail_, &EntryDetailView::detachRequested, this, &MainWindow::detachDetail);
     connect(detail_, &EntryDetailView::dropped, this, &MainWindow::maybeReattachDetail);
@@ -274,7 +298,9 @@ QWidget* MainWindow::buildTreeHeader() {
     auto* graphButton = headerButton(QStringLiteral("graph"), tr("Graph"));
     connect(graphButton, &QToolButton::clicked, this, &MainWindow::openGraph);
     layout->addWidget(graphButton);
-    layout->addWidget(headerButton(QStringLiteral("lock"), tr("Lock vault")));
+    auto* lockButton = headerButton(QStringLiteral("lock"), tr("Lock vault"));
+    connect(lockButton, &QToolButton::clicked, this, &MainWindow::lockVault);
+    layout->addWidget(lockButton);
     layout->addWidget(headerButton(QStringLiteral("settings"), tr("Settings")));
     return header;
 }
@@ -467,6 +493,8 @@ void MainWindow::selectEntryNamed(const QString& name) {
 // The window is rebuilt from scratch on every open, so it always
 // shows a fresh snapshot of the vault.
 void MainWindow::openGraph() {
+    if (lockScreen_->isVisible())
+        return;
     if (graph_) {
         graph_->raise();
         graph_->activateWindow();
@@ -506,6 +534,8 @@ void MainWindow::refreshGraph() {
 // The standalone "Search Entry" window, centered over the main
 // window. One at a time: a second call just brings it forward.
 SearchWindow* MainWindow::openSearch() {
+    if (lockScreen_->isVisible())
+        return nullptr;
     if (search_) {
         search_->raise();
         search_->activateWindow();
@@ -534,8 +564,34 @@ QWidget* MainWindow::openGraphForScreenshot() {
 
 QWidget* MainWindow::openSearchForScreenshot(const QString& query) {
     SearchWindow* window = openSearch();
-    window->setQuery(query);
+    if (window)
+        window->setQuery(query);
     return window;
+}
+
+// The lock icon / ⌘L: windows showing vault data close, the floating
+// detail docks back, and the lock screen covers everything until the
+// right password comes in.
+void MainWindow::lockVault() {
+    if (graph_)
+        graph_->close();
+    if (search_)
+        search_->close();
+    if (detail_->isWindow())
+        dockDetail();
+    lockScreen_->setGeometry(rect());
+    lockScreen_->reset();
+    lockScreen_->show();
+    lockScreen_->raise();
+    // Keynote-style: the Dock icon wears a padlock while locked.
+    QGuiApplication::setWindowIcon(
+        QIcon(QStringLiteral(NIGHTLOCK_ICONS_DIR "/appicon-locked.png")));
+}
+
+void MainWindow::debugLock(bool fail) {
+    lockVault();
+    if (fail)
+        lockScreen_->debugFail();
 }
 
 void MainWindow::onGroupChanged(const QModelIndex& current) {
@@ -963,6 +1019,8 @@ void MainWindow::dockDetail() {
 
 void MainWindow::resizeEvent(QResizeEvent* event) {
     QMainWindow::resizeEvent(event);
+    if (lockScreen_ && lockScreen_->isVisible())
+        lockScreen_->setGeometry(rect());
 #ifdef Q_OS_MACOS
     // AppKit puts the buttons back into the title-bar corner on its own
     // relayouts; re-center them on the tree header after every resize.

@@ -16,6 +16,7 @@ class EntryDetailView;
 class GraphWindow;
 class GroupTreeModel;
 class GroupTreeView;
+class LockScreen;
 class NlMenu;
 class SearchWindow;
 
@@ -86,6 +87,9 @@ public:
     // Debug hook for NIGHTLOCK_SCREENSHOT_SEARCH: opens the search
     // popup, pre-fills `query` and returns it for grabbing.
     QWidget* openSearchForScreenshot(const QString& query);
+    // Debug hook for NIGHTLOCK_SCREENSHOT_LOCK: locks the vault;
+    // `fail` first submits a wrong password for the error state.
+    void debugLock(bool fail);
     // Debug hook for NIGHTLOCK_TEST_REATTACH: docks the floating detail
     // view back through the regular drop path.
     void debugReattachDetail();
@@ -129,6 +133,7 @@ private:
     void openGraph();
     void refreshGraph();
     SearchWindow* openSearch();
+    void lockVault();
     void revealInVault(nightlock::Group* group, nightlock::Entry* entry);
 
     GroupTreeModel* treeModel_;
@@ -147,6 +152,7 @@ private:
     EntryDetailView* detail_;
     GraphWindow* graph_ = nullptr;     // the one graph window, if open
     SearchWindow* search_ = nullptr;   // the one search window, if open
+    LockScreen* lockScreen_ = nullptr; // covers the window while locked
     QSplitter* splitter_;
     QList<int> detailSplitterSizes_;  // pane widths to restore on re-dock
     QList<int> treeSplitterSizes_;    // pane widths to restore on reopen

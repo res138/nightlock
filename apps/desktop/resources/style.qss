@@ -296,6 +296,46 @@ QToolButton#graphZoomButton:pressed {
     background: #EDEBEF;
 }
 
+QWidget#lockScreen {
+    background: #FFFFFF;
+}
+QLabel#lockTitle {
+    font-size: 20px;
+    font-weight: 700;
+    color: #111111;
+}
+QLineEdit#lockField {
+    background: #FBF9FB;
+    border: 1px solid #EFEFEF;
+    border-radius: 10px;
+    padding: 0 14px;
+    font-size: 14px;
+    color: #111111;
+    selection-background-color: #000000;
+    selection-color: #FFFFFF;
+}
+QLineEdit#lockField:focus {
+    background: #FFFFFF;
+    border: 1px solid #D9D7DC;
+}
+QLineEdit#lockField[error="true"] {
+    border: 1px solid #D2605E;
+}
+QToolButton#lockUnlock {
+    background: #000000;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 10px;
+    font-size: 18px;
+}
+QLabel#lockError {
+    font-size: 12px;
+    color: #D2605E;
+}
+QLabel#lockLink {
+    font-size: 12px;
+}
+
 QPushButton#showInGraph {
     background: #000000;
     color: #FFFFFF;

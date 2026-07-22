@@ -25,6 +25,7 @@ qt_add_executable(nightlock-desktop
     src/widgets/totpring.cpp
     src/windows/entryeditdialog.cpp
     src/windows/graphwindow.cpp
+    src/windows/lockscreen.cpp
     src/windows/mainwindow.cpp
     resources/resources.qrc
 )

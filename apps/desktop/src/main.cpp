@@ -24,6 +24,11 @@ int main(int argc, char* argv[]) {
     if (qss.open(QIODevice::ReadOnly))
         app.setStyleSheet(QString::fromUtf8(qss.readAll()));
 
+    // Dock icon for the running process (the squircle render of the
+    // logo); resources/nightlock.icns carries the same art for a
+    // future .app bundle.
+    QApplication::setWindowIcon(QIcon(QStringLiteral(NIGHTLOCK_ICONS_DIR "/appicon.png")));
+
     auto vault = createDemoVault();
 
     MainWindow window(vault.get());
@@ -234,6 +239,19 @@ int main(int argc, char* argv[]) {
                 qEnvironmentVariable("NIGHTLOCK_SEARCH_QUERY"));
             QTimer::singleShot(400, popup, [popup] {
                 popup->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_SEARCH"));
+                QApplication::quit();
+            });
+        });
+    }
+
+    // Debug hook: NIGHTLOCK_SCREENSHOT_LOCK=<path> locks the vault,
+    // saves the window and exits. NIGHTLOCK_LOCK_FAIL=1 first submits
+    // a wrong password to capture the error state.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_LOCK")) {
+        QTimer::singleShot(800, &window, [&window] {
+            window.debugLock(qEnvironmentVariableIsSet("NIGHTLOCK_LOCK_FAIL"));
+            QTimer::singleShot(600, &window, [&window] {
+                window.grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_LOCK"));
                 QApplication::quit();
             });
         });
