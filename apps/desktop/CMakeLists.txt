@@ -6,6 +6,9 @@ set(CMAKE_AUTORCC ON)
 qt_add_executable(nightlock-desktop
     src/main.cpp
     src/demovault.cpp
+    src/appearancesettings.cpp
+    src/graphsettings.cpp
+    src/hotkeys.cpp
     src/standardicons.cpp
     src/models/grouptreemodel.cpp
     src/models/entrylistmodel.cpp
@@ -27,6 +30,7 @@ qt_add_executable(nightlock-desktop
     src/windows/graphwindow.cpp
     src/windows/lockscreen.cpp
     src/windows/mainwindow.cpp
+    src/windows/settingswindow.cpp
     resources/resources.qrc
 )
 

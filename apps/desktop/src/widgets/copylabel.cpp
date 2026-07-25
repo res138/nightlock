@@ -9,13 +9,15 @@
 #include <QTimer>
 #include <QVariantAnimation>
 
+#include "appearancesettings.hpp"
+
 namespace {
 
 constexpr int kFlashMs = 160;
 constexpr int kHoldMs = 900;
 constexpr int kHeight = 16;
 
-const QColor kTextColor(0x3C, 0x3C, 0x3C);
+QColor textColor() { return appearancesettings::palette().value; }
 
 }  // namespace
 
@@ -72,7 +74,7 @@ void CopyLabel::paintEvent(QPaintEvent*) {
 
     if (copied_ < 1.0) {
         painter.setOpacity(1.0 - copied_);
-        painter.setPen(kTextColor);
+        painter.setPen(textColor());
         painter.drawText(rect(), Qt::AlignRight | Qt::AlignVCenter | Qt::TextSingleLine,
                          text_);
     }
@@ -87,9 +89,9 @@ void CopyLabel::paintEvent(QPaintEvent*) {
         const qreal slide = (1.0 - copied_) * 4.0;  // gentle rise-in
         const int x = width() - textWidth - kGap - kIconSize;
         const QRectF iconRect(x, (height() - kIconSize) / 2.0 + slide, kIconSize, kIconSize);
-        static const QIcon copyIcon(QStringLiteral(":/icons/menu/copy.svg"));
+        static const QIcon copyIcon = appearancesettings::themedMenuIcon(QStringLiteral("copy"));
         copyIcon.paint(&painter, iconRect.toRect());
-        painter.setPen(kTextColor);
+        painter.setPen(textColor());
         painter.drawText(QRectF(x + kIconSize + kGap, slide, textWidth, height()),
                          Qt::AlignLeft | Qt::AlignVCenter, label);
     }

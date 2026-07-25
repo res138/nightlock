@@ -15,6 +15,9 @@
 
 #include <nightlock/group.hpp>
 
+#include "appearancesettings.hpp"
+#include "graphsettings.hpp"
+
 namespace {
 
 constexpr qreal kGoldenAngle = 2.39996;  // radians; spreads spiral placements
@@ -23,10 +26,44 @@ constexpr qreal kGoldenAngle = 2.39996;  // radians; spreads spiral placements
 const QColor kEdgePassword(0xD2, 0x60, 0x5E);
 const QColor kEdgeLogin(0x6E, 0x93, 0xD6);
 const QColor kEdgeUrl(0x5F, 0xA5, 0x7F);
-const QColor kEdgeDirectory(0xCB, 0xC7, 0xD0);
-const QColor kInk(0x00, 0x00, 0x00);  // node fill and hub labels
-const QColor kCanvas(0xFB, 0xF9, 0xFB);
-const QColor kLabel(0x6E, 0x6A, 0x75);
+
+// Theme-following paints, resolved on every frame.
+QColor canvasColor() { return appearancesettings::palette().canvas; }
+QColor inkColor() { return appearancesettings::palette().ink; }
+QColor labelColor() { return appearancesettings::palette().muted; }
+QColor directoryEdgeColor() {
+    return appearancesettings::darkActive() ? QColor(0x55, 0x54, 0x5C)
+                                            : QColor(0xCB, 0xC7, 0xD0);
+}
+
+// One width for every link — except the triple match below.
+constexpr qreal kEdgeWidth = 0.71;
+
+// Entry-rule bits for Edge::rules.
+constexpr int kMatchPassword = 1;
+constexpr int kMatchLogin = 2;
+constexpr int kMatchUrl = 4;
+constexpr int kMatchAll = kMatchPassword | kMatchLogin | kMatchUrl;
+
+// Rule combinations get their own colors; the full triple is the
+// loudest signal and also draws 2.5× thicker.
+const QColor kEdgeLoginPassword(0x9A, 0x6E, 0xD6);  // violet
+const QColor kEdgeLoginUrl(0xE0, 0x8A, 0x4E);       // orange
+const QColor kEdgePasswordUrl(0xD9, 0xA8, 0x3C);    // orange-yellow
+const QColor kEdgeTriple(0x8E, 0x2D, 0x44);         // burgundy
+
+QColor matchColor(int rules) {
+    switch (rules) {
+        case kMatchPassword: return kEdgePassword;
+        case kMatchLogin: return kEdgeLogin;
+        case kMatchUrl: return kEdgeUrl;
+        case kMatchLogin | kMatchPassword: return kEdgeLoginPassword;
+        case kMatchLogin | kMatchUrl: return kEdgeLoginUrl;
+        case kMatchPassword | kMatchUrl: return kEdgePasswordUrl;
+        case kMatchAll: return kEdgeTriple;
+    }
+    return directoryEdgeColor();
+}
 
 // "https://accounts.google.com/x" -> "google.com". Naive two-label
 // cut, good enough for vault URLs.
@@ -46,7 +83,7 @@ QString baseDomain(const std::string& url) {
 
 GraphWindow::GraphWindow(nightlock::Group* root, QWidget* parent)
     : QWidget(parent), root_(root) {
-    setWindowTitle(tr("Graph"));
+    setWindowTitle(tr("NetGraph"));
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);  // +/- zoom needs key events
 
@@ -63,10 +100,35 @@ GraphWindow::GraphWindow(nightlock::Group* root, QWidget* parent)
     };
     zoomIn_ = makeZoomButton(QStringLiteral("+"), tr("Zoom in"));
     zoomOut_ = makeZoomButton(QStringLiteral("−"), tr("Zoom out"));
+    focusRoot_ = makeZoomButton(QStringLiteral("/"), tr("Center on Root"));
+    // The slash glyph runs the full ascent, so it renders larger than
+    // the +/− at the same font size; a smaller size evens them out.
+    focusRoot_->setProperty("glyph", QStringLiteral("slash"));
     connect(zoomIn_, &QToolButton::clicked, this,
             [this] { zoomBy(1.25, QPointF(width() / 2.0, height() / 2.0)); });
     connect(zoomOut_, &QToolButton::clicked, this,
             [this] { zoomBy(0.8, QPointF(width() / 2.0, height() / 2.0)); });
+    // "/" pans to the vault root's hub and spotlights it briefly, a
+    // way back home after wandering off across the graph.
+    connect(focusRoot_, &QToolButton::clicked, this, [this] {
+        for (int i = 0; i < static_cast<int>(nodes_.size()); ++i) {
+            if (nodes_[i].group != root_)
+                continue;
+            offset_ = QPointF(width() / 2.0, height() / 2.0) - nodes_[i].pos * scale_;
+            focusNode_ = i;
+            focus_ = 1.0;
+            focusHold_ = 22;
+            update();
+            return;
+        }
+    });
+
+    // A knob change on Settings → NetGraph re-warms the simulation so
+    // the new forces re-layout the graph right away.
+    connect(graphsettings::notifier(), &graphsettings::Notifier::changed, this, [this] {
+        alpha_ = std::max(alpha_, 0.5);
+        update();
+    });
 
     build(root);
     // Pre-settle the layout so the window opens onto a formed graph
@@ -98,7 +160,7 @@ void GraphWindow::build(nightlock::Group* root) {
         hubNode.pos = QPointF(std::cos(angle) * radius, std::sin(angle) * radius);
         ++hubCount;
         if (parentHub >= 0)
-            edges_.push_back({parentHub, hub, Rule::Nesting, 1});
+            edges_.push_back({parentHub, hub, Rule::Nesting, 0});
         nodes_.push_back(hubNode);
         keys.emplace_back();
 
@@ -112,7 +174,7 @@ void GraphWindow::build(nightlock::Group* root) {
             node.pos = nodes_[hub].pos +
                        QPointF(std::cos(spokeAngle), std::sin(spokeAngle)) *
                            (34.0 + 3.0 * spoke);
-            edges_.push_back({hub, static_cast<int>(nodes_.size()), Rule::Directory, 1});
+            edges_.push_back({hub, static_cast<int>(nodes_.size()), Rule::Directory, 0});
             nodes_.push_back(node);
             keys.push_back({QString::fromStdString(entry->login).toLower(),
                             QString::fromStdString(entry->password),
@@ -125,7 +187,7 @@ void GraphWindow::build(nightlock::Group* root) {
     walk(root, -1);
 
     // Direct entry-entry edges. A pair matching several rules gets one
-    // edge: thicker, styled after the strongest rule.
+    // edge carrying the whole rule set — drawn in the blended color.
     const int count = static_cast<int>(nodes_.size());
     for (int i = 0; i < count; ++i) {
         if (!nodes_[i].entry)
@@ -137,11 +199,12 @@ void GraphWindow::build(nightlock::Group* root) {
                 !keys[i].password.isEmpty() && keys[i].password == keys[j].password;
             const bool login = !keys[i].login.isEmpty() && keys[i].login == keys[j].login;
             const bool url = !keys[i].domain.isEmpty() && keys[i].domain == keys[j].domain;
-            const int strength = int(password) + int(login) + int(url);
-            if (!strength)
+            const int rules = (password ? kMatchPassword : 0) | (login ? kMatchLogin : 0) |
+                              (url ? kMatchUrl : 0);
+            if (!rules)
                 continue;
             const Rule rule = password ? Rule::Password : login ? Rule::Login : Rule::Url;
-            edges_.push_back({i, j, rule, strength});
+            edges_.push_back({i, j, rule, rules});
         }
     }
 
@@ -155,7 +218,7 @@ void GraphWindow::build(nightlock::Group* root) {
     // One dot size for every element — entries and directories alike;
     // hubs stand out by their bullseye rendering only.
     for (Node& node : nodes_)
-        node.radius = 7.0;
+        node.radius = 5.6;
 }
 
 void GraphWindow::refresh() {
@@ -233,9 +296,12 @@ void GraphWindow::simulate() {
     const int count = static_cast<int>(nodes_.size());
     if (count == 0)
         return;
-    constexpr qreal kRepulsion = 2600.0;
-    constexpr qreal kSpring = 0.05;
-    constexpr qreal kGravity = 0.0045;
+    // The Obsidian-style knobs from Settings → NetGraph, mapped onto
+    // this simulation's units.
+    const graphsettings::Config config = graphsettings::config();
+    const qreal repulsion = config.repelForce * 300.0;
+    const qreal spring = config.linkForce * 0.04;
+    const qreal gravity = config.centerForce * 0.017;
     constexpr qreal kDamping = 0.88;
     constexpr qreal kMaxSpeed = 16.0;
 
@@ -249,7 +315,7 @@ void GraphWindow::simulate() {
                 dist2 = QPointF::dotProduct(d, d);
             }
             const qreal dist = std::sqrt(dist2);
-            const QPointF push = d / dist * (kRepulsion / dist2);
+            const QPointF push = d / dist * (repulsion / dist2);
             force[i] -= push;
             force[j] += push;
         }
@@ -259,8 +325,8 @@ void GraphWindow::simulate() {
         const qreal dist = std::max<qreal>(1e-3, std::hypot(d.x(), d.y()));
         // Entry spokes rest short so directories stay tight clusters;
         // hierarchy and rule links stretch between them.
-        const qreal rest = edge.rule == Rule::Directory ? 70.0 : 130.0;
-        const QPointF pull = d / dist * (kSpring * (dist - rest));
+        const qreal rest = config.linkDistance * (edge.rule == Rule::Directory ? 0.7 : 1.3);
+        const QPointF pull = d / dist * (spring * (dist - rest));
         force[edge.a] += pull;
         force[edge.b] -= pull;
     }
@@ -270,7 +336,7 @@ void GraphWindow::simulate() {
             node.vel = QPointF();
             continue;
         }
-        force[i] -= node.pos * (kGravity * node.mass);
+        force[i] -= node.pos * (gravity * node.mass);
         node.vel = (node.vel + force[i] * (alpha_ / node.mass)) * kDamping;
         const qreal speed = std::hypot(node.vel.x(), node.vel.y());
         if (speed > kMaxSpeed)
@@ -297,7 +363,7 @@ int GraphWindow::nodeAt(const QPointF& widgetPos) const {
 
 void GraphWindow::paintEvent(QPaintEvent*) {
     QPainter painter(this);
-    painter.fillRect(rect(), kCanvas);
+    painter.fillRect(rect(), canvasColor());
     painter.setRenderHint(QPainter::Antialiasing);
 
     painter.save();
@@ -319,16 +385,13 @@ void GraphWindow::paintEvent(QPaintEvent*) {
     for (const Edge& edge : edges_) {
         const bool structural =
             edge.rule == Rule::Directory || edge.rule == Rule::Nesting;
-        QColor color = edge.rule == Rule::Password ? kEdgePassword
-                       : edge.rule == Rule::Login  ? kEdgeLogin
-                       : edge.rule == Rule::Url    ? kEdgeUrl
-                                                   : kEdgeDirectory;
+        QColor color = structural ? directoryEdgeColor() : matchColor(edge.rules);
         const bool lit =
             focusNode_ >= 0 && (edge.a == focusNode_ || edge.b == focusNode_);
         qreal alpha = structural ? 0.55 : 0.72;
         alpha *= lit ? 1.0 : dim;
         color.setAlphaF(alpha);
-        QPen pen(color, 1.1 + 0.7 * (edge.strength - 1));
+        QPen pen(color, edge.rules == kMatchAll ? kEdgeWidth * 2.5 : kEdgeWidth);
         if (edge.rule == Rule::Nesting)
             pen.setDashPattern({4.0, 3.0});
         painter.setPen(pen);
@@ -338,22 +401,22 @@ void GraphWindow::paintEvent(QPaintEvent*) {
     painter.setPen(Qt::NoPen);
     for (int i = 0; i < static_cast<int>(nodes_.size()); ++i) {
         const Node& node = nodes_[i];
-        QColor ink = kInk;
+        QColor ink = inkColor();
         ink.setAlphaF(inSpotlight(i) ? 1.0 : dim);
         painter.setBrush(ink);
         painter.drawEllipse(node.pos, node.radius, node.radius);
         if (node.group) {
             // Bullseye hub: black core (70% of the radius), white ring
             // (21%), black rim (9%) closing the dot.
-            QColor white(Qt::white);
+            QColor white(canvasColor());  // the ring punches through to the canvas
             white.setAlphaF(ink.alphaF());
             painter.setBrush(white);
             painter.drawEllipse(node.pos, node.radius * 0.91, node.radius * 0.91);
             painter.setBrush(ink);
             painter.drawEllipse(node.pos, node.radius * 0.70, node.radius * 0.70);
         }
-        if (i == hovered_ || i == dragged_) {
-            QColor ring = kInk;
+        if (i == dragged_) {  // hover alone stays ring-free
+            QColor ring = inkColor();
             ring.setAlphaF(0.35);
             painter.setBrush(Qt::NoBrush);
             painter.setPen(QPen(ring, 1.6));
@@ -378,7 +441,7 @@ void GraphWindow::paintEvent(QPaintEvent*) {
         font.setPixelSize(node.group ? 10 : 9);
         font.setWeight(node.group ? QFont::DemiBold : QFont::Normal);
         painter.setFont(font);
-        QColor color = node.group ? kInk : kLabel;
+        QColor color = node.group ? inkColor() : labelColor();
         color.setAlphaF(alpha);
         painter.setPen(color);
         painter.drawText(
@@ -391,32 +454,72 @@ void GraphWindow::paintEvent(QPaintEvent*) {
 }
 
 void GraphWindow::drawLegend(QPainter& painter) {
+    // Only kinds that actually occur in the current graph get a row.
+    bool hasDirectory = false;
+    bool hasNesting = false;
+    bool present[kMatchAll + 1] = {};
+    for (const Edge& edge : edges_) {
+        if (edge.rule == Rule::Directory)
+            hasDirectory = true;
+        else if (edge.rule == Rule::Nesting)
+            hasNesting = true;
+        else
+            present[edge.rules] = true;
+    }
+
     struct Row {
-        const char* text;
+        QString text;
         QColor color;
         bool dashed;
+        bool thick;
     };
-    const Row rows[] = {
-        {"Directory", kEdgeDirectory, false},
-        {"Subdirectory", kEdgeDirectory, true},
-        {"Same login", kEdgeLogin, false},
-        {"Same password", kEdgePassword, false},
-        {"Same URL", kEdgeUrl, false},
+    QVector<Row> rows;
+    if (hasDirectory)
+        rows.append({tr("Directory"), directoryEdgeColor(), false, false});
+    if (hasNesting)
+        rows.append({tr("Subdirectory"), directoryEdgeColor(), true, false});
+    const auto addMatchRow = [&](const QString& text, int mask) {
+        if (present[mask])
+            rows.append({text, matchColor(mask), false, mask == kMatchAll});
     };
+    addMatchRow(tr("Same login"), kMatchLogin);
+    addMatchRow(tr("Same password"), kMatchPassword);
+    addMatchRow(tr("Same URL"), kMatchUrl);
+    addMatchRow(tr("Same login, password"), kMatchLogin | kMatchPassword);
+    addMatchRow(tr("Same login, URL"), kMatchLogin | kMatchUrl);
+    addMatchRow(tr("Same password, URL"), kMatchPassword | kMatchUrl);
+    addMatchRow(tr("Same login, password, URL"), kMatchAll);
+    if (rows.isEmpty())
+        return;
+
     QFont font = painter.font();
     font.setPixelSize(11);
     font.setWeight(QFont::Normal);
     painter.setFont(font);
-    int y = 18;
+
+    // Plain white card behind the rows: square corners, hairline gray
+    // border, the same offset from the left and the top edge.
+    constexpr int kMargin = 14;
+    constexpr int kRowHeight = 20;
+    const QFontMetrics metrics(font);
+    int textWidth = 0;
+    for (const Row& row : rows)
+        textWidth = std::max(textWidth, metrics.horizontalAdvance(row.text));
+    painter.setPen(QPen(appearancesettings::palette().borderStrong, 1));
+    painter.setBrush(appearancesettings::palette().window);
+    painter.drawRect(
+        QRect(kMargin, kMargin, 38 + textWidth + 12, 8 + rows.size() * kRowHeight));
+
+    int y = kMargin + 14;
     for (const Row& row : rows) {
-        QPen pen(row.color, 2);
+        QPen pen(row.color, row.thick ? 5 : 2);  // triple matches draw thicker
         if (row.dashed)
             pen.setDashPattern({3.0, 2.5});
         painter.setPen(pen);
-        painter.drawLine(QPointF(16, y), QPointF(38, y));
-        painter.setPen(kLabel);
-        painter.drawText(QPointF(46, y + 4), QString::fromLatin1(row.text));
-        y += 20;
+        painter.drawLine(QPointF(kMargin + 8, y), QPointF(kMargin + 30, y));
+        painter.setPen(labelColor());
+        painter.drawText(QPointF(kMargin + 38, y + 4), row.text);
+        y += kRowHeight;
     }
 }
 
@@ -534,6 +637,7 @@ void GraphWindow::resizeEvent(QResizeEvent* event) {
                            (event->size().height() - event->oldSize().height()) / 2.0);
     zoomIn_->move(width() - 14 - zoomIn_->width(), 14);
     zoomOut_->move(width() - 14 - zoomOut_->width(), 14 + zoomIn_->height() + 6);
+    focusRoot_->move(width() - 14 - focusRoot_->width(), 14 + 2 * (zoomIn_->height() + 6));
     QWidget::resizeEvent(event);
 }
 

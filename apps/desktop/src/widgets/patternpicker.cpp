@@ -6,6 +6,8 @@
 #include <QPainterPath>
 #include <QVariantAnimation>
 
+#include "appearancesettings.hpp"
+
 #include <array>
 
 #include "nlmenu.hpp"
@@ -18,11 +20,13 @@ constexpr int kPadLeft = 10;
 constexpr int kChevronPad = 14;    // chevron center inset from the right
 constexpr int kChevronMs = 130;    // same tempo as the NlMenu reveal
 
-const QColor kFieldBackground(0xFB, 0xF9, 0xFB);
-const QColor kFieldBorder(0xEF, 0xEF, 0xEF);
-const QColor kOpenBorder(0x00, 0x00, 0x00);
-const QColor kTextColor(0x11, 0x11, 0x11);
-const QColor kChevronColor(0x8A, 0x8A, 0x8E);
+// Theme-following looks of the closed field, matching the dialog's
+// line edits on either scheme.
+QColor fieldBackground() { return appearancesettings::palette().input; }
+QColor fieldBorder() { return appearancesettings::palette().border; }
+QColor openBorder() { return appearancesettings::palette().ink; }
+QColor fieldText() { return appearancesettings::palette().ink; }
+QColor chevronColor() { return appearancesettings::palette().muted; }
 
 struct PatternOption {
     nightlock::Pattern kind;
@@ -112,19 +116,19 @@ void PatternPicker::paintEvent(QPaintEvent*) {
     painter.setRenderHint(QPainter::Antialiasing);
 
     // Same idle/focused looks as the dialog's QLineEdit fields.
-    painter.setPen(menuOpen_ ? kOpenBorder : kFieldBorder);
-    painter.setBrush(menuOpen_ ? Qt::white : kFieldBackground);
+    painter.setPen(menuOpen_ ? openBorder() : fieldBorder());
+    painter.setBrush(menuOpen_ ? appearancesettings::palette().window : fieldBackground());
     painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5),
                             kFieldRadius, kFieldRadius);
 
-    painter.setPen(kTextColor);
+    painter.setPen(fieldText());
     painter.drawText(rect().adjusted(kPadLeft, 0, -2 * kChevronPad, 0),
                      Qt::AlignLeft | Qt::AlignVCenter, titleFor(value_));
 
     // Downward chevron that flips upside down while the menu is open.
     painter.translate(width() - kChevronPad, height() / 2.0);
     painter.rotate(180.0 * chevronTurn_);
-    QPen pen(kChevronColor, 1.6);
+    QPen pen(chevronColor(), 1.6);
     pen.setCapStyle(Qt::RoundCap);
     pen.setJoinStyle(Qt::RoundJoin);
     painter.setPen(pen);

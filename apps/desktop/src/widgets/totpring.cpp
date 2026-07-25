@@ -4,6 +4,8 @@
 #include <QPainter>
 #include <QTimer>
 
+#include "appearancesettings.hpp"
+
 #include <cmath>
 
 namespace {
@@ -26,7 +28,7 @@ void TotpRing::paintEvent(QPaintEvent*) {
     const double remaining = kPeriodSeconds - std::fmod(now, kPeriodSeconds);
 
     const QRectF r = QRectF(rect()).adjusted(1.5, 1.5, -1.5, -1.5);
-    painter.setPen(QPen(QColor(0xE3, 0xE3, 0xE3), 2.5));
+    painter.setPen(QPen(appearancesettings::palette().borderStrong, 2.5));
     painter.drawEllipse(r);
     painter.setPen(QPen(QColor(0x22, 0xA0, 0x45), 2.5));
     painter.drawArc(r, 90 * 16, static_cast<int>(-(remaining / kPeriodSeconds) * 360 * 16));

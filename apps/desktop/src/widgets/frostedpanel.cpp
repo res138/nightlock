@@ -4,6 +4,8 @@
 #include <QPainterPath>
 #include <QWidget>
 
+#include "appearancesettings.hpp"
+
 namespace frosted {
 
 
@@ -25,15 +27,16 @@ void paintPanel(QWidget* widget, const QRectF& panel, qreal reveal,
                                 kRadius + i * 0.6, kRadius + i * 0.6);
     }
 
-    // Frosted glass: blurred backdrop showing through a white veil.
+    // Frosted glass: blurred backdrop showing through the veil tint.
     QPainterPath path;
     path.addRoundedRect(panel, kRadius, kRadius);
     painter.save();
     painter.setClipPath(path);
-    painter.fillRect(panel, Qt::white);
+    const QColor veil = appearancesettings::palette().veil;
+    painter.fillRect(panel, veil);
     if (!backdrop.isNull())
         painter.drawPixmap(panel.topLeft() + backdropOffset, backdrop);
-    painter.fillRect(panel, QColor(255, 255, 255, qRound(kVeil * 255)));
+    painter.fillRect(panel, QColor(veil.red(), veil.green(), veil.blue(), qRound(kVeil * 255)));
     painter.restore();
 }
 
@@ -62,7 +65,7 @@ QPixmap captureBackdrop(QWidget* widget, QPoint* offsetOut) {
 
     QPixmap canvas(panel.size() * dpr);
     canvas.setDevicePixelRatio(dpr);
-    canvas.fill(Qt::white);
+    canvas.fill(appearancesettings::palette().window);
     bool captured = false;
     {
         QPainter compose(&canvas);

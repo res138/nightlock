@@ -8,6 +8,7 @@
 #include <QGraphicsOpacityEffect>
 #include <QGuiApplication>
 #include <QHBoxLayout>
+#include <QItemSelectionModel>
 #include <QLabel>
 #include <QListView>
 #include <QMessageBox>
@@ -15,7 +16,6 @@
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QScrollBar>
-#include <QShortcut>
 #include <QStyle>
 #include <QTimer>
 #include <QToolButton>
@@ -30,6 +30,8 @@
 
 #include <nightlock/group.hpp>
 
+#include "appearancesettings.hpp"
+#include "hotkeys.hpp"
 #include "models/grouptreemodel.hpp"
 #include "standardicons.hpp"
 #include "widgets/entrydetailview.hpp"
@@ -42,6 +44,7 @@
 #include "windows/entryeditdialog.hpp"
 #include "windows/graphwindow.hpp"
 #include "windows/lockscreen.hpp"
+#include "windows/settingswindow.hpp"
 
 #ifdef Q_OS_MACOS
 #include "platform/macwindow.hpp"
@@ -71,7 +74,8 @@ nightlock::Group* findGroup(nightlock::Group* group, const QString& name) {
 }
 
 QIcon menuIcon(const QString& name) {
-    return QIcon(QStringLiteral(":/icons/menu/%1.svg").arg(name));
+    // Theme-following: the glyph lightens with the dark scheme.
+    return appearancesettings::themedMenuIcon(name);
 }
 
 // Toolbar strip at the top of a pane. Empty areas drag the whole
@@ -196,23 +200,34 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     splitter_->setSizes({375, 420, 460});
     setCentralWidget(splitter_);
 
-    // ⌘F / ⌘G / ⌘L / ⌘N / ⌘T / ⌘D land here as Ctrl on other
-    // platforms. Vault-touching ones stay dead while locked.
-    new QShortcut(QKeySequence::Find, this, [this] { openSearch(); });
-    new QShortcut(QKeySequence(QStringLiteral("Ctrl+G")), this, [this] { openGraph(); });
-    new QShortcut(QKeySequence(QStringLiteral("Ctrl+L")), this, [this] { lockVault(); });
-    new QShortcut(QKeySequence::New, this, [this] {  // ⌘N: new entry
-        if (!lockScreen_->isVisible())
-            addEntryTo(currentGroup() ? currentGroup() : treeModel_->rootGroup());
-    });
-    new QShortcut(QKeySequence(QStringLiteral("Ctrl+T")), this, [this] {  // ⌘T: new folder
-        if (!lockScreen_->isVisible())
-            addFolderTo(currentGroup() ? currentGroup() : treeModel_->rootGroup());
-    });
-    new QShortcut(QKeySequence(QStringLiteral("Ctrl+D")), this, [this] {  // ⌘D: fold the panel
-        if (!lockScreen_->isVisible())
-            setTreePaneVisible(!treePane_->isVisible());
-    });
+    // The ⌘-shortcuts (Ctrl on other platforms), all rebindable from
+    // Settings → Hotkeys, which retargets these live QShortcuts.
+    // Vault-touching ones stay dead while locked; Settings is
+    // app-level and works even then. Registration order is the row
+    // order on the Hotkeys page.
+    hotkeys::bind(QStringLiteral("new-entry"), tr("New entry"), QKeySequence(QKeySequence::New),
+                  this, [this] {
+                      if (!lockScreen_->isVisible())
+                          addEntryTo(currentGroup() ? currentGroup() : treeModel_->rootGroup());
+                  });
+    hotkeys::bind(QStringLiteral("new-folder"), tr("New folder"),
+                  QKeySequence(QStringLiteral("Ctrl+T")), this, [this] {
+                      if (!lockScreen_->isVisible())
+                          addFolderTo(currentGroup() ? currentGroup() : treeModel_->rootGroup());
+                  });
+    hotkeys::bind(QStringLiteral("search"), tr("Search"), QKeySequence(QKeySequence::Find), this,
+                  [this] { openSearch(); });
+    hotkeys::bind(QStringLiteral("graph"), tr("NetGraph view"),
+                  QKeySequence(QStringLiteral("Ctrl+G")), this, [this] { openGraph(); });
+    hotkeys::bind(QStringLiteral("lock"), tr("Lock vault"),
+                  QKeySequence(QStringLiteral("Ctrl+L")), this, [this] { lockVault(); });
+    hotkeys::bind(QStringLiteral("toggle-folder-panel"), tr("Toggle folder panel"),
+                  QKeySequence(QStringLiteral("Ctrl+D")), this, [this] {
+                      if (!lockScreen_->isVisible())
+                          setTreePaneVisible(!treePane_->isVisible());
+                  });
+    hotkeys::bind(QStringLiteral("settings"), tr("Settings"),
+                  QKeySequence(QStringLiteral("Ctrl+,")), this, [this] { openSettings(); });
 
     lockScreen_ = new LockScreen(this);
     lockScreen_->hide();
@@ -295,13 +310,15 @@ QWidget* MainWindow::buildTreeHeader() {
     auto* searchButton = headerButton(QStringLiteral("search"), tr("Search"));
     connect(searchButton, &QToolButton::clicked, this, &MainWindow::openSearch);
     layout->addWidget(searchButton);
-    auto* graphButton = headerButton(QStringLiteral("graph"), tr("Graph"));
+    auto* graphButton = headerButton(QStringLiteral("graph"), tr("NetGraph"));
     connect(graphButton, &QToolButton::clicked, this, &MainWindow::openGraph);
     layout->addWidget(graphButton);
     auto* lockButton = headerButton(QStringLiteral("lock"), tr("Lock vault"));
     connect(lockButton, &QToolButton::clicked, this, &MainWindow::lockVault);
     layout->addWidget(lockButton);
-    layout->addWidget(headerButton(QStringLiteral("settings"), tr("Settings")));
+    auto* settingsButton = headerButton(QStringLiteral("settings"), tr("Settings"));
+    connect(settingsButton, &QToolButton::clicked, this, &MainWindow::openSettings);
+    layout->addWidget(settingsButton);
     return header;
 }
 
@@ -560,6 +577,30 @@ QWidget* MainWindow::openGraphForScreenshot() {
             graph_->focusEntry(entry);
     }
     return graph_;
+}
+
+// The standalone Settings window, centered over the main window.
+// App-level preferences only, so it is not gated on the lock screen
+// and stays open through a vault lock. One at a time: a second call
+// just brings it forward.
+SettingsWindow* MainWindow::openSettings() {
+    if (settings_) {
+        settings_->raise();
+        settings_->activateWindow();
+        return settings_;
+    }
+    settings_ = new SettingsWindow;
+    connect(settings_, &QObject::destroyed, this, [this] { settings_ = nullptr; });
+    settings_->move(geometry().center() -
+                    QPoint(settings_->width() / 2, settings_->height() / 2));
+    settings_->show();
+    return settings_;
+}
+
+QWidget* MainWindow::openSettingsForScreenshot(int category) {
+    SettingsWindow* window = openSettings();
+    window->selectCategory(category);
+    return window;
 }
 
 QWidget* MainWindow::openSearchForScreenshot(const QString& query) {
@@ -850,7 +891,10 @@ void MainWindow::addFolderTo(nightlock::Group* group) {
     if (!idx.isValid())
         return;
     tree_->expand(parentIdx);
-    tree_->setCurrentIndex(idx);
+    // Explicit ClearAndSelect: plain setCurrentIndex() reads live keyboard
+    // modifiers, so the still-held ⌘ of ⌘T would add to the selection.
+    tree_->selectionModel()->setCurrentIndex(
+        idx, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Current);
     tree_->edit(idx);  // Finder-style: name the folder right away
 }
 

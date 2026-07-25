@@ -74,7 +74,7 @@ private:
         int a = 0;
         int b = 0;
         Rule rule = Rule::Directory;
-        int strength = 1;  // how many rules matched this pair
+        int rules = 0;  // kMatch* bitmask of entry rules this pair hit
     };
 
     void build(nightlock::Group* root);
@@ -103,6 +103,7 @@ private:
     int focusHold_ = 0;    // ticks the Show-in-Graph spotlight stays lit
     QToolButton* zoomIn_;
     QToolButton* zoomOut_;
+    QToolButton* focusRoot_;
     int dragged_ = -1;
     bool panning_ = false;
     bool moved_ = false;   // drag exceeded the click threshold

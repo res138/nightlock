@@ -6,6 +6,8 @@
 
 #include <nightlock/group.hpp>
 
+#include "appearancesettings.hpp"
+
 namespace {
 
 constexpr char kGroupMime[] = "application/x-nightlock-group";
@@ -24,7 +26,12 @@ nightlock::Group* decodeGroup(const QMimeData* data) {
 GroupTreeModel::GroupTreeModel(nightlock::Group* root, QObject* parent)
     : QAbstractItemModel(parent),
       root_(root),
-      folderIcon_(QStringLiteral(":/icons/folder.png")) {}
+      folderIcon_(QStringLiteral(":/icons/folder.png")) {
+    // The Settings → Appearance "Folder icons" toggle lands here: the
+    // decoration column re-resolves against the new preference.
+    connect(appearancesettings::notifier(), &appearancesettings::Notifier::changed, this,
+            [this] { emit layoutChanged(); });
+}
 
 QModelIndex GroupTreeModel::index(int row, int column, const QModelIndex& parent) const {
     if (!hasIndex(row, column, parent))
@@ -60,6 +67,8 @@ QVariant GroupTreeModel::data(const QModelIndex& index, int role) const {
     case Qt::EditRole:  // prefills the inline rename editor
         return QString::fromStdString(g->name());
     case Qt::DecorationRole:
+        if (!appearancesettings::folderIcons())
+            return {};
         if (!g->icon().empty())
             return QIcon(QString::fromStdString(g->icon()));
         return folderIcon_;
