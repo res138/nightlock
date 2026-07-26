@@ -65,6 +65,7 @@ private:
         QHBoxLayout* layout = nullptr;
     };
     FieldRow makeRow(QVBoxLayout* cardLayout, const QString& label, bool last = false);
+    void refreshUrlText();
     void refreshLastVisibleRow();
     void updatePatternGeometry();
 
@@ -85,6 +86,7 @@ private:
     FieldRow passwordRow_;
     SpoilerLabel* passwordSpoiler_;
     FieldRow urlRow_;
+    QString url_;  // shown link, re-colored on a theme switch
     FieldRow codeRow_;
     FieldRow createdRow_;
     FieldRow modifiedRow_;

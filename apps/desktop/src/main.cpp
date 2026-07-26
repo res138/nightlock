@@ -9,6 +9,7 @@
 
 #include "appearancesettings.hpp"
 #include "demovault.hpp"
+#include "fonts.hpp"
 #include "standardicons.hpp"
 #include "windows/entryeditdialog.hpp"
 #include "windows/mainwindow.hpp"
@@ -22,6 +23,9 @@ int main(int argc, char* argv[]) {
     QApplication::setOrganizationName(QStringLiteral("Nightlock"));
     QApplication::setApplicationName(QStringLiteral("Nightlock"));
 
+    // San Francisco everywhere, not "whatever the platform default
+    // is" — critical for the Windows/Linux ports.
+    fonts::applyApplicationFont();
     appearancesettings::applyStylesheet();
 
     // Dock icon for the running process (the squircle render of the
@@ -251,15 +255,18 @@ int main(int argc, char* argv[]) {
         QTimer::singleShot(800, &window, [&window] {
             QWidget* settings = window.openSettingsForScreenshot(
                 qEnvironmentVariableIntValue("NIGHTLOCK_SETTINGS_PAGE"));
-            // NIGHTLOCK_SETTINGS_DROPDOWN=1 opens the page's first
-            // dropdown and captures its frosted menu instead.
+            // NIGHTLOCK_SETTINGS_DROPDOWN=<n> opens the page's n-th
+            // dropdown (1-based) and captures its frosted menu.
             if (qEnvironmentVariableIsSet("NIGHTLOCK_SETTINGS_DROPDOWN")) {
                 QTimer::singleShot(300, settings, [settings] {
                     // Only the current page's dropdowns are visible.
+                    int wanted = qEnvironmentVariableIntValue("NIGHTLOCK_SETTINGS_DROPDOWN");
                     const auto dropdowns = settings->findChildren<QAbstractButton*>(
                         QStringLiteral("settingsDropdown"));
                     for (QAbstractButton* dropdown : dropdowns) {
                         if (!dropdown->isVisible())
+                            continue;
+                        if (--wanted > 0)
                             continue;
                         dropdown->click();
                         break;

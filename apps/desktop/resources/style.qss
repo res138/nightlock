@@ -10,7 +10,7 @@ QTreeView#groupTree {
     background: @bg;
     border: none;
     outline: none;
-    font-family: Georgia;
+    font-family: "@font-secondary";
     font-size: 17px;
     font-weight: bold;
     /* the toolbar header above clears the traffic lights; keep a bit
@@ -76,7 +76,7 @@ QScrollArea > QWidget > QWidget {
 }
 
 QLabel#detailTitle {
-    font-family: Georgia;
+    font-family: "@font-secondary";
     font-size: 26px;
     font-weight: bold;
     color: @text-strong;
@@ -86,7 +86,7 @@ QLabel#detailNote {
     color: @text-note;
 }
 QLabel#metaHeader {
-    font-family: Georgia;
+    font-family: "@font-secondary";
     font-size: 20px;
     font-weight: bold;
     color: @text-strong;

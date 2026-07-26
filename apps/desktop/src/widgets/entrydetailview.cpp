@@ -233,7 +233,10 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     };
     tintGraphGlyph();
     connect(appearancesettings::notifier(), &appearancesettings::Notifier::changed, this,
-            tintGraphGlyph);
+            [this, tintGraphGlyph] {
+                tintGraphGlyph();
+                refreshUrlText();
+            });
     graphButton_->setIconSize(QSize(17, 17));
     connect(graphButton_, &QPushButton::clicked, this, &EntryDetailView::graphRequested);
     layout->addWidget(graphButton_);
@@ -354,6 +357,15 @@ void EntryDetailView::debugSpoiler(const QString& state) {
         loginCopy_->copyAndFlash();
 }
 
+// Ink from the palette, not a hardcoded near-black: the link must
+// stay readable on the dark theme too, and it re-colors on a switch.
+void EntryDetailView::refreshUrlText() {
+    if (url_.isEmpty())
+        return;
+    urlRow_.value->setText(QStringLiteral("<a href=\"%1\" style=\"color:%2;\">%1</a> ↗")
+                               .arg(url_, appearancesettings::palette().ink.name()));
+}
+
 void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     content_->setVisible(entry != nullptr);
     editButton_->setVisible(entry != nullptr);
@@ -378,9 +390,8 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     passwordSpoiler_->setSecret(QString::fromStdString(entry->password));
 
     urlRow_.frame->setVisible(!entry->url.empty());
-    const QString url = QString::fromStdString(entry->url);
-    urlRow_.value->setText(
-        QStringLiteral("<a href=\"%1\" style=\"color:#111111;\">%1</a> ↗").arg(url));
+    url_ = QString::fromStdString(entry->url);
+    refreshUrlText();
 
     codeRow_.frame->setVisible(!entry->code.empty());
     codeRow_.value->setText(QString::fromStdString(entry->code));

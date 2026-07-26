@@ -3,6 +3,7 @@
 #include <QPainter>
 
 #include "appearancesettings.hpp"
+#include "fonts.hpp"
 #include "models/entrylistmodel.hpp"
 
 namespace {
@@ -35,7 +36,7 @@ void EntryListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
     const int textLeft = iconRect.right() + 16;
     const int textWidth = content.right() - textLeft - 8;
 
-    QFont nameFont(QStringLiteral("Georgia"), 14);
+    QFont nameFont(fonts::resolvedFamily(fonts::Role::Secondary), 14);
     nameFont.setBold(true);
     painter->setFont(nameFont);
     painter->setPen(selected ? appearancesettings::accentTextColor()

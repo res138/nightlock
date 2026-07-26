@@ -21,6 +21,7 @@
 #include <iterator>
 
 #include "appearancesettings.hpp"
+#include "fonts.hpp"
 #include "graphsettings.hpp"
 #include "hotkeys.hpp"
 #include "widgets/nlmenu.hpp"
@@ -123,6 +124,10 @@ public:
         update();
     }
 
+    // Per-option availability: disabled entries stay visible in the
+    // menu (grayed out) but cannot be chosen.
+    void setOptionsEnabled(QVector<bool> enabled) { enabled_ = std::move(enabled); }
+
     void setOnSelected(std::function<void(int)> onSelected) {
         onSelected_ = std::move(onSelected);
     }
@@ -175,6 +180,7 @@ private:
                 action->setIcon(dotIcon(dots_[i]));
             else if (i == current_)
                 action->setIcon(navIcon(QStringLiteral("check")));
+            action->setEnabled(enabled_.value(i, true));
         }
         menu->popupAt(mapToGlobal(QPoint(0, height() + 4)));
     }
@@ -182,6 +188,7 @@ private:
     QStringList options_;
     int current_;
     QVector<QColor> dots_;
+    QVector<bool> enabled_;
     std::function<void(int)> onSelected_;
 };
 
@@ -432,6 +439,28 @@ QWidget* SettingsWindow::buildAppearancePage() {
         appearancesettings::setAccent(QLatin1String(appearancesettings::kAccents[index]));
     });
     addRow(rows, tr("Accent color"), tr("Highlight color used across the app."), accent);
+
+    // Font pickers: the dropdown shows the effective choice (a stored
+    // font missing on this system resolves to the first available
+    // option), and unavailable fonts stay listed but grayed out.
+    const auto fontDropdown = [](fonts::Role role) {
+        const QList<fonts::Option> catalog = fonts::options(role);
+        QStringList titles;
+        QVector<bool> available;
+        for (const fonts::Option& option : catalog) {
+            titles.append(option.title);
+            available.append(option.available);
+        }
+        auto* dropdown = new DropdownButton(titles, fonts::selectedIndex(role));
+        dropdown->setOptionsEnabled(available);
+        dropdown->setOnSelected(
+            [role, catalog](int index) { fonts::setSelected(role, catalog[index].id); });
+        return dropdown;
+    };
+    addRow(rows, tr("Primary font"), tr("The interface font."),
+           fontDropdown(fonts::Role::Primary));
+    addRow(rows, tr("Secondary font"), tr("Serif font of the tree, titles and entry names."),
+           fontDropdown(fonts::Role::Secondary));
 
     auto* folderIcons = new ToggleSwitch(appearancesettings::folderIcons());
     connect(folderIcons, &QAbstractButton::toggled, folderIcons,
