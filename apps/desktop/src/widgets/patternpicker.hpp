@@ -9,8 +9,8 @@ class QVariantAnimation;
 
 // Dropdown field of the entry dialog that picks the detail-view
 // background pattern. Styled after the dialog's line edits; clicking
-// it drops an animated NlMenu with the five options (None + the four
-// generated looks) and swings the chevron while the menu is open.
+// it drops an animated NlMenu with the options (None + the generated
+// looks) and swings the chevron while the menu is open.
 class PatternPicker : public QWidget {
     Q_OBJECT
 public:
@@ -18,6 +18,10 @@ public:
 
     nightlock::Pattern value() const { return value_; }
     void setValue(nightlock::Pattern value);
+
+    // A random pickable pattern (never None) — the default for a
+    // freshly created entry.
+    static nightlock::Pattern randomOption();
 
     // Drops the option menu under the field; public so the screenshot
     // debug hook can open it without synthesizing a click.

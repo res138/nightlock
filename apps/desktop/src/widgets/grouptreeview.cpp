@@ -5,6 +5,8 @@
 #include <QProxyStyle>
 #include <QVariantAnimation>
 
+#include "appearancesettings.hpp"
+
 namespace {
 
 // Insertion line between rows / rounded outline around the target folder.
@@ -23,15 +25,15 @@ public:
         if (option->rect.height() <= 2) {
             const qreal y = option->rect.top();
             painter->setPen(Qt::NoPen);
-            painter->setBrush(Qt::black);
+            painter->setBrush(appearancesettings::palette().ink);
             painter->drawEllipse(QPointF(option->rect.left() + 3, y), 3, 3);
-            QPen pen(Qt::black, 2.4);
+            QPen pen(appearancesettings::palette().ink, 2.4);
             pen.setCapStyle(Qt::RoundCap);
             painter->setPen(pen);
             painter->drawLine(QPointF(option->rect.left() + 7, y),
                               QPointF(option->rect.right() - 2, y));
         } else {
-            QPen pen(Qt::black, 2);
+            QPen pen(appearancesettings::palette().ink, 2);
             painter->setPen(pen);
             painter->setBrush(Qt::NoBrush);
             painter->drawRoundedRect(QRectF(option->rect).adjusted(1, 1, -1, -1), 6, 6);
@@ -108,7 +110,9 @@ void GroupTreeView::flashRow(const QModelIndex& index) {
     if (rowRect.isEmpty())
         return;
     const bool selected = selectionModel() && selectionModel()->isSelected(index);
-    const QColor color = selected ? QColor(255, 255, 255, 110) : QColor(0, 0, 0, 50);
+    const QColor ink = appearancesettings::palette().ink;
+    const QColor color = selected ? QColor(255, 255, 255, 110)
+                                  : QColor(ink.red(), ink.green(), ink.blue(), 50);
     auto* overlay = new FlashOverlay(color, viewport());
     overlay->setGeometry(QRect(QPoint(0, rowRect.top()), QSize(viewport()->width(), rowRect.height())));
     overlay->show();

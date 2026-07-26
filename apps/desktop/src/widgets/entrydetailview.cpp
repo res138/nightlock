@@ -12,6 +12,8 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include "appearancesettings.hpp"
+
 #include <array>
 
 #include <nightlock/entry.hpp>
@@ -50,8 +52,8 @@ protected:
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
         painter.setPen(Qt::NoPen);
-        // Same near-black as the header icon strokes.
-        painter.setBrush(QColor(0x1F, 0x1F, 0x1F));
+        // Same shade as the header icon strokes.
+        painter.setBrush(appearancesettings::palette().ink);
         constexpr qreal kDotRadius = 2.6;
         constexpr int kStep = 12;
         const qreal left = width() / 2.0 - kStep;
@@ -98,8 +100,8 @@ protected:
     void paintEvent(QPaintEvent*) override {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
-        painter.setPen(QColor(0xEA, 0xEA, 0xEA));
-        painter.setBrush(Qt::white);
+        painter.setPen(appearancesettings::palette().border);
+        painter.setBrush(appearancesettings::palette().window);
         painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5),
                                 kFloatingRadius, kFloatingRadius);
     }
@@ -214,18 +216,27 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     layout->addSpacing(kSectionGap);
 
     // Full-width black pill jumping to this entry's node in the graph.
-    graphButton_ = new QPushButton(tr("Show in Graph"));
+    graphButton_ = new QPushButton(tr("Show in NetGraph"));
     graphButton_->setObjectName(QStringLiteral("showInGraph"));
     graphButton_->setCursor(Qt::PointingHandCursor);
-    // The toolbar's graph glyph, recolored white for the dark pill.
-    QPixmap glyph = QIcon(QStringLiteral(":/icons/menu/graph.svg")).pixmap(QSize(34, 34));
-    {
+    // The toolbar's graph glyph, recolored to the accent's text color
+    // for the accent pill; re-tinted when the theme or accent changes.
+    const auto tintGraphGlyph = [this] {
+        QPixmap glyph =
+            QIcon(QStringLiteral(":/icons/menu/graph.svg")).pixmap(QSize(34, 34));
         QPainter tint(&glyph);
         tint.setCompositionMode(QPainter::CompositionMode_SourceIn);
-        tint.fillRect(glyph.rect(), Qt::white);
-    }
-    glyph.setDevicePixelRatio(2.0);
-    graphButton_->setIcon(QIcon(glyph));
+        tint.fillRect(glyph.rect(), appearancesettings::accentTextColor());
+        tint.end();
+        glyph.setDevicePixelRatio(2.0);
+        graphButton_->setIcon(QIcon(glyph));
+    };
+    tintGraphGlyph();
+    connect(appearancesettings::notifier(), &appearancesettings::Notifier::changed, this,
+            [this, tintGraphGlyph] {
+                tintGraphGlyph();
+                refreshUrlText();
+            });
     graphButton_->setIconSize(QSize(17, 17));
     connect(graphButton_, &QPushButton::clicked, this, &EntryDetailView::graphRequested);
     layout->addWidget(graphButton_);
@@ -251,7 +262,7 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     const auto makeCornerButton = [this](const QString& icon, const QString& toolTip) {
         auto* button = new QToolButton(this);
         button->setObjectName(QStringLiteral("headerIconButton"));
-        button->setIcon(QIcon(QStringLiteral(":/icons/menu/%1.svg").arg(icon)));
+        button->setIcon(appearancesettings::themedMenuIcon(icon));
         button->setIconSize(QSize(17, 17));
         button->setFixedSize(28, 28);
         button->setCursor(Qt::PointingHandCursor);
@@ -346,6 +357,15 @@ void EntryDetailView::debugSpoiler(const QString& state) {
         loginCopy_->copyAndFlash();
 }
 
+// Ink from the palette, not a hardcoded near-black: the link must
+// stay readable on the dark theme too, and it re-colors on a switch.
+void EntryDetailView::refreshUrlText() {
+    if (url_.isEmpty())
+        return;
+    urlRow_.value->setText(QStringLiteral("<a href=\"%1\" style=\"color:%2;\">%1</a> ↗")
+                               .arg(url_, appearancesettings::palette().ink.name()));
+}
+
 void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     content_->setVisible(entry != nullptr);
     editButton_->setVisible(entry != nullptr);
@@ -370,9 +390,8 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     passwordSpoiler_->setSecret(QString::fromStdString(entry->password));
 
     urlRow_.frame->setVisible(!entry->url.empty());
-    const QString url = QString::fromStdString(entry->url);
-    urlRow_.value->setText(
-        QStringLiteral("<a href=\"%1\" style=\"color:#111111;\">%1</a> ↗").arg(url));
+    url_ = QString::fromStdString(entry->url);
+    refreshUrlText();
 
     codeRow_.frame->setVisible(!entry->code.empty());
     codeRow_.value->setText(QString::fromStdString(entry->code));

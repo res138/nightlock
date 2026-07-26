@@ -7,6 +7,8 @@
 #include <QTimer>
 #include <QVariantAnimation>
 
+#include "appearancesettings.hpp"
+
 #include <algorithm>
 
 namespace {
@@ -80,8 +82,8 @@ void OverlayScrollBar::paintEvent(QPaintEvent*) {
         return;
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
-    QColor color = dragging_ || underMouse() ? QColor(0xA9, 0xA9, 0xA9)
-                                             : QColor(0xCF, 0xCF, 0xCF);
+    QColor color = dragging_ || underMouse() ? appearancesettings::palette().scrollHover
+                                             : appearancesettings::palette().scroll;
     color.setAlphaF(color.alphaF() * opacity_);
     painter.setPen(Qt::NoPen);
     painter.setBrush(color);

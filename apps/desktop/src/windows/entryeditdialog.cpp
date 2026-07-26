@@ -35,8 +35,11 @@ EntryEditDialog::EntryEditDialog(Mode mode, QWidget* parent) : QDialog(parent) {
     });
     layout->addWidget(makeField(tr("Icon"), iconPicker_));
 
-    // Optional detail-view background pattern; entries start without one.
+    // Detail-view background pattern; a fresh entry starts on a
+    // random look instead of None.
     patternPicker_ = new PatternPicker;
+    if (mode == Mode::Add)
+        patternPicker_->setValue(PatternPicker::randomOption());
     layout->addWidget(makeField(tr("Pattern"), patternPicker_));
 
     nameEdit_ = new QLineEdit;

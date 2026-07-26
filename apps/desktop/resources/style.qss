@@ -1,16 +1,16 @@
 QMainWindow {
-    background: #FFFFFF;
+    background: @bg;
 }
 
 QSplitter::handle {
-    background: #EAEAEA;
+    background: @border;
 }
 
 QTreeView#groupTree {
-    background: #FFFFFF;
+    background: @bg;
     border: none;
     outline: none;
-    font-family: Georgia;
+    font-family: "@font-secondary";
     font-size: 17px;
     font-weight: bold;
     /* the toolbar header above clears the traffic lights; keep a bit
@@ -21,12 +21,12 @@ QTreeView#groupTree {
 QTreeView#groupTree::item {
     height: 26px;
     border: none;
-    color: #111111;
+    color: @text;
     padding-left: 11px;
 }
 QTreeView#groupTree::item:selected {
-    background: #000000;
-    color: #FFFFFF;
+    background: @accent;
+    color: @accent-text;
 }
 QTreeView#groupTree::branch {
     background: transparent;
@@ -34,20 +34,20 @@ QTreeView#groupTree::branch {
     border-image: none;
 }
 QTreeView#groupTree::branch:selected {
-    background: #000000;
+    background: @accent;
 }
 
 QListView#entryList {
-    background: #FFFFFF;
+    background: @bg;
     border: none;
     outline: none;
 }
 
 QFrame#listHeader,
 QFrame#treeHeader {
-    background: #FFFFFF;
+    background: @bg;
     border: none;
-    border-bottom: 1px solid #F0F0F0;
+    border-bottom: 1px solid @border-faint;
 }
 QToolButton#headerIconButton {
     background: transparent;
@@ -55,51 +55,51 @@ QToolButton#headerIconButton {
     border-radius: 7px;
 }
 QToolButton#headerIconButton[active="true"] {
-    background: rgba(0, 0, 0, 0.08);
+    background: @overlay-active;
 }
 QLabel#itemsCount {
     font-size: 13px;
     font-weight: 600;
-    color: #1A1A1A;
+    color: @text;
 }
 QLabel#itemsPath {
     font-size: 12px;
-    color: #6E6E6E;
+    color: @text-muted;
 }
 
 QScrollArea {
-    background: #FFFFFF;
+    background: @bg;
     border: none;
 }
 QScrollArea > QWidget > QWidget {
-    background: #FFFFFF;
+    background: @bg;
 }
 
 QLabel#detailTitle {
-    font-family: Georgia;
+    font-family: "@font-secondary";
     font-size: 26px;
     font-weight: bold;
-    color: #000000;
+    color: @text-strong;
 }
 QLabel#detailNote {
     font-size: 12px;
-    color: #4A4A4A;
+    color: @text-note;
 }
 QLabel#metaHeader {
-    font-family: Georgia;
+    font-family: "@font-secondary";
     font-size: 20px;
     font-weight: bold;
-    color: #000000;
+    color: @text-strong;
 }
 
 QFrame#card {
-    background: #FDFCFD;
-    border: 1px solid #EFEFEF;
+    background: @bg-card;
+    border: 1px solid @border-soft;
     border-radius: 9px;
 }
 QFrame#fieldRow {
     border: none;
-    border-bottom: 1px solid #F5F5F5;
+    border-bottom: 1px solid @border-row;
     background: transparent;
 }
 QFrame#fieldRow[lastVisible="true"] {
@@ -112,52 +112,52 @@ QFrame#fieldRowLast {
 QLabel#fieldLabel {
     font-size: 12px;
     font-weight: 600;
-    color: #141414;
+    color: @text;
 }
 QLabel#fieldValue {
     font-size: 12px;
-    color: #3C3C3C;
+    color: @text-value;
 }
 
 /* Folder renaming happens in place: the editor melts into the black
    selected row (black on black, white text), so it reads as editing
    the row's own text rather than a popped-up input panel. */
 QTreeView#groupTree QLineEdit {
-    background: #000000;
-    border: 1px solid #000000;
+    background: @accent;
+    border: 1px solid @accent;
     border-radius: 4px;
     /* lines the editor text up with the row text it replaces */
     padding-left: 1px;
-    color: #FFFFFF;
+    color: @accent-text;
     /* the select-all highlight stays a soft band instead of flipping
        the text back to a white block */
     selection-background-color: rgba(255, 255, 255, 0.3);
-    selection-color: #FFFFFF;
+    selection-color: @accent-text;
 }
 
 QDialog#entryEditDialog {
-    background: #FFFFFF;
+    background: @bg;
 }
 QLabel#dialogFieldLabel {
     font-size: 12px;
     font-weight: 600;
-    color: #141414;
+    color: @text;
 }
 QDialog#entryEditDialog QLineEdit,
 QDialog#entryEditDialog QPlainTextEdit {
-    background: #FBF9FB;
-    border: 1px solid #EFEFEF;
+    background: @bg-input;
+    border: 1px solid @border-soft;
     border-radius: 7px;
     padding: 7px 10px;
     font-size: 13px;
-    color: #111111;
-    selection-background-color: #000000;
-    selection-color: #FFFFFF;
+    color: @text;
+    selection-background-color: @accent;
+    selection-color: @accent-text;
 }
 QDialog#entryEditDialog QLineEdit:focus,
 QDialog#entryEditDialog QPlainTextEdit:focus {
-    background: #FFFFFF;
-    border: 1px solid #000000;
+    background: @bg-input-focus;
+    border: 1px solid @accent;
 }
 QToolButton#iconPickerButton {
     background: transparent;
@@ -165,11 +165,11 @@ QToolButton#iconPickerButton {
     border-radius: 10px;
 }
 QToolButton#iconPickerButton:checked {
-    border: 1px solid #000000;
+    border: 1px solid @accent;
 }
 QPushButton#primaryButton {
-    background: #000000;
-    color: #FFFFFF;
+    background: @accent;
+    color: @accent-text;
     border: none;
     border-radius: 8px;
     padding: 8px 22px;
@@ -177,47 +177,47 @@ QPushButton#primaryButton {
     font-weight: 600;
 }
 QPushButton#primaryButton:hover {
-    background: #262626;
+    background: @accent-hover;
 }
 QPushButton#primaryButton:disabled {
-    background: #BDBDBD;
+    background: @disabled;
 }
 QPushButton#ghostButton {
-    background: #FFFFFF;
-    color: #111111;
-    border: 1px solid #EAEAEA;
+    background: @bg-elevated;
+    color: @text;
+    border: 1px solid @border;
     border-radius: 8px;
     padding: 8px 18px;
     font-size: 13px;
     font-weight: 600;
 }
 QPushButton#ghostButton:hover {
-    background: #F5F5F5;
+    background: @hover;
 }
 
 QToolButton#iconPickerAdd {
     background: transparent;
     border: none;
     font-size: 20px;
-    color: #000000;
+    color: @text-strong;
 }
 
 QWidget#searchWindow {
-    background: #FFFFFF;
+    background: @bg;
 }
 QWidget#searchWindow QLineEdit#searchField {
-    background: #FBF9FB;
-    border: 1px solid #EFEFEF;
+    background: @bg-input;
+    border: 1px solid @border-soft;
     border-radius: 8px;
     padding: 7px 10px;
     font-size: 13px;
-    color: #111111;
-    selection-background-color: #000000;
-    selection-color: #FFFFFF;
+    color: @text;
+    selection-background-color: @accent;
+    selection-color: @accent-text;
 }
 QWidget#searchWindow QLineEdit#searchField:focus {
-    background: #FFFFFF;
-    border: 1px solid #D9D7DC;
+    background: @bg-input-focus;
+    border: 1px solid @border-focus;
 }
 QListWidget#searchResults {
     background: transparent;
@@ -225,7 +225,7 @@ QListWidget#searchResults {
 }
 QLabel#searchEmpty {
     font-size: 12px;
-    color: #8A8792;
+    color: @text-faint;
     padding: 8px 0;
 }
 
@@ -238,7 +238,7 @@ QListView#iconGallery::item {
     border-radius: 9px;
 }
 QListView#iconGallery::item:hover {
-    background: rgba(0, 0, 0, 0.07);
+    background: @overlay-hover;
 }
 
 QScrollArea[floatingWindow="true"] {
@@ -259,18 +259,18 @@ QScrollBar:horizontal {
     margin: 2px 2px 2px 2px;
 }
 QScrollBar::handle:vertical {
-    background: #CFCFCF;
+    background: @scroll;
     border-radius: 2px;
     min-height: 22px;
 }
 QScrollBar::handle:horizontal {
-    background: #CFCFCF;
+    background: @scroll;
     border-radius: 2px;
     min-width: 22px;
 }
 QScrollBar::handle:vertical:hover,
 QScrollBar::handle:horizontal:hover {
-    background: #A9A9A9;
+    background: @scroll-hover;
 }
 QScrollBar::add-line, QScrollBar::sub-line {
     width: 0;
@@ -283,47 +283,52 @@ QScrollBar::add-page, QScrollBar::sub-page {
 }
 
 QToolButton#graphZoomButton {
-    background: #FFFFFF;
-    border: 1px solid #E6E4E8;
+    background: @bg-elevated;
+    border: 1px solid @border-strong;
     border-radius: 14px;
     font-size: 16px;
-    color: #111111;
+    color: @text;
 }
 QToolButton#graphZoomButton:hover {
-    background: #F5F3F6;
+    background: @hover-tint;
 }
 QToolButton#graphZoomButton:pressed {
-    background: #EDEBEF;
+    background: @pressed;
+}
+/* The slash spans the full ascent, so it needs a smaller font to
+   render the same visual size as the +/− glyphs. */
+QToolButton#graphZoomButton[glyph="slash"] {
+    font-size: 12px;
 }
 
 QWidget#lockScreen {
-    background: #FFFFFF;
+    background: @bg;
 }
 QLabel#lockTitle {
     font-size: 20px;
     font-weight: 700;
-    color: #111111;
+    color: @text;
 }
 QLineEdit#lockField {
-    background: #FBF9FB;
-    border: 1px solid #EFEFEF;
+    background: @bg-input;
+    border: 1px solid @border-soft;
     border-radius: 10px;
     padding: 0 14px;
     font-size: 14px;
-    color: #111111;
-    selection-background-color: #000000;
-    selection-color: #FFFFFF;
+    color: @text;
+    selection-background-color: @accent;
+    selection-color: @accent-text;
 }
 QLineEdit#lockField:focus {
-    background: #FFFFFF;
-    border: 1px solid #D9D7DC;
+    background: @bg-input-focus;
+    border: 1px solid @border-focus;
 }
 QLineEdit#lockField[error="true"] {
     border: 1px solid #D2605E;
 }
 QToolButton#lockUnlock {
-    background: #000000;
-    color: #FFFFFF;
+    background: @accent;
+    color: @accent-text;
     border: none;
     border-radius: 10px;
     font-size: 18px;
@@ -336,9 +341,94 @@ QLabel#lockLink {
     font-size: 12px;
 }
 
+QWidget#settingsWindow {
+    background: @bg;
+}
+QFrame#settingsNavPane {
+    background: @bg-sidebar;
+    border: none;
+    border-right: 1px solid @border;
+}
+QListWidget#settingsNav {
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 13px;
+}
+QListWidget#settingsNav::item {
+    height: 30px;
+    border-radius: 8px;
+    padding-left: 8px;
+    margin: 1px 10px;
+    color: @text;
+}
+QListWidget#settingsNav::item:selected {
+    background: @accent;
+    color: @accent-text;
+}
+QFrame#settingsRow {
+    border: none;
+    border-bottom: 1px solid @border-row;
+    background: transparent;
+}
+QFrame#settingsRow[last="true"] {
+    border-bottom: none;
+}
+QLabel#settingsRowTitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: @text;
+}
+QLabel#settingsRowDesc {
+    font-size: 12px;
+    color: @text-muted;
+}
+QPushButton#settingsKeycap {
+    background: @hover-tint;
+    border: 1px solid @border-strong;
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-size: 12px;
+    font-weight: 600;
+    color: @text;
+}
+QPushButton#settingsKeycap:hover {
+    background: @hover-strong;
+}
+QPushButton#settingsKeycap[recording="true"] {
+    background: @bg-input-focus;
+    border: 1px solid @accent;
+    color: @text-muted;
+}
+QPushButton#settingsInlineButton {
+    background: transparent;
+    border: none;
+    padding: 8px 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: @text;
+}
+QPushButton#settingsInlineButton:hover {
+    color: @text-muted;
+}
+QLineEdit#settingsNumberField {
+    background: @bg-input;
+    border: 1px solid @border-soft;
+    border-radius: 7px;
+    padding: 5px 8px;
+    font-size: 13px;
+    color: @text;
+    selection-background-color: @accent;
+    selection-color: @accent-text;
+}
+QLineEdit#settingsNumberField:focus {
+    background: @bg-input-focus;
+    border: 1px solid @accent;
+}
+
 QPushButton#showInGraph {
-    background: #000000;
-    color: #FFFFFF;
+    background: @accent;
+    color: @accent-text;
     border: none;
     border-radius: 12px;
     padding: 12px 0;

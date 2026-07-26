@@ -19,6 +19,7 @@ class GroupTreeView;
 class LockScreen;
 class NlMenu;
 class SearchWindow;
+class SettingsWindow;
 
 namespace nightlock {
 class Group;
@@ -87,6 +88,9 @@ public:
     // Debug hook for NIGHTLOCK_SCREENSHOT_SEARCH: opens the search
     // popup, pre-fills `query` and returns it for grabbing.
     QWidget* openSearchForScreenshot(const QString& query);
+    // Debug hook for NIGHTLOCK_SCREENSHOT_SETTINGS: opens the Settings
+    // window on the given category row and returns it for grabbing.
+    QWidget* openSettingsForScreenshot(int category);
     // Debug hook for NIGHTLOCK_SCREENSHOT_LOCK: locks the vault;
     // `fail` first submits a wrong password for the error state.
     void debugLock(bool fail);
@@ -133,6 +137,7 @@ private:
     void openGraph();
     void refreshGraph();
     SearchWindow* openSearch();
+    SettingsWindow* openSettings();
     void lockVault();
     void revealInVault(nightlock::Group* group, nightlock::Entry* entry);
 
@@ -152,6 +157,7 @@ private:
     EntryDetailView* detail_;
     GraphWindow* graph_ = nullptr;     // the one graph window, if open
     SearchWindow* search_ = nullptr;   // the one search window, if open
+    SettingsWindow* settings_ = nullptr;  // the one settings window, if open
     LockScreen* lockScreen_ = nullptr; // covers the window while locked
     QSplitter* splitter_;
     QList<int> detailSplitterSizes_;  // pane widths to restore on re-dock

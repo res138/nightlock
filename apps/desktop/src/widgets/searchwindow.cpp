@@ -10,6 +10,8 @@
 #include <QStyledItemDelegate>
 #include <QVBoxLayout>
 
+#include "appearancesettings.hpp"
+
 #include <functional>
 
 #include <nightlock/group.hpp>
@@ -33,8 +35,11 @@ public:
 protected:
     void paintEvent(QPaintEvent*) override {
         QLinearGradient gradient(0, top_ ? 0 : height(), 0, top_ ? height() : 0);
-        gradient.setColorAt(0.0, QColor(255, 255, 255, 240));
-        gradient.setColorAt(1.0, QColor(255, 255, 255, 0));
+        QColor fade = appearancesettings::palette().window;
+        fade.setAlpha(240);
+        gradient.setColorAt(0.0, fade);
+        fade.setAlpha(0);
+        gradient.setColorAt(1.0, fade);
         QPainter painter(this);
         painter.fillRect(rect(), gradient);
     }
@@ -54,7 +59,10 @@ public:
         painter->setRenderHint(QPainter::Antialiasing);
         if (option.state & (QStyle::State_Selected | QStyle::State_MouseOver)) {
             painter->setPen(Qt::NoPen);
-            painter->setBrush(QColor(0, 0, 0, option.state & QStyle::State_Selected ? 18 : 10));
+            const int alpha = option.state & QStyle::State_Selected ? 18 : 10;
+            painter->setBrush(appearancesettings::darkActive()
+                                  ? QColor(255, 255, 255, alpha + 8)
+                                  : QColor(0, 0, 0, alpha));
             painter->drawRoundedRect(QRectF(option.rect).adjusted(2, 1, -2, -1), 8, 8);
         }
         const QIcon icon = index.data(Qt::DecorationRole).value<QIcon>();
@@ -67,14 +75,14 @@ public:
         font.setPixelSize(13);
         font.setWeight(QFont::DemiBold);
         painter->setFont(font);
-        painter->setPen(QColor(0x11, 0x11, 0x11));
+        painter->setPen(appearancesettings::palette().ink);
         painter->drawText(text, Qt::AlignTop | Qt::AlignLeft,
                           QFontMetrics(font).elidedText(index.data(Qt::DisplayRole).toString(),
                                                         Qt::ElideRight, text.width()));
         font.setPixelSize(11);
         font.setWeight(QFont::Normal);
         painter->setFont(font);
-        painter->setPen(QColor(0x8A, 0x87, 0x92));
+        painter->setPen(appearancesettings::palette().faint);
         painter->drawText(text, Qt::AlignBottom | Qt::AlignLeft,
                           QFontMetrics(font).elidedText(index.data(Qt::UserRole).toString(),
                                                         Qt::ElideRight, text.width()));

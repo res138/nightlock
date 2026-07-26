@@ -11,6 +11,8 @@
 #include <QTimer>
 #include <QVariantAnimation>
 
+#include "appearancesettings.hpp"
+
 #include <cmath>
 
 namespace {
@@ -31,8 +33,11 @@ constexpr int kCopiedFlashMs = 160;
 constexpr int kCopiedHoldMs = 900;
 constexpr int kHeight = 16;
 
-const QColor kTextColor(0x3C, 0x3C, 0x3C);
-const QColor kParticleColor(0x2A, 0x2A, 0x2A);
+QColor textColor() { return appearancesettings::palette().value; }
+QColor particleColor() {
+    return appearancesettings::darkActive() ? QColor(0xC8, 0xC6, 0xCD)
+                                            : QColor(0x2A, 0x2A, 0x2A);
+}
 
 qreal randomIn(qreal from, qreal to) {
     return from + QRandomGenerator::global()->generateDouble() * (to - from);
@@ -198,7 +203,7 @@ void SpoilerLabel::paintEvent(QPaintEvent*) {
                 fadeEnvelope(particle.age / particle.lifetime) * (1.0 - reveal_);
             if (alpha <= 0.01)
                 continue;
-            QColor color = kParticleColor;
+            QColor color = particleColor();
             color.setAlphaF(alpha * 0.85);
             painter.setBrush(color);
             painter.drawEllipse(particle.pos, particle.radius, particle.radius);
@@ -207,7 +212,7 @@ void SpoilerLabel::paintEvent(QPaintEvent*) {
 
     if (reveal_ > 0.0 && copied_ < 1.0) {
         painter.setOpacity(reveal_ * (1.0 - copied_));
-        painter.setPen(kTextColor);
+        painter.setPen(textColor());
         painter.drawText(rect(), Qt::AlignRight | Qt::AlignVCenter | Qt::TextSingleLine,
                          secret_);
     }
@@ -222,9 +227,9 @@ void SpoilerLabel::paintEvent(QPaintEvent*) {
         const qreal slide = (1.0 - copied_) * 4.0;  // gentle rise-in
         int x = width() - textWidth - kGap - kIconSize;
         const QRectF iconRect(x, (height() - kIconSize) / 2.0 + slide, kIconSize, kIconSize);
-        static const QIcon copyIcon(QStringLiteral(":/icons/menu/copy.svg"));
+        static const QIcon copyIcon = appearancesettings::themedMenuIcon(QStringLiteral("copy"));
         copyIcon.paint(&painter, iconRect.toRect());
-        painter.setPen(kTextColor);
+        painter.setPen(textColor());
         painter.drawText(QRectF(x + kIconSize + kGap, slide, textWidth, height()),
                          Qt::AlignLeft | Qt::AlignVCenter, label);
     }

@@ -8,6 +8,8 @@
 #include <QStyleOptionMenuItem>
 #include <QVariantAnimation>
 
+#include "appearancesettings.hpp"
+
 #include "frostedpanel.hpp"
 
 namespace {
@@ -34,12 +36,19 @@ constexpr int kRevealMs = 130;
 constexpr int kHoverInset = 4;
 constexpr qreal kHoverRadius = 6.5;
 
-const QColor kTextColor(0x1F, 0x1F, 0x1F);
 const QColor kDangerColor(0xFF, 0x3B, 0x30);
-const QColor kHoverColor(0, 0, 0, 14);
-const QColor kHairlineColor(0, 0, 0, 18);
-const QColor kBandColor(0, 0, 0, 14);
-const QColor kChevronColor(0x8A, 0x8A, 0x8E);
+
+// Theme-following paints; the soft overlays flip to white-based in
+// the dark scheme so they stay visible on the dark veil.
+QColor textColor() { return appearancesettings::palette().ink; }
+QColor chevronColor() { return appearancesettings::palette().muted; }
+QColor softOverlay(int alpha) {
+    return appearancesettings::darkActive() ? QColor(255, 255, 255, alpha + 8)
+                                            : QColor(0, 0, 0, alpha);
+}
+QColor hoverColor() { return softOverlay(14); }
+QColor hairlineColor() { return softOverlay(18); }
+QColor bandColor() { return softOverlay(14); }
 
 class NlMenuStyle : public QProxyStyle {
 public:
@@ -102,7 +111,7 @@ public:
         const QRect rect = item->rect;
 
         if (item->menuItemType == QStyleOptionMenuItem::Separator) {
-            painter->fillRect(rect, kBandColor);
+            painter->fillRect(rect, bandColor());
             painter->restore();
             return;
         }
@@ -123,7 +132,7 @@ public:
                     previous = a;
             }
             if (previous && !previous->isSeparator()) {
-                painter->setPen(kHairlineColor);
+                painter->setPen(hairlineColor());
                 painter->drawLine(rect.topLeft(), rect.topRight());
             }
         }
@@ -132,7 +141,7 @@ public:
 
         if ((item->state & State_Selected) && enabled) {
             painter->setPen(Qt::NoPen);
-            painter->setBrush(kHoverColor);
+            painter->setBrush(hoverColor());
             painter->drawRoundedRect(
                 QRectF(rect).adjusted(kHoverInset, kHoverInset, -kHoverInset, -kHoverInset),
                 kHoverRadius, kHoverRadius);
@@ -157,10 +166,10 @@ public:
         }
         x += kIconSize + kIconTextGap;
 
-        QColor textColor = danger ? kDangerColor : kTextColor;
+        QColor itemColor = danger ? kDangerColor : textColor();
         if (!enabled)
-            textColor.setAlpha(90);
-        painter->setPen(textColor);
+            itemColor.setAlpha(90);
+        painter->setPen(itemColor);
         painter->setFont(item->font);
         QString text = item->text;
         text.remove(QLatin1Char('&'));
@@ -170,7 +179,7 @@ public:
         if (item->menuItemType == QStyleOptionMenuItem::SubMenu) {
             const qreal cx = panel.right() - kPadRight - 3;
             const qreal cy = rect.center().y();
-            QPen pen(kChevronColor, 1.6);
+            QPen pen(chevronColor(), 1.6);
             pen.setCapStyle(Qt::RoundCap);
             pen.setJoinStyle(Qt::RoundJoin);
             painter->setPen(pen);

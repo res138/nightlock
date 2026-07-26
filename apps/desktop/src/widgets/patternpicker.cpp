@@ -4,7 +4,10 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QRandomGenerator>
 #include <QVariantAnimation>
+
+#include "appearancesettings.hpp"
 
 #include <array>
 
@@ -18,28 +21,29 @@ constexpr int kPadLeft = 10;
 constexpr int kChevronPad = 14;    // chevron center inset from the right
 constexpr int kChevronMs = 130;    // same tempo as the NlMenu reveal
 
-const QColor kFieldBackground(0xFB, 0xF9, 0xFB);
-const QColor kFieldBorder(0xEF, 0xEF, 0xEF);
-const QColor kOpenBorder(0x00, 0x00, 0x00);
-const QColor kTextColor(0x11, 0x11, 0x11);
-const QColor kChevronColor(0x8A, 0x8A, 0x8E);
+// Theme-following looks of the closed field, matching the dialog's
+// line edits on either scheme.
+QColor fieldBackground() { return appearancesettings::palette().input; }
+QColor fieldBorder() { return appearancesettings::palette().border; }
+QColor openBorder() { return appearancesettings::palette().ink; }
+QColor fieldText() { return appearancesettings::palette().ink; }
+QColor chevronColor() { return appearancesettings::palette().muted; }
 
 struct PatternOption {
     nightlock::Pattern kind;
     const char* title;
 };
 
-constexpr std::array<PatternOption, 10> kOptions = {{
+// Retired kinds (Icon tile v1/v3, Halo) still render for entries that
+// carry them, they just cannot be picked anymore.
+constexpr std::array<PatternOption, 7> kOptions = {{
     {nightlock::Pattern::None, QT_TRANSLATE_NOOP("PatternPicker", "None")},
     {nightlock::Pattern::GlowSoft, QT_TRANSLATE_NOOP("PatternPicker", "Glow · soft")},
     {nightlock::Pattern::GlowBold, QT_TRANSLATE_NOOP("PatternPicker", "Glow · bold")},
-    {nightlock::Pattern::IconTile, QT_TRANSLATE_NOOP("PatternPicker", "Icon tile · v1")},
-    {nightlock::Pattern::IconTileV2, QT_TRANSLATE_NOOP("PatternPicker", "Icon tile · v2")},
-    {nightlock::Pattern::IconTileV3, QT_TRANSLATE_NOOP("PatternPicker", "Icon tile · v3")},
+    {nightlock::Pattern::IconTileV2, QT_TRANSLATE_NOOP("PatternPicker", "Icon tile")},
     {nightlock::Pattern::Ripple, QT_TRANSLATE_NOOP("PatternPicker", "Ripple")},
     {nightlock::Pattern::Constellation, QT_TRANSLATE_NOOP("PatternPicker", "Constellation")},
     {nightlock::Pattern::Aurora, QT_TRANSLATE_NOOP("PatternPicker", "Aurora")},
-    {nightlock::Pattern::Halo, QT_TRANSLATE_NOOP("PatternPicker", "Halo")},
 }};
 
 QString titleFor(nightlock::Pattern kind) {
@@ -57,6 +61,13 @@ PatternPicker::PatternPicker(QWidget* parent) : QWidget(parent) {
     QFont f = font();
     f.setPixelSize(13);
     setFont(f);
+}
+
+nightlock::Pattern PatternPicker::randomOption() {
+    // Index 0 is None; any of the real looks may come up.
+    const int index =
+        1 + QRandomGenerator::global()->bounded(static_cast<int>(kOptions.size()) - 1);
+    return kOptions[index].kind;
 }
 
 void PatternPicker::setValue(nightlock::Pattern value) {
@@ -112,19 +123,19 @@ void PatternPicker::paintEvent(QPaintEvent*) {
     painter.setRenderHint(QPainter::Antialiasing);
 
     // Same idle/focused looks as the dialog's QLineEdit fields.
-    painter.setPen(menuOpen_ ? kOpenBorder : kFieldBorder);
-    painter.setBrush(menuOpen_ ? Qt::white : kFieldBackground);
+    painter.setPen(menuOpen_ ? openBorder() : fieldBorder());
+    painter.setBrush(menuOpen_ ? appearancesettings::palette().window : fieldBackground());
     painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5),
                             kFieldRadius, kFieldRadius);
 
-    painter.setPen(kTextColor);
+    painter.setPen(fieldText());
     painter.drawText(rect().adjusted(kPadLeft, 0, -2 * kChevronPad, 0),
                      Qt::AlignLeft | Qt::AlignVCenter, titleFor(value_));
 
     // Downward chevron that flips upside down while the menu is open.
     painter.translate(width() - kChevronPad, height() / 2.0);
     painter.rotate(180.0 * chevronTurn_);
-    QPen pen(kChevronColor, 1.6);
+    QPen pen(chevronColor(), 1.6);
     pen.setCapStyle(Qt::RoundCap);
     pen.setJoinStyle(Qt::RoundJoin);
     painter.setPen(pen);

@@ -2,6 +2,8 @@
 
 #include <QPainter>
 
+#include "appearancesettings.hpp"
+#include "fonts.hpp"
 #include "models/entrylistmodel.hpp"
 
 namespace {
@@ -16,14 +18,14 @@ void EntryListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
     const QRect rect = option.rect;
     const bool selected = option.state.testFlag(QStyle::State_Selected);
 
-    painter->fillRect(rect, Qt::white);
-    painter->setPen(QColor(0xF0, 0xF0, 0xF0));
+    painter->fillRect(rect, appearancesettings::palette().window);
+    painter->setPen(appearancesettings::palette().separator);
     painter->drawLine(rect.bottomLeft(), rect.bottomRight());
 
     const QRect content = rect.adjusted(10, 4, -10, -6);
     if (selected) {
         painter->setPen(Qt::NoPen);
-        painter->setBrush(Qt::black);
+        painter->setBrush(appearancesettings::accentColor());
         painter->drawRoundedRect(content, 10, 10);
     }
 
@@ -34,10 +36,11 @@ void EntryListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
     const int textLeft = iconRect.right() + 16;
     const int textWidth = content.right() - textLeft - 8;
 
-    QFont nameFont(QStringLiteral("Georgia"), 14);
+    QFont nameFont(fonts::resolvedFamily(fonts::Role::Secondary), 14);
     nameFont.setBold(true);
     painter->setFont(nameFont);
-    painter->setPen(selected ? Qt::white : Qt::black);
+    painter->setPen(selected ? appearancesettings::accentTextColor()
+                             : appearancesettings::palette().ink);
     const QRect nameRect(textLeft, content.top() + 10, textWidth, 20);
     painter->drawText(nameRect, Qt::AlignLeft | Qt::AlignVCenter,
                       index.data(EntryListModel::NameRole).toString());
@@ -45,7 +48,9 @@ void EntryListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
     QFont loginFont = option.font;
     loginFont.setPointSize(11);
     painter->setFont(loginFont);
-    painter->setPen(selected ? QColor(0xCF, 0xCF, 0xCF) : QColor(0x77, 0x77, 0x77));
+    QColor selectedLogin = appearancesettings::accentTextColor();
+    selectedLogin.setAlpha(190);
+    painter->setPen(selected ? selectedLogin : appearancesettings::palette().muted);
     const QRect loginRect(textLeft, nameRect.bottom() + 2, textWidth, 16);
     painter->drawText(loginRect, Qt::AlignLeft | Qt::AlignVCenter,
                       index.data(EntryListModel::LoginRole).toString());

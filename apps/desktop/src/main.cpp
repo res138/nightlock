@@ -1,3 +1,4 @@
+#include <QAbstractButton>
 #include <QApplication>
 #include <QDialog>
 #include <QFile>
@@ -6,7 +7,9 @@
 
 #include <nightlock/group.hpp>
 
+#include "appearancesettings.hpp"
 #include "demovault.hpp"
+#include "fonts.hpp"
 #include "standardicons.hpp"
 #include "windows/entryeditdialog.hpp"
 #include "windows/mainwindow.hpp"
@@ -20,9 +23,10 @@ int main(int argc, char* argv[]) {
     QApplication::setOrganizationName(QStringLiteral("Nightlock"));
     QApplication::setApplicationName(QStringLiteral("Nightlock"));
 
-    QFile qss(QStringLiteral(":/style.qss"));
-    if (qss.open(QIODevice::ReadOnly))
-        app.setStyleSheet(QString::fromUtf8(qss.readAll()));
+    // San Francisco everywhere, not "whatever the platform default
+    // is" — critical for the Windows/Linux ports.
+    fonts::applyApplicationFont();
+    appearancesettings::applyStylesheet();
 
     // Dock icon for the running process (the squircle render of the
     // logo); resources/nightlock.icns carries the same art for a
@@ -239,6 +243,45 @@ int main(int argc, char* argv[]) {
                 qEnvironmentVariable("NIGHTLOCK_SEARCH_QUERY"));
             QTimer::singleShot(400, popup, [popup] {
                 popup->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_SEARCH"));
+                QApplication::quit();
+            });
+        });
+    }
+
+    // Debug hook: NIGHTLOCK_SCREENSHOT_SETTINGS=<path> opens the
+    // Settings window, saves it and exits. NIGHTLOCK_SETTINGS_PAGE=<n>
+    // picks the category row first (0-based, default General).
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_SETTINGS")) {
+        QTimer::singleShot(800, &window, [&window] {
+            QWidget* settings = window.openSettingsForScreenshot(
+                qEnvironmentVariableIntValue("NIGHTLOCK_SETTINGS_PAGE"));
+            // NIGHTLOCK_SETTINGS_DROPDOWN=<n> opens the page's n-th
+            // dropdown (1-based) and captures its frosted menu.
+            if (qEnvironmentVariableIsSet("NIGHTLOCK_SETTINGS_DROPDOWN")) {
+                QTimer::singleShot(300, settings, [settings] {
+                    // Only the current page's dropdowns are visible.
+                    int wanted = qEnvironmentVariableIntValue("NIGHTLOCK_SETTINGS_DROPDOWN");
+                    const auto dropdowns = settings->findChildren<QAbstractButton*>(
+                        QStringLiteral("settingsDropdown"));
+                    for (QAbstractButton* dropdown : dropdowns) {
+                        if (!dropdown->isVisible())
+                            continue;
+                        if (--wanted > 0)
+                            continue;
+                        dropdown->click();
+                        break;
+                    }
+                    QTimer::singleShot(400, settings, [] {
+                        if (QWidget* popup = QApplication::activePopupWidget())
+                            popup->grab().save(
+                                qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_SETTINGS"));
+                        QApplication::quit();
+                    });
+                });
+                return;
+            }
+            QTimer::singleShot(400, settings, [settings] {
+                settings->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_SETTINGS"));
                 QApplication::quit();
             });
         });

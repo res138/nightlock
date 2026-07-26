@@ -6,6 +6,10 @@ set(CMAKE_AUTORCC ON)
 qt_add_executable(nightlock-desktop
     src/main.cpp
     src/demovault.cpp
+    src/appearancesettings.cpp
+    src/fonts.cpp
+    src/graphsettings.cpp
+    src/hotkeys.cpp
     src/standardicons.cpp
     src/models/grouptreemodel.cpp
     src/models/entrylistmodel.cpp
@@ -27,6 +31,7 @@ qt_add_executable(nightlock-desktop
     src/windows/graphwindow.cpp
     src/windows/lockscreen.cpp
     src/windows/mainwindow.cpp
+    src/windows/settingswindow.cpp
     resources/resources.qrc
 )
 
@@ -35,7 +40,10 @@ target_include_directories(nightlock-desktop PRIVATE src)
 # The P* icon packs are loaded from disk at runtime — ~190 MB is too
 # much to embed as Qt resources. Dev builds read the source tree.
 target_compile_definitions(nightlock-desktop PRIVATE
-    NIGHTLOCK_ICONS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/icons")
+    NIGHTLOCK_ICONS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
+    # San Francisco for non-Apple platforms is side-loaded from here
+    # (Apple's license keeps the files out of the repository).
+    NIGHTLOCK_FONTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/fonts")
 
 if(APPLE)
     target_sources(nightlock-desktop PRIVATE src/platform/macwindow.mm)
