@@ -33,7 +33,9 @@
 #include "appearancesettings.hpp"
 #include "hotkeys.hpp"
 #include "models/grouptreemodel.hpp"
+#include "qsecure.hpp"
 #include "standardicons.hpp"
+#include "vaultservice.hpp"
 #include "widgets/entrydetailview.hpp"
 #include "widgets/entrylistdelegate.hpp"
 #include "widgets/grouptreeview.hpp"
@@ -231,12 +233,19 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
 
     lockScreen_ = new LockScreen(this);
     lockScreen_->hide();
-    connect(lockScreen_, &LockScreen::unlocked, this, [this] {
-        lockScreen_->hide();
-        // The Dock loses its lock badge together with the screen.
-        QGuiApplication::setWindowIcon(
-            QIcon(QStringLiteral(NIGHTLOCK_ICONS_DIR "/appicon.png")));
-    });
+    connect(lockScreen_, &LockScreen::passwordSubmitted, this,
+            &MainWindow::handlePassword);
+    // A failed autosave must not pass silently — the user thinks their
+    // edit is on disk.
+    connect(VaultService::instance(), &VaultService::saveFailed, this,
+            [this](const QString& reason) {
+                auto* box = new QMessageBox(
+                    QMessageBox::Warning, tr("Save Failed"),
+                    tr("The vault could not be saved: %1").arg(reason),
+                    QMessageBox::Ok, this);
+                box->setAttribute(Qt::WA_DeleteOnClose);
+                box->open();
+            });
 
     connect(detail_, &EntryDetailView::detachRequested, this, &MainWindow::detachDetail);
     connect(detail_, &EntryDetailView::dropped, this, &MainWindow::maybeReattachDetail);
@@ -611,15 +620,23 @@ QWidget* MainWindow::openSearchForScreenshot(const QString& query) {
 }
 
 // The lock icon / ⌘L: windows showing vault data close, the floating
-// detail docks back, and the lock screen covers everything until the
-// right password comes in.
+// detail docks back, the models drop their pointers into the tree,
+// the decrypted tree and key are wiped, and the lock screen covers
+// everything until the right password comes in.
 void MainWindow::lockVault() {
+    if (lockScreen_->isVisible())
+        return;
     if (graph_)
         graph_->close();
     if (search_)
         search_->close();
     if (detail_->isWindow())
         dockDetail();
+    // Views first, tree second: after lockAndWipe() every cached
+    // Group*/Entry* dangles.
+    setVaultRoot(nullptr);
+    VaultService::instance()->lockAndWipe();
+    lockScreen_->setMode(LockScreen::Mode::Unlock);
     lockScreen_->setGeometry(rect());
     lockScreen_->reset();
     lockScreen_->show();
@@ -629,10 +646,77 @@ void MainWindow::lockVault() {
         QIcon(QStringLiteral(NIGHTLOCK_ICONS_DIR "/appicon-locked.png")));
 }
 
+void MainWindow::startLocked() {
+    lockScreen_->setMode(VaultService::instance()->vaultExists()
+                             ? LockScreen::Mode::Unlock
+                             : LockScreen::Mode::Create);
+    lockScreen_->setGeometry(rect());
+    lockScreen_->reset();
+    lockScreen_->show();
+    lockScreen_->raise();
+    QGuiApplication::setWindowIcon(
+        QIcon(QStringLiteral(NIGHTLOCK_ICONS_DIR "/appicon-locked.png")));
+}
+
+void MainWindow::setVaultRoot(nightlock::Group* root) {
+    detail_->setEntry(nullptr);
+    entryModel_->setGroup(nullptr);
+    treeModel_->setRootGroup(root);
+    countLabel_->clear();
+    pathLabel_->clear();
+    if (root) {
+        tree_->expandAll();
+        tree_->setCurrentIndex(treeModel_->indexOf(root));
+    }
+}
+
+void MainWindow::handlePassword(const QString& password) {
+    auto* service = VaultService::instance();
+    // The demo vault has no file behind it; the mockup password from
+    // the Figma days keeps the screenshot flows working.
+    if (service->demoMode()) {
+        if (password == QLatin1String("nightlock"))
+            finishUnlock(service->root());
+        else
+            lockScreen_->rejectPassword();
+        return;
+    }
+    if (lockScreen_->mode() == LockScreen::Mode::Create) {
+        const nightlock::VaultError error = service->createNew(password);
+        if (error == nightlock::VaultError::None)
+            finishUnlock(service->root());
+        else
+            lockScreen_->rejectPassword(
+                QString::fromUtf8(nightlock::errorMessage(error)));
+        return;
+    }
+    const nightlock::VaultError error = service->unlock(password);
+    if (error == nightlock::VaultError::None) {
+        finishUnlock(service->root());
+    } else if (error == nightlock::VaultError::WrongPassword) {
+        lockScreen_->rejectPassword();
+    } else {
+        lockScreen_->rejectPassword(
+            QString::fromUtf8(nightlock::errorMessage(error)));
+    }
+}
+
+void MainWindow::finishUnlock(nightlock::Group* root) {
+    setVaultRoot(root);
+    lockScreen_->hide();
+    // The Dock loses its lock badge together with the screen.
+    QGuiApplication::setWindowIcon(
+        QIcon(QStringLiteral(NIGHTLOCK_ICONS_DIR "/appicon.png")));
+}
+
 void MainWindow::debugLock(bool fail) {
     lockVault();
     if (fail)
         lockScreen_->debugFail();
+}
+
+void MainWindow::debugSubmitPassword(const QString& password) {
+    handlePassword(password);
 }
 
 void MainWindow::onGroupChanged(const QModelIndex& current) {
@@ -752,11 +836,11 @@ NlMenu* MainWindow::buildEntryMenu(nightlock::Entry* entry) {
         QGuiApplication::clipboard()->setText(QString::fromStdString(entry->login));
     });
     menu->addAction(menuIcon(QStringLiteral("key")), tr("Copy password"), this, [entry] {
-        QGuiApplication::clipboard()->setText(QString::fromStdString(entry->password));
+        QGuiApplication::clipboard()->setText(toQString(entry->password));
     });
     if (!entry->code.empty()) {
         menu->addAction(menuIcon(QStringLiteral("hash")), tr("Copy 2FA code"), this, [entry] {
-            QGuiApplication::clipboard()->setText(QString::fromStdString(entry->code));
+            QGuiApplication::clipboard()->setText(toQString(entry->code));
         });
     }
     if (!entry->url.empty()) {
@@ -831,6 +915,7 @@ void MainWindow::moveEntriesTo(const QList<nightlock::Entry*>& entries,
         return;
     for (nightlock::Entry* entry : entries)
         source->transferEntry(entry, *target);
+    VaultService::instance()->markDirty();
     // Show where they landed, exactly like adding does: switch to the
     // target folder and keep the first moved entry selected (pointers
     // survive the transfer, so the detail view follows seamlessly).
@@ -855,6 +940,7 @@ void MainWindow::addEntryTo(nightlock::Group* group) {
 
 void MainWindow::insertEntry(nightlock::Group* group, nightlock::Entry entry) {
     auto& added = group->addEntry(std::move(entry));
+    VaultService::instance()->markDirty();
     tree_->setCurrentIndex(treeModel_->indexOf(group));
     onGroupChanged(tree_->currentIndex());  // re-reads the list and the header
     list_->setCurrentIndex(entryModel_->indexOf(&added));
@@ -875,8 +961,10 @@ void MainWindow::editEntry(nightlock::Entry* entry) {
                          entry->password != before.password || entry->url != before.url ||
                          entry->note != before.note || entry->icon != before.icon ||
                          entry->pattern != before.pattern;
-    if (changed)
+    if (changed) {
         entry->modified = std::chrono::system_clock::now();
+        VaultService::instance()->markDirty();
+    }
     standardicons::addRecentIconPath(QString::fromStdString(entry->icon));
     entryModel_->notifyEntryChanged(entry);
     // A sorted view may have moved the row under the edit; follow it.
@@ -1137,6 +1225,7 @@ void MainWindow::debugSetEntryIcon(const QString& path) {
     if (!entry)
         return;
     entry->icon = path.toStdString();
+    VaultService::instance()->markDirty();
     entryModel_->notifyEntryChanged(entry);
     detail_->setEntry(entry);
 }
@@ -1177,8 +1266,10 @@ void MainWindow::debugSetEntryPattern(const QString& spec) {
                     entry = entryModel_->entry(idx);
             }
         }
-        if (entry)
+        if (entry) {
             entry->pattern = kindOf(kind);
+            VaultService::instance()->markDirty();
+        }
     }
     detail_->setEntry(entryModel_->entry(list_->currentIndex()));
 }

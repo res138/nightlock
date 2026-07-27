@@ -17,6 +17,7 @@
 
 #include "appearancesettings.hpp"
 #include "graphsettings.hpp"
+#include "qsecure.hpp"
 
 namespace {
 
@@ -177,7 +178,7 @@ void GraphWindow::build(nightlock::Group* root) {
             edges_.push_back({hub, static_cast<int>(nodes_.size()), Rule::Directory, 0});
             nodes_.push_back(node);
             keys.push_back({QString::fromStdString(entry->login).toLower(),
-                            QString::fromStdString(entry->password),
+                            toQString(entry->password),
                             baseDomain(entry->url)});
             ++spoke;
         }

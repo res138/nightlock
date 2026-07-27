@@ -2,6 +2,7 @@
 #include <QApplication>
 #include <QDialog>
 #include <QFile>
+#include <QFileInfo>
 #include <QMenu>
 #include <QTimer>
 
@@ -11,6 +12,7 @@
 #include "demovault.hpp"
 #include "fonts.hpp"
 #include "standardicons.hpp"
+#include "vaultservice.hpp"
 #include "windows/entryeditdialog.hpp"
 #include "windows/mainwindow.hpp"
 
@@ -33,9 +35,16 @@ int main(int argc, char* argv[]) {
     // future .app bundle.
     QApplication::setWindowIcon(QIcon(QStringLiteral(NIGHTLOCK_ICONS_DIR "/appicon.png")));
 
-    auto vault = createDemoVault();
+    // NIGHTLOCK_DEMO=1 runs on the in-memory mockup vault (no disk
+    // I/O, unlock password "nightlock") — the screenshot/debug hooks
+    // below assume its data. The normal mode opens the encrypted
+    // vault file and starts behind the lock screen.
+    VaultService* service = VaultService::instance();
+    const bool demoMode = qEnvironmentVariableIsSet("NIGHTLOCK_DEMO");
+    if (demoMode)
+        service->setDemoRoot(createDemoVault());
 
-    MainWindow window(vault.get());
+    MainWindow window(service->root());
     // Content extends into the title bar zone: the panes and their
     // borders run from the very top edge of the window, with only the
     // traffic-light buttons floating above the directory pane.
@@ -58,9 +67,18 @@ int main(int argc, char* argv[]) {
     standardicons::preloadGalleryIcons();
     QObject::connect(&app, &QCoreApplication::aboutToQuit,
                      [] { standardicons::stopGalleryPreload(); });
-    window.selectGroupNamed(QStringLiteral("Personal 2020"));
-    window.selectEntryNamed(
-        qEnvironmentVariable("NIGHTLOCK_SELECT_ENTRY", QStringLiteral("GitHub")));
+    // A pending debounced autosave must reach the disk before exit.
+    QObject::connect(&app, &QCoreApplication::aboutToQuit,
+                     [service] { service->saveNow(); });
+
+    if (demoMode) {
+        window.selectGroupNamed(QStringLiteral("Personal 2020"));
+        window.selectEntryNamed(
+            qEnvironmentVariable("NIGHTLOCK_SELECT_ENTRY", QStringLiteral("GitHub")));
+    } else {
+        window.setWindowTitle(QFileInfo(service->vaultPath()).fileName());
+        window.startLocked();
+    }
 
     // Debug hook: NIGHTLOCK_TEST_MOVE="<group>:<target>" drops a folder
     // onto another through the regular drag-and-drop model path.
@@ -75,10 +93,26 @@ int main(int argc, char* argv[]) {
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_ENTRY_ICON"))
         window.debugSetEntryIcon(qEnvironmentVariable("NIGHTLOCK_TEST_ENTRY_ICON"));
 
+    // Debug hook: NIGHTLOCK_TEST_PASSWORD=<pw> submits the password on
+    // the lock screen shortly after startup — unlocks a real vault, or
+    // creates one on the first run.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_PASSWORD")) {
+        QTimer::singleShot(400, &window, [&window] {
+            window.debugSubmitPassword(qEnvironmentVariable("NIGHTLOCK_TEST_PASSWORD"));
+        });
+    }
+
     // Debug hook: NIGHTLOCK_TEST_ADD_ENTRY=<name> creates an entry in
     // the current folder (fresh Created/Modified).
-    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_ADD_ENTRY"))
-        window.debugAddEntry(qEnvironmentVariable("NIGHTLOCK_TEST_ADD_ENTRY"));
+    // NIGHTLOCK_TEST_ADD_ENTRY_DELAY=<ms> postpones it, e.g. until
+    // after a NIGHTLOCK_TEST_PASSWORD unlock.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_ADD_ENTRY")) {
+        QTimer::singleShot(
+            qEnvironmentVariableIntValue("NIGHTLOCK_TEST_ADD_ENTRY_DELAY"), &window,
+            [&window] {
+                window.debugAddEntry(qEnvironmentVariable("NIGHTLOCK_TEST_ADD_ENTRY"));
+            });
+    }
 
     // Debug hook: NIGHTLOCK_TEST_ENTRY_PATTERN="[name:]kind[,name:kind…]"
     // assigns background patterns (glow-soft|glow-bold|icon-tile|
@@ -144,8 +178,10 @@ int main(int argc, char* argv[]) {
     }
 
     // Debug hook: NIGHTLOCK_SCREENSHOT=<path> saves a frame and exits.
+    // NIGHTLOCK_SCREENSHOT_DELAY=<ms> overrides the default 800.
     if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT")) {
-        QTimer::singleShot(800, &window, [&window] {
+        const int shotDelay = qEnvironmentVariableIntValue("NIGHTLOCK_SCREENSHOT_DELAY");
+        QTimer::singleShot(shotDelay > 0 ? shotDelay : 800, &window, [&window] {
             window.grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT"));
             QApplication::quit();
         });

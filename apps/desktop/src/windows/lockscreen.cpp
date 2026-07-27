@@ -12,10 +12,6 @@
 
 namespace {
 
-// The demo vault has no real encryption yet; the lock screen accepts
-// this password.
-constexpr char kDemoPassword[] = "nightlock";
-
 constexpr int kFieldWidth = 300;
 constexpr int kFieldHeight = 42;
 constexpr int kRowSpacing = 8;
@@ -38,9 +34,9 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
         icon->setPixmap(scaled);
     }
 
-    auto* title = new QLabel(tr("Nightlock Vault is Locked"));
-    title->setObjectName(QStringLiteral("lockTitle"));
-    title->setAlignment(Qt::AlignHCenter);
+    title_ = new QLabel(tr("Nightlock Vault is Locked"));
+    title_->setObjectName(QStringLiteral("lockTitle"));
+    title_->setAlignment(Qt::AlignHCenter);
 
     field_ = new QLineEdit;
     field_->setObjectName(QStringLiteral("lockField"));
@@ -48,7 +44,7 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     field_->setEchoMode(QLineEdit::Password);
     field_->setAttribute(Qt::WA_MacShowFocusRect, false);
     field_->setFixedSize(kFieldWidth, kFieldHeight);
-    connect(field_, &QLineEdit::returnPressed, this, &LockScreen::tryUnlock);
+    connect(field_, &QLineEdit::returnPressed, this, &LockScreen::submit);
     connect(field_, &QLineEdit::textEdited, this, [this] { setError(false); });
 
     auto* unlock = new QToolButton;
@@ -57,7 +53,7 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     unlock->setToolTip(tr("Unlock"));
     unlock->setFixedSize(kFieldHeight, kFieldHeight);
     unlock->setCursor(Qt::PointingHandCursor);
-    connect(unlock, &QToolButton::clicked, this, &LockScreen::tryUnlock);
+    connect(unlock, &QToolButton::clicked, this, &LockScreen::submit);
 
     // The row sits inside a fixed-size holder outside any layout, so
     // the shake can move it freely without the layout fighting back.
@@ -74,6 +70,25 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     rowLayout->setSpacing(kRowSpacing);
     rowLayout->addWidget(field_);
     rowLayout->addWidget(unlock);
+
+    // Create mode's confirm field, aligned with the field above (the
+    // arrow button's width stays empty on the right flank).
+    confirm_ = new QLineEdit;
+    confirm_->setObjectName(QStringLiteral("lockField"));
+    confirm_->setPlaceholderText(tr("Repeat the password"));
+    confirm_->setEchoMode(QLineEdit::Password);
+    confirm_->setAttribute(Qt::WA_MacShowFocusRect, false);
+    confirm_->setFixedSize(kFieldWidth, kFieldHeight);
+    connect(confirm_, &QLineEdit::returnPressed, this, &LockScreen::submit);
+    connect(confirm_, &QLineEdit::textEdited, this, [this] { setError(false); });
+
+    confirmHolder_ = new QWidget;
+    confirmHolder_->setFixedSize(holder->width(), kFieldHeight + 10);
+    auto* confirmLayout = new QHBoxLayout(confirmHolder_);
+    confirmLayout->setContentsMargins(kShakeReach, 10,
+                                      kShakeReach + kRowSpacing + kFieldHeight, 0);
+    confirmLayout->addWidget(confirm_);
+    confirmHolder_->hide();
 
     error_ = new QLabel(QStringLiteral(" "));
     error_->setObjectName(QStringLiteral("lockError"));
@@ -92,44 +107,70 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     layout->addStretch(5);
     layout->addWidget(icon);
     layout->addSpacing(18);
-    layout->addWidget(title);
+    layout->addWidget(title_);
     layout->addSpacing(16);
     layout->addWidget(holder, 0, Qt::AlignHCenter);
+    layout->addWidget(confirmHolder_, 0, Qt::AlignHCenter);
     layout->addSpacing(10);
     layout->addWidget(error_);
     layout->addStretch(6);
     layout->addWidget(link);
 }
 
+void LockScreen::setMode(Mode mode) {
+    mode_ = mode;
+    const bool create = mode == Mode::Create;
+    title_->setText(create ? tr("Create Your Nightlock Vault")
+                           : tr("Nightlock Vault is Locked"));
+    field_->setPlaceholderText(create ? tr("Choose a master password")
+                                      : tr("Enter the password"));
+    confirmHolder_->setVisible(create);
+}
+
 void LockScreen::reset() {
     field_->clear();
+    confirm_->clear();
     setError(false);
     field_->setFocus();
 }
 
-void LockScreen::debugFail() {
-    field_->setText(QStringLiteral("wrong-password"));
-    tryUnlock();
-}
-
-void LockScreen::tryUnlock() {
-    if (field_->text() == QLatin1String(kDemoPassword)) {
-        emit unlocked();
-        return;
-    }
-    setError(true);
+void LockScreen::rejectPassword(const QString& message) {
+    setError(true, message);
     shake();
     field_->selectAll();
     field_->setFocus();
 }
 
-void LockScreen::setError(bool on) {
+void LockScreen::debugFail() {
+    field_->setText(QStringLiteral("wrong-password"));
+    submit();
+}
+
+void LockScreen::submit() {
+    const QString password = field_->text();
+    if (password.isEmpty()) {
+        rejectPassword(tr("Enter a password."));
+        return;
+    }
+    if (mode_ == Mode::Create && password != confirm_->text()) {
+        setError(true, tr("Passwords do not match."));
+        shake();
+        confirm_->selectAll();
+        confirm_->setFocus();
+        return;
+    }
+    emit passwordSubmitted(password);
+}
+
+void LockScreen::setError(bool on, const QString& message) {
     if (field_->property("error").toBool() != on) {
         field_->setProperty("error", on);
         field_->style()->unpolish(field_);
         field_->style()->polish(field_);
     }
-    error_->setText(on ? tr("Invalid password. Try again.") : QStringLiteral(" "));
+    error_->setText(on ? (message.isEmpty() ? tr("Invalid password. Try again.")
+                                            : message)
+                       : QStringLiteral(" "));
 }
 
 // Damped horizontal wiggle of the field row.

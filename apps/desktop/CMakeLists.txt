@@ -11,6 +11,7 @@ qt_add_executable(nightlock-desktop
     src/graphsettings.cpp
     src/hotkeys.cpp
     src/standardicons.cpp
+    src/vaultservice.cpp
     src/models/grouptreemodel.cpp
     src/models/entrylistmodel.cpp
     src/widgets/copylabel.cpp

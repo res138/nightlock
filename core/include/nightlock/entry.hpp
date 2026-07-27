@@ -3,6 +3,8 @@
 #include <chrono>
 #include <string>
 
+#include "secure.hpp"
+
 namespace nightlock {
 
 // Decorative background pattern behind the entry icon in the detail
@@ -23,18 +25,19 @@ enum class Pattern {
 };
 
 // Classic password entry. name, login, password and both dates are
-// required; the rest is optional and empty when unset.
+// required; the rest is optional and empty when unset. The secret
+// fields live in secure::String — pinned pages, zeroized on free.
 struct Entry {
     std::string name;
     std::string login;
-    std::string password;
+    secure::String password;
     std::chrono::system_clock::time_point created;
     std::chrono::system_clock::time_point modified;
 
     std::string url;
     std::string icon;  // path or resource id; empty = default icon
     std::string note;
-    std::string code;  // 2FA one-time code
+    secure::String code;  // 2FA one-time code
     Pattern pattern = Pattern::None;  // detail-view background pattern
 };
 
