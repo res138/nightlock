@@ -18,7 +18,7 @@ nightlock::Entry makeEntry(std::string name, std::string login, std::string pass
     nightlock::Entry e;
     e.name = std::move(name);
     e.login = std::move(login);
-    e.password = std::move(password);
+    e.password.assign(password.data(), password.size());
     e.created = created;
     e.modified = modified;
     return e;

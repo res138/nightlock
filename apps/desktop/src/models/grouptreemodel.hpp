@@ -14,6 +14,10 @@ class GroupTreeModel : public QAbstractItemModel {
 public:
     explicit GroupTreeModel(nightlock::Group* root, QObject* parent = nullptr);
 
+    // Swaps the whole tree (nullptr = locked vault, empty model). The
+    // views must drop cached indexes — this resets the model.
+    void setRootGroup(nightlock::Group* root);
+
     QModelIndex index(int row, int column, const QModelIndex& parent = {}) const override;
     QModelIndex parent(const QModelIndex& child) const override;
     int rowCount(const QModelIndex& parent = {}) const override;

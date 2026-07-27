@@ -10,6 +10,7 @@
 
 #include <nightlock/entry.hpp>
 
+#include "qsecure.hpp"
 #include "widgets/icongallerypopup.hpp"
 #include "widgets/iconpicker.hpp"
 #include "widgets/nlmenu.hpp"
@@ -91,7 +92,7 @@ EntryEditDialog::EntryEditDialog(Mode mode, QWidget* parent) : QDialog(parent) {
 void EntryEditDialog::setEntry(const nightlock::Entry& entry) {
     nameEdit_->setText(QString::fromStdString(entry.name));
     loginEdit_->setText(QString::fromStdString(entry.login));
-    passwordEdit_->setText(QString::fromStdString(entry.password));
+    passwordEdit_->setText(toQString(entry.password));
     urlEdit_->setText(QString::fromStdString(entry.url));
     noteEdit_->setPlainText(QString::fromStdString(entry.note));
     iconPicker_->setSelectedIconValue(QString::fromStdString(entry.icon));
@@ -101,7 +102,7 @@ void EntryEditDialog::setEntry(const nightlock::Entry& entry) {
 void EntryEditDialog::applyTo(nightlock::Entry& entry) const {
     entry.name = nameEdit_->text().trimmed().toStdString();
     entry.login = loginEdit_->text().trimmed().toStdString();
-    entry.password = passwordEdit_->text().toStdString();
+    assignSecret(entry.password, passwordEdit_->text());
     entry.url = urlEdit_->text().trimmed().toStdString();
     entry.note = noteEdit_->toPlainText().trimmed().toStdString();
     entry.icon = iconPicker_->selectedIconValue().toStdString();

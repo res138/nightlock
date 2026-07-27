@@ -7,6 +7,7 @@
 #include <nightlock/group.hpp>
 
 #include "appearancesettings.hpp"
+#include "vaultservice.hpp"
 
 namespace {
 
@@ -33,6 +34,12 @@ GroupTreeModel::GroupTreeModel(nightlock::Group* root, QObject* parent)
             [this] { emit layoutChanged(); });
 }
 
+void GroupTreeModel::setRootGroup(nightlock::Group* root) {
+    beginResetModel();
+    root_ = root;
+    endResetModel();
+}
+
 QModelIndex GroupTreeModel::index(int row, int column, const QModelIndex& parent) const {
     if (!hasIndex(row, column, parent))
         return {};
@@ -50,7 +57,7 @@ QModelIndex GroupTreeModel::parent(const QModelIndex& child) const {
 
 int GroupTreeModel::rowCount(const QModelIndex& parent) const {
     if (!parent.isValid())
-        return 1;
+        return root_ ? 1 : 0;  // no root row while the vault is locked
     return static_cast<int>(group(parent)->groups().size());
 }
 
@@ -85,6 +92,7 @@ bool GroupTreeModel::setData(const QModelIndex& index, const QVariant& value, in
         return false;
     g->setName(name.toStdString());
     emit dataChanged(index, index, {Qt::DisplayRole});
+    VaultService::instance()->markDirty();
     return true;
 }
 
@@ -96,6 +104,7 @@ QModelIndex GroupTreeModel::addGroup(const QModelIndex& parent, const QString& n
     beginInsertRows(parent, row, row);
     auto& created = parentGroup->addGroup(name.trimmed().toStdString());
     endInsertRows();
+    VaultService::instance()->markDirty();
     return indexOf(&created);
 }
 
@@ -105,6 +114,7 @@ bool GroupTreeModel::setGroupIcon(const QModelIndex& index, const QString& path)
         return false;
     g->setIcon(path.toStdString());
     emit dataChanged(index, index, {Qt::DecorationRole});
+    VaultService::instance()->markDirty();
     return true;
 }
 
@@ -115,6 +125,8 @@ bool GroupTreeModel::removeGroup(const QModelIndex& index) {
     beginRemoveRows(indexOf(g->parent()), g->indexInParent(), g->indexInParent());
     const bool removed = g->parent()->removeGroup(g);
     endRemoveRows();
+    if (removed)
+        VaultService::instance()->markDirty();
     return removed;
 }
 
@@ -180,6 +192,7 @@ bool GroupTreeModel::dropMimeData(const QMimeData* data, Qt::DropAction action, 
         return false;
     nightlock::Group::reparent(*moving, *targetParent, destRow);
     endMoveRows();
+    VaultService::instance()->markDirty();
     emit groupMoved(moving);
     return true;
 }

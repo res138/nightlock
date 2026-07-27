@@ -8,6 +8,8 @@
 
 #include <nightlock/group.hpp>
 
+#include "vaultservice.hpp"
+
 namespace {
 
 constexpr char kEntryMime[] = "application/x-nightlock-entry";
@@ -112,6 +114,8 @@ bool EntryListModel::removeEntry(nightlock::Entry* entry) {
     const bool removed = group_->removeEntry(entry);
     rebuildView();
     endRemoveRows();
+    if (removed)
+        VaultService::instance()->markDirty();
     return removed;
 }
 
@@ -172,6 +176,7 @@ bool EntryListModel::dropMimeData(const QMimeData* data, Qt::DropAction action, 
     group_->moveEntry(from, to);
     rebuildView();
     endMoveRows();
+    VaultService::instance()->markDirty();
     return true;
 }
 

@@ -31,6 +31,11 @@ class MainWindow : public QMainWindow {
 public:
     explicit MainWindow(nightlock::Group* root, QWidget* parent = nullptr);
 
+    // First-run/normal startup for a real (non-demo) vault: shows the
+    // lock screen in Create or Unlock mode depending on whether the
+    // vault file exists yet.
+    void startLocked();
+
     void selectGroupNamed(const QString& name);
     void selectEntryNamed(const QString& name);
 
@@ -94,6 +99,9 @@ public:
     // Debug hook for NIGHTLOCK_SCREENSHOT_LOCK: locks the vault;
     // `fail` first submits a wrong password for the error state.
     void debugLock(bool fail);
+    // Debug hook for NIGHTLOCK_TEST_PASSWORD: feeds a password to the
+    // lock screen flow (Create and Unlock alike).
+    void debugSubmitPassword(const QString& password);
     // Debug hook for NIGHTLOCK_TEST_REATTACH: docks the floating detail
     // view back through the regular drop path.
     void debugReattachDetail();
@@ -139,6 +147,13 @@ private:
     SearchWindow* openSearch();
     SettingsWindow* openSettings();
     void lockVault();
+    // Points both models (and the detail pane) at a new tree; nullptr
+    // empties everything, which is the locked state.
+    void setVaultRoot(nightlock::Group* root);
+    // Verifies a lock-screen submission against the vault service.
+    void handlePassword(const QString& password);
+    // Hides the lock screen and shows `root`.
+    void finishUnlock(nightlock::Group* root);
     void revealInVault(nightlock::Group* group, nightlock::Entry* entry);
 
     GroupTreeModel* treeModel_;

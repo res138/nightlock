@@ -20,6 +20,7 @@
 
 #include "copylabel.hpp"
 #include "overlayscrollbar.hpp"
+#include "qsecure.hpp"
 #include "patternbackdrop.hpp"
 #include "spoilerlabel.hpp"
 #include "totpring.hpp"
@@ -387,14 +388,14 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     noteLabel_->setText(QString::fromStdString(entry->note));
 
     loginCopy_->setText(QString::fromStdString(entry->login));
-    passwordSpoiler_->setSecret(QString::fromStdString(entry->password));
+    passwordSpoiler_->setSecret(toQString(entry->password));
 
     urlRow_.frame->setVisible(!entry->url.empty());
     url_ = QString::fromStdString(entry->url);
     refreshUrlText();
 
     codeRow_.frame->setVisible(!entry->code.empty());
-    codeRow_.value->setText(QString::fromStdString(entry->code));
+    codeRow_.value->setText(toQString(entry->code));
 
     createdRow_.value->setText(formatDate(entry->created));
     modifiedRow_.value->setText(formatDate(entry->modified));
