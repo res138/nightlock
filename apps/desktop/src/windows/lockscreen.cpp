@@ -120,9 +120,9 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     error_->setAlignment(Qt::AlignHCenter);
     error_->setFixedHeight(18);  // reserved, so nothing jumps on error
 
-    // Unlock mode's escape hatch, right under the input: the
-    // remembered vault may not be the one the user has the password
-    // for.
+    // Unlock mode's escape hatch: the remembered vault may not be the
+    // one the user has the password for. Shares the bottom slot with
+    // Create mode's openExisting_ — the modes never show both.
     selectAnother_ = new QLabel(
         QStringLiteral("<a style=\"color:#6E6A75;\" href=\"#select\">") +
         tr("Select another Vault") + QStringLiteral("</a>"));
@@ -161,10 +161,9 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     layout->addWidget(locationHolder_, 0, Qt::AlignHCenter);
     layout->addSpacing(10);
     layout->addWidget(error_);
-    layout->addSpacing(2);
-    layout->addWidget(selectAnother_);
     layout->addStretch(6);
     layout->addWidget(openExisting_);
+    layout->addWidget(selectAnother_);
     layout->addSpacing(6);
     layout->addWidget(link);
 }

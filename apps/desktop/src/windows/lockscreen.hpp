@@ -16,9 +16,9 @@ class QPushButton;
 // hides it. Create mode adds a confirm field plus a location row: the
 // vault target starts at the owner-provided default and "Select
 // Folder" moves it (the file name stays); a bottom link lets the user
-// point at an existing vault file instead. Unlock mode puts a
-// "Select another Vault" link under the input — the remembered vault
-// may not be the one the user knows the password for.
+// point at an existing vault file instead. Unlock mode swaps that
+// bottom link for "Select another Vault" — the remembered vault may
+// not be the one the user knows the password for.
 class LockScreen : public QWidget {
     Q_OBJECT
 public:
