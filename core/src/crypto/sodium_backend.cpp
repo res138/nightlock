@@ -35,6 +35,15 @@ bool deriveKey(secure::Bytes& keyOut, std::string_view password,
                          crypto_pwhash_ALG_ARGON2ID13) == 0;
 }
 
+bool secretEquals(std::span<const std::uint8_t> a, std::span<const std::uint8_t> b) {
+    secure::detail::ensureSodium();
+    if (a.size() != b.size())
+        return false;
+    if (a.empty())
+        return true;
+    return sodium_memcmp(a.data(), b.data(), a.size()) == 0;
+}
+
 bool aeadSeal(std::vector<std::uint8_t>& out, const secure::Bytes& plaintext,
               std::span<const std::uint8_t, kNonceBytes> nonce,
               std::span<const std::uint8_t> ad, const secure::Bytes& key) {

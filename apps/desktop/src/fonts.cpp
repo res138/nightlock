@@ -34,8 +34,13 @@ struct RawOption {
     std::vector<const char*> families;
 };
 
-const std::vector<RawOption>& rawOptions(Role role) {
-    static const std::vector<RawOption> primary = {
+// One catalog for both roles — the Primary and Secondary pickers list
+// exactly the same fonts (sans, then serif, then mono), so any font
+// can play either part. Each entry is a canonical name plus the
+// platform aliases / metric-compatible stand-ins that make it resolve
+// on macOS, Windows and Linux alike.
+const std::vector<RawOption>& rawOptions() {
+    static const std::vector<RawOption> catalog = {
         {"san-francisco", "San Francisco",
          {"SF Pro Text", "SF Pro Display", "SF Pro", "San Francisco", ".AppleSystemUIFont",
           ".SF NS Text"}},
@@ -44,16 +49,31 @@ const std::vector<RawOption>& rawOptions(Role role) {
         // The runs-everywhere option: macOS and Windows ship Arial,
         // Linux covers it with the metric-compatible Liberation Sans.
         {"arial", "Arial", {"Arial", "Liberation Sans"}},
-    };
-    static const std::vector<RawOption> secondary = {
+        {"inter", "Inter", {"Inter", "Inter Variable", "Inter Display"}},
+        {"roboto", "Roboto", {"Roboto", "Roboto Flex"}},
+        {"verdana", "Verdana", {"Verdana", "DejaVu Sans"}},
+        {"tahoma", "Tahoma", {"Tahoma"}},
+        {"trebuchet-ms", "Trebuchet MS", {"Trebuchet MS"}},
         {"georgia", "Georgia", {"Georgia"}},
         // The runs-everywhere option: Liberation Serif covers Linux.
         {"times-new-roman", "Times New Roman",
          {"Times New Roman", "Liberation Serif", "Times"}},
         {"palatino", "Palatino", {"Palatino", "Palatino Linotype", "Book Antiqua", "P052"}},
         {"charter", "Charter", {"Charter", "Bitstream Charter", "XCharter"}},
+        {"garamond", "Garamond",
+         {"Garamond", "EB Garamond", "Adobe Garamond Pro", "URW Garamond"}},
+        {"baskerville", "Baskerville",
+         {"Baskerville", "Baskerville Old Face", "Libre Baskerville"}},
+        {"menlo", "Menlo",
+         {"Menlo", "SF Mono", "Consolas", "DejaVu Sans Mono", "Liberation Mono"}},
     };
-    return role == Role::Primary ? primary : secondary;
+    return catalog;
+}
+
+// Distinct defaults keep the roles' characters apart even though the
+// catalogs match: the interface stays sans, the display serif.
+const char* defaultId(Role role) {
+    return role == Role::Primary ? "san-francisco" : "georgia";
 }
 
 bool anyFamilyPresent(const RawOption& raw) {
@@ -84,9 +104,10 @@ int generation = 1;
 }  // namespace
 
 QList<Option> options(Role role) {
+    Q_UNUSED(role);  // both roles share the one catalog
     loadBundledFonts();
     QList<Option> list;
-    for (const RawOption& raw : rawOptions(role)) {
+    for (const RawOption& raw : rawOptions()) {
         Option option;
         option.id = QLatin1String(raw.id);
         option.title = QLatin1String(raw.title);
@@ -100,19 +121,27 @@ QList<Option> options(Role role) {
 
 int selectedIndex(Role role) {
     const QList<Option> catalog = options(role);
+    const auto indexOfAvailable = [&catalog](const QString& id) {
+        for (int i = 0; i < catalog.size(); ++i)
+            if (catalog[i].id == id && catalog[i].available)
+                return i;
+        return -1;
+    };
     const QString stored =
-        QSettings().value(QLatin1String(settingsKey(role)), catalog.first().id).toString();
-    int firstAvailable = 0;
-    for (int i = 0; i < catalog.size(); ++i) {
-        if (catalog[i].available) {
-            firstAvailable = i;
-            break;
-        }
-    }
+        QSettings()
+            .value(QLatin1String(settingsKey(role)), QLatin1String(defaultId(role)))
+            .toString();
+    if (const int index = indexOfAvailable(stored); index >= 0)
+        return index;
+    // The stored font is gone from this system: fall back to the
+    // role's own default first — a serif role should not degrade into
+    // the catalog's leading sans — then to whatever is available.
+    if (const int index = indexOfAvailable(QLatin1String(defaultId(role))); index >= 0)
+        return index;
     for (int i = 0; i < catalog.size(); ++i)
-        if (catalog[i].id == stored)
-            return catalog[i].available ? i : firstAvailable;
-    return firstAvailable;
+        if (catalog[i].available)
+            return i;
+    return 0;
 }
 
 QString resolvedFamily(Role role) {

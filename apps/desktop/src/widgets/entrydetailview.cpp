@@ -201,9 +201,9 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
     layout->addWidget(fieldsCard_);
     layout->addSpacing(kSectionGap);
 
-    auto* metaHeader = new QLabel(tr("Meta"));
-    metaHeader->setObjectName(QStringLiteral("metaHeader"));
-    layout->addWidget(metaHeader);
+    metaHeader_ = new QLabel(tr("Meta"));
+    metaHeader_->setObjectName(QStringLiteral("metaHeader"));
+    layout->addWidget(metaHeader_);
     layout->addSpacing(12);
 
     auto* metaCard = new QFrame;
@@ -302,7 +302,12 @@ void EntryDetailView::resizeEvent(QResizeEvent* event) {
 void EntryDetailView::updatePatternGeometry() {
     if (auto* layout = content_->layout())
         layout->activate();  // the card must sit at its final position
-    patternBackdrop_->setGeometry(0, 0, content_->width(), fieldsCard_->geometry().top());
+    // A fieldless entry hides the whole card; its stale geometry can't
+    // anchor the zone, so the Meta header takes over.
+    const QWidget* below = fieldsCard_->isHidden()
+                               ? static_cast<const QWidget*>(metaHeader_)
+                               : fieldsCard_;
+    patternBackdrop_->setGeometry(0, 0, content_->width(), below->geometry().top());
     patternBackdrop_->setIconCenterY(iconLabel_->geometry().center().y());
 }
 
@@ -387,7 +392,12 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     noteLabel_->setVisible(!entry->note.empty());
     noteLabel_->setText(QString::fromStdString(entry->note));
 
+    // Only filled fields get a row — a name-only entry shows no card
+    // at all instead of a stack of blanks.
+    loginRow_.frame->setVisible(!entry->login.empty());
     loginCopy_->setText(QString::fromStdString(entry->login));
+
+    passwordRow_.frame->setVisible(!entry->password.empty());
     passwordSpoiler_->setSecret(toQString(entry->password));
 
     urlRow_.frame->setVisible(!entry->url.empty());
@@ -396,6 +406,9 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
 
     codeRow_.frame->setVisible(!entry->code.empty());
     codeRow_.value->setText(toQString(entry->code));
+
+    fieldsCard_->setVisible(!entry->login.empty() || !entry->password.empty() ||
+                            !entry->url.empty() || !entry->code.empty());
 
     createdRow_.value->setText(formatDate(entry->created));
     modifiedRow_.value->setText(formatDate(entry->modified));

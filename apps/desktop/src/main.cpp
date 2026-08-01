@@ -1,8 +1,8 @@
 #include <QAbstractButton>
 #include <QApplication>
+#include <QDebug>
 #include <QDialog>
 #include <QFile>
-#include <QFileInfo>
 #include <QMenu>
 #include <QTimer>
 
@@ -76,7 +76,8 @@ int main(int argc, char* argv[]) {
         window.selectEntryNamed(
             qEnvironmentVariable("NIGHTLOCK_SELECT_ENTRY", QStringLiteral("GitHub")));
     } else {
-        window.setWindowTitle(QFileInfo(service->vaultPath()).fileName());
+        // startLocked() resolves the remembered vault (or the first-run
+        // default) and titles the window after it.
         window.startLocked();
     }
 
@@ -93,12 +94,32 @@ int main(int argc, char* argv[]) {
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_ENTRY_ICON"))
         window.debugSetEntryIcon(qEnvironmentVariable("NIGHTLOCK_TEST_ENTRY_ICON"));
 
+    // Debug hook: NIGHTLOCK_TEST_VAULT_TARGET=<path> retargets the
+    // create flow's location row, standing in for the Select Folder
+    // dialog in headless runs.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_VAULT_TARGET"))
+        window.debugSetVaultTarget(qEnvironmentVariable("NIGHTLOCK_TEST_VAULT_TARGET"));
+
     // Debug hook: NIGHTLOCK_TEST_PASSWORD=<pw> submits the password on
     // the lock screen shortly after startup — unlocks a real vault, or
     // creates one on the first run.
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_PASSWORD")) {
         QTimer::singleShot(400, &window, [&window] {
             window.debugSubmitPassword(qEnvironmentVariable("NIGHTLOCK_TEST_PASSWORD"));
+        });
+    }
+
+    // Debug hook: NIGHTLOCK_TEST_CHANGE_PASSWORD="current:new" runs a
+    // master-password change once the NIGHTLOCK_TEST_PASSWORD unlock
+    // has landed, and logs the outcome.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_CHANGE_PASSWORD")) {
+        QTimer::singleShot(900, &window, [service] {
+            const QString spec = qEnvironmentVariable("NIGHTLOCK_TEST_CHANGE_PASSWORD");
+            const qsizetype colon = spec.indexOf(QLatin1Char(':'));
+            const nightlock::VaultError error =
+                service->changePassword(spec.left(colon), spec.mid(colon + 1));
+            qInfo() << "NIGHTLOCK_TEST_CHANGE_PASSWORD:"
+                    << nightlock::errorMessage(error);
         });
     }
 

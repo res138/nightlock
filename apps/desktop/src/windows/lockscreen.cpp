@@ -1,8 +1,12 @@
 #include "lockscreen.hpp"
 
+#include <QDir>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPushButton>
 #include <QStyle>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -16,6 +20,7 @@ constexpr int kFieldWidth = 300;
 constexpr int kFieldHeight = 42;
 constexpr int kRowSpacing = 8;
 constexpr int kShakeReach = 14;  // widest shake swing, plus a hair
+constexpr int kSelectFolderWidth = 118;
 
 }  // namespace
 
@@ -90,10 +95,53 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     confirmLayout->addWidget(confirm_);
     confirmHolder_->hide();
 
+    // Create mode's location row: where the new vault file will land.
+    // The default is fine to keep — "Select Folder" is the opt-out.
+    locationLabel_ = new QLabel;
+    locationLabel_->setObjectName(QStringLiteral("lockPath"));
+
+    auto* selectFolder = new QPushButton(tr("Select Folder…"));
+    selectFolder->setObjectName(QStringLiteral("lockSelectFolder"));
+    selectFolder->setCursor(Qt::PointingHandCursor);
+    selectFolder->setFixedSize(kSelectFolderWidth, 30);
+    connect(selectFolder, &QPushButton::clicked, this, &LockScreen::selectFolder);
+
+    locationHolder_ = new QWidget;
+    locationHolder_->setFixedSize(holder->width(), 42);
+    auto* locationLayout = new QHBoxLayout(locationHolder_);
+    locationLayout->setContentsMargins(kShakeReach, 12, kShakeReach, 0);
+    locationLayout->setSpacing(kRowSpacing);
+    locationLayout->addWidget(locationLabel_, 1);
+    locationLayout->addWidget(selectFolder);
+    locationHolder_->hide();
+
     error_ = new QLabel(QStringLiteral(" "));
     error_->setObjectName(QStringLiteral("lockError"));
     error_->setAlignment(Qt::AlignHCenter);
     error_->setFixedHeight(18);  // reserved, so nothing jumps on error
+
+    // Unlock mode's escape hatch: no password means this vault is a
+    // dead end — forget it and start over on the first-run screen (the
+    // file itself stays on disk). Shares the bottom slot with Create
+    // mode's openExisting_ — the modes never show both.
+    forgotPassword_ = new QLabel(
+        QStringLiteral("<a style=\"color:#6E6A75;\" href=\"#forgot\">") +
+        tr("Forgot a password?") + QStringLiteral("</a>"));
+    forgotPassword_->setObjectName(QStringLiteral("lockLink"));
+    forgotPassword_->setAlignment(Qt::AlignHCenter);
+    connect(forgotPassword_, &QLabel::linkActivated, this,
+            [this] { emit forgotPasswordRequested(); });
+
+    // Create mode's escape hatch: point Nightlock at a vault file that
+    // already exists instead of creating one.
+    openExisting_ = new QLabel(
+        QStringLiteral("<a style=\"color:#6E6A75;\" href=\"#open\">") +
+        tr("Open an existing vault instead.") + QStringLiteral("</a>"));
+    openExisting_->setObjectName(QStringLiteral("lockLink"));
+    openExisting_->setAlignment(Qt::AlignHCenter);
+    connect(openExisting_, &QLabel::linkActivated, this,
+            [this] { emit openExistingRequested(); });
+    openExisting_->hide();
 
     auto* link = new QLabel(QStringLiteral(
         "<a style=\"color:#6E6A75;\" href=\"https://github.com/rodukov/nightlock\">"
@@ -111,9 +159,13 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     layout->addSpacing(16);
     layout->addWidget(holder, 0, Qt::AlignHCenter);
     layout->addWidget(confirmHolder_, 0, Qt::AlignHCenter);
+    layout->addWidget(locationHolder_, 0, Qt::AlignHCenter);
     layout->addSpacing(10);
     layout->addWidget(error_);
     layout->addStretch(6);
+    layout->addWidget(openExisting_);
+    layout->addWidget(forgotPassword_);
+    layout->addSpacing(6);
     layout->addWidget(link);
 }
 
@@ -125,6 +177,28 @@ void LockScreen::setMode(Mode mode) {
     field_->setPlaceholderText(create ? tr("Choose a master password")
                                       : tr("Enter the password"));
     confirmHolder_->setVisible(create);
+    locationHolder_->setVisible(create);
+    openExisting_->setVisible(create);
+    forgotPassword_->setVisible(!create);
+}
+
+void LockScreen::setVaultTarget(const QString& path) {
+    vaultTarget_ = QDir::cleanPath(path);
+    const QString shown = QDir::toNativeSeparators(vaultTarget_);
+    locationLabel_->ensurePolished();  // elide with the styled font
+    locationLabel_->setText(locationLabel_->fontMetrics().elidedText(
+        shown, Qt::ElideMiddle, kFieldWidth + kFieldHeight - kSelectFolderWidth));
+    locationLabel_->setToolTip(shown);
+}
+
+void LockScreen::selectFolder() {
+    const QFileInfo current(vaultTarget_);
+    const QString dir = QFileDialog::getExistingDirectory(this, tr("Select Folder"),
+                                                          current.absolutePath());
+    if (dir.isEmpty())
+        return;
+    setVaultTarget(QDir(dir).filePath(current.fileName()));
+    setError(false);
 }
 
 void LockScreen::reset() {

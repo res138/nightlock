@@ -194,6 +194,17 @@ VaultError VaultFile::save() {
     return VaultError::None;
 }
 
+bool VaultFile::verifyPassword(std::string_view password) const {
+    if (!root_ || key_.empty())
+        return false;
+    secure::Bytes candidate;
+    if (!crypto::deriveKey(candidate, password, salt_, params_))
+        return false;
+    const bool match = crypto::secretEquals(candidate, key_);
+    secure::zeroize(candidate.data(), candidate.size());
+    return match;
+}
+
 VaultError VaultFile::changePassword(
     std::string_view newPassword,
     const std::optional<crypto::KdfParams>& newParams) {
