@@ -2,7 +2,6 @@
 #include <QApplication>
 #include <QDialog>
 #include <QFile>
-#include <QFileInfo>
 #include <QMenu>
 #include <QTimer>
 
@@ -76,7 +75,8 @@ int main(int argc, char* argv[]) {
         window.selectEntryNamed(
             qEnvironmentVariable("NIGHTLOCK_SELECT_ENTRY", QStringLiteral("GitHub")));
     } else {
-        window.setWindowTitle(QFileInfo(service->vaultPath()).fileName());
+        // startLocked() resolves the remembered vault (or the first-run
+        // default) and titles the window after it.
         window.startLocked();
     }
 
@@ -92,6 +92,12 @@ int main(int argc, char* argv[]) {
     // the selected entry.
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_ENTRY_ICON"))
         window.debugSetEntryIcon(qEnvironmentVariable("NIGHTLOCK_TEST_ENTRY_ICON"));
+
+    // Debug hook: NIGHTLOCK_TEST_VAULT_TARGET=<path> retargets the
+    // create flow's location row, standing in for the Select Folder
+    // dialog in headless runs.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_VAULT_TARGET"))
+        window.debugSetVaultTarget(qEnvironmentVariable("NIGHTLOCK_TEST_VAULT_TARGET"));
 
     // Debug hook: NIGHTLOCK_TEST_PASSWORD=<pw> submits the password on
     // the lock screen shortly after startup — unlocks a real vault, or

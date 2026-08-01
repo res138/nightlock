@@ -18,6 +18,12 @@ public:
     // Switches the left-hand list to the given category row.
     void selectCategory(int index);
 
+signals:
+    // Database page picks; MainWindow owns the vault mechanics.
+    void switchDatabaseRequested(const QString& path);
+    void createDatabaseRequested(const QString& path);
+    void signOutRequested();
+
 protected:
     void keyPressEvent(QKeyEvent* event) override;
 
@@ -25,6 +31,7 @@ private:
     void addCategory(const QString& iconName, const QString& title, QWidget* page);
 
     QWidget* buildGeneralPage();
+    QWidget* buildDatabasePage();
     QWidget* buildAppearancePage();
     QWidget* buildHotkeysPage();
     QWidget* buildGraphPage();

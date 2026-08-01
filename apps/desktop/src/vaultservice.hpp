@@ -25,11 +25,33 @@ public:
     bool demoMode() const { return demoRoot_ != nullptr; }
     void setDemoRoot(std::unique_ptr<nightlock::Group> root);
 
-    // $NIGHTLOCK_VAULT override, else AppDataLocation/Primary.nlck —
-    // the same resolution order the CLI uses.
+    // Where a fresh install keeps the vault: AppDataLocation/
+    // Primary.nlck — the same location the CLI defaults to.
+    static QString defaultVaultPath();
+
+    // $NIGHTLOCK_VAULT override, else the session's active file, else
+    // defaultVaultPath().
     QString vaultPath() const;
+    // Retargets the service at another vault file. The open session
+    // does not follow — callers lock first, then switch.
+    void setVaultPath(const QString& path);
     bool vaultExists() const;
     bool isUnlocked() const;
+
+    // The startup default ("vault/default" in QSettings): the single
+    // vault that opens on the next launch. Every successful unlock or
+    // create refreshes it, so the most recent vault wins. A present-
+    // but-empty value means the user cleared it — the app then starts
+    // on the first-run screen with no vault preselected.
+    static QString rememberedVaultPath();
+    void setRememberedVaultPath(const QString& path);
+    void clearRememberedVaultPath();
+
+    // Launch resolution: env override first, then the remembered vault
+    // when its file still exists, then (only if the setting was never
+    // written — pre-NL8 installs) an existing default-location vault.
+    // Empty result = first-run screen.
+    QString startupPath() const;
 
     nightlock::VaultError createNew(const QString& password);
     nightlock::VaultError unlock(const QString& password);
@@ -46,12 +68,19 @@ public:
 
 signals:
     void saveFailed(const QString& reason);
+    void vaultPathChanged(const QString& path);
+    void rememberedVaultChanged(const QString& path);
 
 private:
     VaultService();
 
+    // The vault that just opened becomes the startup default. Skipped
+    // under $NIGHTLOCK_VAULT so test runs never touch the real setting.
+    void rememberOpenedVault();
+
     std::optional<nightlock::VaultFile> vault_;
     std::unique_ptr<nightlock::Group> demoRoot_;
+    QString activePath_;  // empty = defaultVaultPath()
     QTimer debounce_;
     bool dirty_ = false;
 };

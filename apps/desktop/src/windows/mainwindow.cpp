@@ -4,6 +4,8 @@
 #include <QCursor>
 #include <QDebug>
 #include <QDesktopServices>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QFrame>
 #include <QGraphicsOpacityEffect>
 #include <QGuiApplication>
@@ -235,6 +237,14 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     lockScreen_->hide();
     connect(lockScreen_, &LockScreen::passwordSubmitted, this,
             &MainWindow::handlePassword);
+    connect(lockScreen_, &LockScreen::openExistingRequested, this, [this] {
+        const QString path = QFileDialog::getOpenFileName(
+            this, tr("Open Vault"),
+            QFileInfo(VaultService::instance()->vaultPath()).absolutePath(),
+            tr("Nightlock Vault (*.nlck)"));
+        if (!path.isEmpty())
+            switchToVault(path);
+    });
     // A failed autosave must not pass silently — the user thinks their
     // edit is on disk.
     connect(VaultService::instance(), &VaultService::saveFailed, this,
@@ -600,6 +610,12 @@ SettingsWindow* MainWindow::openSettings() {
     }
     settings_ = new SettingsWindow;
     connect(settings_, &QObject::destroyed, this, [this] { settings_ = nullptr; });
+    connect(settings_, &SettingsWindow::switchDatabaseRequested, this,
+            &MainWindow::switchToVault);
+    connect(settings_, &SettingsWindow::createDatabaseRequested, this,
+            &MainWindow::createVaultAt);
+    connect(settings_, &SettingsWindow::signOutRequested, this,
+            &MainWindow::signOutVault);
     settings_->move(geometry().center() -
                     QPoint(settings_->width() / 2, settings_->height() / 2));
     settings_->show();
@@ -626,6 +642,11 @@ QWidget* MainWindow::openSearchForScreenshot(const QString& query) {
 void MainWindow::lockVault() {
     if (lockScreen_->isVisible())
         return;
+    closeVaultSession();
+    showLockScreen(false);
+}
+
+void MainWindow::closeVaultSession() {
     if (graph_)
         graph_->close();
     if (search_)
@@ -636,7 +657,12 @@ void MainWindow::lockVault() {
     // Group*/Entry* dangles.
     setVaultRoot(nullptr);
     VaultService::instance()->lockAndWipe();
-    lockScreen_->setMode(LockScreen::Mode::Unlock);
+}
+
+void MainWindow::showLockScreen(bool create) {
+    lockScreen_->setMode(create ? LockScreen::Mode::Create
+                                : LockScreen::Mode::Unlock);
+    lockScreen_->setVaultTarget(VaultService::instance()->vaultPath());
     lockScreen_->setGeometry(rect());
     lockScreen_->reset();
     lockScreen_->show();
@@ -646,16 +672,59 @@ void MainWindow::lockVault() {
         QIcon(QStringLiteral(NIGHTLOCK_ICONS_DIR "/appicon-locked.png")));
 }
 
+void MainWindow::updateVaultTitle() {
+    setWindowTitle(QFileInfo(VaultService::instance()->vaultPath()).fileName());
+}
+
 void MainWindow::startLocked() {
-    lockScreen_->setMode(VaultService::instance()->vaultExists()
-                             ? LockScreen::Mode::Unlock
-                             : LockScreen::Mode::Create);
-    lockScreen_->setGeometry(rect());
-    lockScreen_->reset();
-    lockScreen_->show();
-    lockScreen_->raise();
-    QGuiApplication::setWindowIcon(
-        QIcon(QStringLiteral(NIGHTLOCK_ICONS_DIR "/appicon-locked.png")));
+    auto* service = VaultService::instance();
+    const QString path = service->startupPath();
+    // Empty = first-run: nothing remembered (or explicitly cleared) —
+    // offer creation at the default location.
+    service->setVaultPath(path.isEmpty() ? VaultService::defaultVaultPath()
+                                         : path);
+    updateVaultTitle();
+    showLockScreen(path.isEmpty() || !service->vaultExists());
+}
+
+void MainWindow::switchToVault(const QString& path) {
+    auto* service = VaultService::instance();
+    if (service->demoMode())
+        return;  // demo sessions never retarget
+    closeVaultSession();
+    service->setVaultPath(path);
+    // Switching is the commitment: the pick opens on the next launch
+    // even if it never gets unlocked in this session.
+    service->setRememberedVaultPath(service->vaultPath());
+    updateVaultTitle();
+    showLockScreen(!service->vaultExists());
+    raise();
+    activateWindow();
+}
+
+void MainWindow::createVaultAt(const QString& path) {
+    auto* service = VaultService::instance();
+    if (service->demoMode())
+        return;
+    closeVaultSession();
+    service->setVaultPath(path);
+    updateVaultTitle();
+    showLockScreen(true);
+    raise();
+    activateWindow();
+}
+
+void MainWindow::signOutVault() {
+    auto* service = VaultService::instance();
+    if (service->demoMode())
+        return;
+    closeVaultSession();
+    service->clearRememberedVaultPath();
+    service->setVaultPath(VaultService::defaultVaultPath());
+    updateVaultTitle();
+    showLockScreen(true);
+    raise();
+    activateWindow();
 }
 
 void MainWindow::setVaultRoot(nightlock::Group* root) {
@@ -682,6 +751,16 @@ void MainWindow::handlePassword(const QString& password) {
         return;
     }
     if (lockScreen_->mode() == LockScreen::Mode::Create) {
+        // The location row picks the target; never overwrite a vault
+        // that is already there — the link below opens those.
+        const QString target = lockScreen_->vaultTarget();
+        if (QFileInfo::exists(target)) {
+            lockScreen_->rejectPassword(
+                tr("A vault already exists here. Select another folder."));
+            return;
+        }
+        service->setVaultPath(target);
+        updateVaultTitle();
         const nightlock::VaultError error = service->createNew(password);
         if (error == nightlock::VaultError::None)
             finishUnlock(service->root());
@@ -717,6 +796,10 @@ void MainWindow::debugLock(bool fail) {
 
 void MainWindow::debugSubmitPassword(const QString& password) {
     handlePassword(password);
+}
+
+void MainWindow::debugSetVaultTarget(const QString& path) {
+    lockScreen_->setVaultTarget(path);
 }
 
 void MainWindow::onGroupChanged(const QModelIndex& current) {

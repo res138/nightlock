@@ -26,5 +26,6 @@
         <file>icons/menu/search.svg</file>
         <file>icons/menu/lock.svg</file>
         <file>icons/menu/keys.svg</file>
+        <file>icons/menu/database.svg</file>
     </qresource>
 </RCC>

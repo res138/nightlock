@@ -31,10 +31,20 @@ class MainWindow : public QMainWindow {
 public:
     explicit MainWindow(nightlock::Group* root, QWidget* parent = nullptr);
 
-    // First-run/normal startup for a real (non-demo) vault: shows the
-    // lock screen in Create or Unlock mode depending on whether the
-    // vault file exists yet.
+    // First-run/normal startup for a real (non-demo) vault: opens the
+    // remembered vault behind the lock screen, or lands on the
+    // first-run create screen when none is known.
     void startLocked();
+
+    // Locks the current session and retargets Nightlock at another
+    // vault file, which becomes the startup default right away.
+    void switchToVault(const QString& path);
+    // Locks the current session and walks the create flow at `path`;
+    // the new vault becomes the default once it exists.
+    void createVaultAt(const QString& path);
+    // Locks, forgets the startup default and returns to the first-run
+    // screen — Nightlock keeps no memory of the vault.
+    void signOutVault();
 
     void selectGroupNamed(const QString& name);
     void selectEntryNamed(const QString& name);
@@ -102,6 +112,9 @@ public:
     // Debug hook for NIGHTLOCK_TEST_PASSWORD: feeds a password to the
     // lock screen flow (Create and Unlock alike).
     void debugSubmitPassword(const QString& password);
+    // Debug hook for NIGHTLOCK_TEST_VAULT_TARGET: retargets the create
+    // flow's location row, standing in for the Select Folder dialog.
+    void debugSetVaultTarget(const QString& path);
     // Debug hook for NIGHTLOCK_TEST_REATTACH: docks the floating detail
     // view back through the regular drop path.
     void debugReattachDetail();
@@ -147,6 +160,13 @@ private:
     SearchWindow* openSearch();
     SettingsWindow* openSettings();
     void lockVault();
+    // Closes every vault-showing surface and wipes the session.
+    void closeVaultSession();
+    // Covers the window with the lock screen (Create or Unlock), the
+    // location row prefilled from the service's current path.
+    void showLockScreen(bool create);
+    // Window title = the vault file's name.
+    void updateVaultTitle();
     // Points both models (and the detail pane) at a new tree; nullptr
     // empties everything, which is the locked state.
     void setVaultRoot(nightlock::Group* root);

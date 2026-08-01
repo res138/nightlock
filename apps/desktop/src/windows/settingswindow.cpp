@@ -1,7 +1,10 @@
 #include "settingswindow.hpp"
 
 #include <QAbstractButton>
+#include <QDir>
 #include <QDoubleValidator>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -9,6 +12,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMessageBox>
 #include <QPainter>
 #include <QPushButton>
 #include <QScrollArea>
@@ -24,6 +28,7 @@
 #include "fonts.hpp"
 #include "graphsettings.hpp"
 #include "hotkeys.hpp"
+#include "vaultservice.hpp"
 #include "widgets/nlmenu.hpp"
 
 namespace {
@@ -284,8 +289,10 @@ QFrame* makeCard(QVBoxLayout*& rows) {
     return card;
 }
 
-void addRow(QVBoxLayout* rows, const QString& title, const QString& description,
-            QWidget* control) {
+// Returns the description label (or nullptr) so pages with live text
+// — the Database paths — can retarget it later.
+QLabel* addRow(QVBoxLayout* rows, const QString& title, const QString& description,
+               QWidget* control) {
     auto* row = new QFrame;
     row->setObjectName(QStringLiteral("settingsRow"));
     auto* layout = new QHBoxLayout(row);
@@ -298,8 +305,9 @@ void addRow(QVBoxLayout* rows, const QString& title, const QString& description,
     auto* titleLabel = new QLabel(title);
     titleLabel->setObjectName(QStringLiteral("settingsRowTitle"));
     text->addWidget(titleLabel);
+    QLabel* descriptionLabel = nullptr;
     if (!description.isEmpty()) {
-        auto* descriptionLabel = new QLabel(description);
+        descriptionLabel = new QLabel(description);
         descriptionLabel->setObjectName(QStringLiteral("settingsRowDesc"));
         descriptionLabel->setWordWrap(true);
         text->addWidget(descriptionLabel);
@@ -308,6 +316,16 @@ void addRow(QVBoxLayout* rows, const QString& title, const QString& description,
     if (control)
         layout->addWidget(control, 0, Qt::AlignVCenter);
     rows->addWidget(row);
+    return descriptionLabel;
+}
+
+// The bare text button used on action rows ("Check for updates" and
+// the Database page's file pickers).
+QPushButton* inlineButton(const QString& title) {
+    auto* button = new QPushButton(title);
+    button->setObjectName(QStringLiteral("settingsInlineButton"));
+    button->setCursor(Qt::PointingHandCursor);
+    return button;
 }
 
 // The last row of a card drops its separator line.
@@ -347,6 +365,7 @@ SettingsWindow::SettingsWindow(QWidget* parent) : QWidget(parent) {
     pages_ = new QStackedWidget;
 
     addCategory(QStringLiteral("settings"), tr("General"), buildGeneralPage());
+    addCategory(QStringLiteral("database"), tr("Database"), buildDatabasePage());
     addCategory(QStringLiteral("palette"), tr("Appearance"), buildAppearancePage());
     addCategory(QStringLiteral("command"), tr("Hotkeys"), buildHotkeysPage());
     addCategory(QStringLiteral("graph"), tr("NetGraph"), buildGraphPage());
@@ -390,9 +409,7 @@ QWidget* SettingsWindow::buildGeneralPage() {
     QVBoxLayout* rows = nullptr;
     QFrame* card = makeCard(rows);
 
-    auto* checkUpdates = new QPushButton(tr("Check for updates"));
-    checkUpdates->setObjectName(QStringLiteral("settingsInlineButton"));
-    checkUpdates->setCursor(Qt::PointingHandCursor);
+    auto* checkUpdates = inlineButton(tr("Check for updates"));
     addRow(rows, tr("Version 0.1"), tr("Development build with the demo vault."), checkUpdates);
 
     addRow(rows, tr("Automatic updates"),
@@ -403,6 +420,97 @@ QWidget* SettingsWindow::buildGeneralPage() {
     finishCard(rows);
 
     column->addWidget(card);
+    column->addStretch(1);
+    return page;
+}
+
+QWidget* SettingsWindow::buildDatabasePage() {
+    QVBoxLayout* column = nullptr;
+    QWidget* page = makePage(column);
+    auto* service = VaultService::instance();
+
+    QVBoxLayout* rows = nullptr;
+    QFrame* card = makeCard(rows);
+
+    // The vault this session points at; follows switches live.
+    QLabel* pathLabel = addRow(rows, tr("Current database"),
+                               QDir::toNativeSeparators(service->vaultPath()), nullptr);
+    connect(service, &VaultService::vaultPathChanged, pathLabel,
+            [pathLabel](const QString& path) {
+                pathLabel->setText(QDir::toNativeSeparators(path));
+            });
+
+    auto* switchButton = inlineButton(tr("Choose File…"));
+    connect(switchButton, &QPushButton::clicked, this, [this, service] {
+        const QString path = QFileDialog::getOpenFileName(
+            this, tr("Select Database"),
+            QFileInfo(service->vaultPath()).absolutePath(),
+            tr("Nightlock Vault (*.nlck)"));
+        if (!path.isEmpty())
+            emit switchDatabaseRequested(path);
+    });
+    addRow(rows, tr("Switch database"),
+           tr("Open another vault file and make it the default."), switchButton);
+
+    auto* createButton = inlineButton(tr("Create…"));
+    connect(createButton, &QPushButton::clicked, this, [this, service] {
+        QString path = QFileDialog::getSaveFileName(
+            this, tr("Create Database"),
+            QFileInfo(service->vaultPath()).dir().filePath(QStringLiteral("Vault.nlck")),
+            tr("Nightlock Vault (*.nlck)"), nullptr,
+            // The existence check below refuses instead — a vault is
+            // never silently replaced.
+            QFileDialog::DontConfirmOverwrite);
+        if (path.isEmpty())
+            return;
+        if (!path.endsWith(QLatin1String(".nlck"), Qt::CaseInsensitive))
+            path += QLatin1String(".nlck");
+        if (QFileInfo::exists(path)) {
+            QMessageBox::warning(this, tr("Create Database"),
+                                 tr("A vault already exists there. Pick another name."));
+            return;
+        }
+        emit createDatabaseRequested(path);
+    });
+    addRow(rows, tr("New database"),
+           tr("Create a fresh vault and make it the default."), createButton);
+    finishCard(rows);
+    column->addWidget(card);
+
+    QVBoxLayout* startupRows = nullptr;
+    QFrame* startupCard = makeCard(startupRows);
+
+    // The startup default: the one vault that opens on the next
+    // launch. Clearing it makes Nightlock start knowing nothing.
+    auto* clearButton = inlineButton(tr("Clear"));
+    QLabel* defaultLabel =
+        addRow(startupRows, tr("Open at startup"), QStringLiteral(" "), clearButton);
+    const auto refreshDefault = [defaultLabel, clearButton] {
+        const QString remembered = VaultService::rememberedVaultPath();
+        defaultLabel->setText(remembered.isEmpty()
+                                  ? tr("None — Nightlock starts without a database.")
+                                  : QDir::toNativeSeparators(remembered));
+        clearButton->setEnabled(!remembered.isEmpty());
+    };
+    refreshDefault();
+    connect(service, &VaultService::rememberedVaultChanged, defaultLabel,
+            [refreshDefault](const QString&) { refreshDefault(); });
+    connect(clearButton, &QPushButton::clicked, service,
+            [service] { service->clearRememberedVaultPath(); });
+
+    auto* signOutButton = inlineButton(tr("Sign Out"));
+    connect(signOutButton, &QPushButton::clicked, this, [this] {
+        const auto answer = QMessageBox::question(
+            this, tr("Sign Out"),
+            tr("Close this database and forget it? The vault file stays on disk."));
+        if (answer == QMessageBox::Yes)
+            emit signOutRequested();
+    });
+    addRow(startupRows, tr("Sign out"),
+           tr("Lock the current database and forget it completely."), signOutButton);
+    finishCard(startupRows);
+    column->addWidget(startupCard);
+
     column->addStretch(1);
     return page;
 }
