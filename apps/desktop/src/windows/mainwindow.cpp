@@ -246,6 +246,10 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
         if (!path.isEmpty())
             switchToVault(path);
     });
+    // Forgetting is the whole point: the same flow as Settings' Sign
+    // Out, landing on the first-run screen.
+    connect(lockScreen_, &LockScreen::forgotPasswordRequested, this,
+            &MainWindow::signOutVault);
     // A failed autosave must not pass silently — the user thinks their
     // edit is on disk.
     connect(VaultService::instance(), &VaultService::saveFailed, this,

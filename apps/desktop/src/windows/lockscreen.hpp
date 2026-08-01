@@ -17,8 +17,8 @@ class QPushButton;
 // vault target starts at the owner-provided default and "Select
 // Folder" moves it (the file name stays); a bottom link lets the user
 // point at an existing vault file instead. Unlock mode swaps that
-// bottom link for "Select another Vault" — the remembered vault may
-// not be the one the user knows the password for.
+// bottom link for "Forgot a password?" — it forgets the remembered
+// vault and drops the user back on the first-run screen.
 class LockScreen : public QWidget {
     Q_OBJECT
 public:
@@ -49,6 +49,9 @@ signals:
     // Create mode's "open an existing vault" link; the owner shows the
     // file dialog and switches.
     void openExistingRequested();
+    // Unlock mode's "Forgot a password?" link; the owner forgets the
+    // vault and restarts the first-run flow.
+    void forgotPasswordRequested();
 
 private:
     void submit();
@@ -66,6 +69,6 @@ private:
     QWidget* locationHolder_;  // Create mode only
     QLabel* locationLabel_;
     QLabel* error_;
-    QLabel* selectAnother_;  // Unlock mode only
-    QLabel* openExisting_;   // Create mode only
+    QLabel* forgotPassword_;  // Unlock mode only
+    QLabel* openExisting_;    // Create mode only
 };

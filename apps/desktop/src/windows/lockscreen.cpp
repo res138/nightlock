@@ -120,16 +120,17 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     error_->setAlignment(Qt::AlignHCenter);
     error_->setFixedHeight(18);  // reserved, so nothing jumps on error
 
-    // Unlock mode's escape hatch: the remembered vault may not be the
-    // one the user has the password for. Shares the bottom slot with
-    // Create mode's openExisting_ — the modes never show both.
-    selectAnother_ = new QLabel(
-        QStringLiteral("<a style=\"color:#6E6A75;\" href=\"#select\">") +
-        tr("Select another Vault") + QStringLiteral("</a>"));
-    selectAnother_->setObjectName(QStringLiteral("lockLink"));
-    selectAnother_->setAlignment(Qt::AlignHCenter);
-    connect(selectAnother_, &QLabel::linkActivated, this,
-            [this] { emit openExistingRequested(); });
+    // Unlock mode's escape hatch: no password means this vault is a
+    // dead end — forget it and start over on the first-run screen (the
+    // file itself stays on disk). Shares the bottom slot with Create
+    // mode's openExisting_ — the modes never show both.
+    forgotPassword_ = new QLabel(
+        QStringLiteral("<a style=\"color:#6E6A75;\" href=\"#forgot\">") +
+        tr("Forgot a password?") + QStringLiteral("</a>"));
+    forgotPassword_->setObjectName(QStringLiteral("lockLink"));
+    forgotPassword_->setAlignment(Qt::AlignHCenter);
+    connect(forgotPassword_, &QLabel::linkActivated, this,
+            [this] { emit forgotPasswordRequested(); });
 
     // Create mode's escape hatch: point Nightlock at a vault file that
     // already exists instead of creating one.
@@ -163,7 +164,7 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     layout->addWidget(error_);
     layout->addStretch(6);
     layout->addWidget(openExisting_);
-    layout->addWidget(selectAnother_);
+    layout->addWidget(forgotPassword_);
     layout->addSpacing(6);
     layout->addWidget(link);
 }
@@ -178,7 +179,7 @@ void LockScreen::setMode(Mode mode) {
     confirmHolder_->setVisible(create);
     locationHolder_->setVisible(create);
     openExisting_->setVisible(create);
-    selectAnother_->setVisible(!create);
+    forgotPassword_->setVisible(!create);
 }
 
 void LockScreen::setVaultTarget(const QString& path) {
