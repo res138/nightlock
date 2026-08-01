@@ -1310,8 +1310,16 @@ void MainWindow::debugAddEntry(const QString& name) {
         return;
     nightlock::Entry entry;
     entry.name = name.toStdString();
-    entry.login = "debug@nightlock.app";
-    entry.password = "debug";
+    // NIGHTLOCK_TEST_ADD_ENTRY_FIELDS picks the filled fields —
+    // "login,password" when unset, "none" leaves a name-only entry.
+    const QString fields = qEnvironmentVariable("NIGHTLOCK_TEST_ADD_ENTRY_FIELDS",
+                                                QStringLiteral("login,password"));
+    if (fields.contains(QLatin1String("login")))
+        entry.login = "debug@nightlock.app";
+    if (fields.contains(QLatin1String("password")))
+        entry.password = "debug";
+    if (fields.contains(QLatin1String("url")))
+        entry.url = "https://example.com";
     entry.created = entry.modified = std::chrono::system_clock::now();
     insertEntry(group, std::move(entry));
 }

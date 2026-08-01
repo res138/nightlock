@@ -80,6 +80,7 @@ private:
     QLabel* titleLabel_;
     QLabel* noteLabel_;
     QFrame* fieldsCard_;
+    QLabel* metaHeader_;  // pattern-zone anchor when the card hides
     PatternBackdrop* patternBackdrop_;
     FieldRow loginRow_;
     CopyLabel* loginCopy_;
