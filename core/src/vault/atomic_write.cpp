@@ -1,7 +1,12 @@
 #include "vault/atomic_write.hpp"
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#else
 #include <fcntl.h>
 #include <unistd.h>
+#endif
 
 #include <cerrno>
 #include <system_error>
@@ -9,6 +14,25 @@
 namespace nightlock::io {
 
 namespace {
+
+#ifdef _WIN32
+
+bool writeAll(HANDLE file, std::span<const std::uint8_t> data) {
+    const std::uint8_t* p = data.data();
+    std::size_t left = data.size();
+    while (left > 0) {
+        const DWORD chunk =
+            left > 0x0FFFFFFFu ? 0x0FFFFFFFu : static_cast<DWORD>(left);
+        DWORD written = 0;
+        if (!WriteFile(file, p, chunk, &written, nullptr) || written == 0)
+            return false;
+        p += written;
+        left -= written;
+    }
+    return true;
+}
+
+#else
 
 bool writeAll(int fd, std::span<const std::uint8_t> data) {
     const std::uint8_t* p = data.data();
@@ -36,7 +60,49 @@ bool flushToDisk(int fd) {
     return ::fsync(fd) == 0;
 }
 
+#endif
+
 }  // namespace
+
+#ifdef _WIN32
+
+bool atomicReplace(const std::filesystem::path& path,
+                   std::span<const std::uint8_t> head,
+                   std::span<const std::uint8_t> tail) {
+    std::filesystem::path tmp = path;
+    tmp += ".tmp";
+
+    const HANDLE file = CreateFileW(tmp.c_str(), GENERIC_WRITE, 0, nullptr,
+                                    CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE)
+        return false;
+    bool ok = writeAll(file, head) && writeAll(file, tail) &&
+              FlushFileBuffers(file) != 0;
+    ok = (CloseHandle(file) != 0) && ok;
+    if (!ok) {
+        DeleteFileW(tmp.c_str());
+        return false;
+    }
+
+    std::error_code ec;
+    if (std::filesystem::exists(path, ec)) {
+        std::filesystem::path bak = path;
+        bak += ".bak";
+        // Best-effort: a failed backup must not block the save itself.
+        MoveFileExW(path.c_str(), bak.c_str(), MOVEFILE_REPLACE_EXISTING);
+    }
+
+    // WRITE_THROUGH flushes the rename's metadata before returning —
+    // the closest Windows gets to POSIX's fsync-the-directory step.
+    if (!MoveFileExW(tmp.c_str(), path.c_str(),
+                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        DeleteFileW(tmp.c_str());
+        return false;
+    }
+    return true;
+}
+
+#else
 
 bool atomicReplace(const std::filesystem::path& path,
                    std::span<const std::uint8_t> head,
@@ -79,5 +145,7 @@ bool atomicReplace(const std::filesystem::path& path,
     }
     return true;
 }
+
+#endif
 
 }  // namespace nightlock::io
