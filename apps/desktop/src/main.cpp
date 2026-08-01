@@ -1,5 +1,6 @@
 #include <QAbstractButton>
 #include <QApplication>
+#include <QDebug>
 #include <QDialog>
 #include <QFile>
 #include <QMenu>
@@ -105,6 +106,20 @@ int main(int argc, char* argv[]) {
     if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_PASSWORD")) {
         QTimer::singleShot(400, &window, [&window] {
             window.debugSubmitPassword(qEnvironmentVariable("NIGHTLOCK_TEST_PASSWORD"));
+        });
+    }
+
+    // Debug hook: NIGHTLOCK_TEST_CHANGE_PASSWORD="current:new" runs a
+    // master-password change once the NIGHTLOCK_TEST_PASSWORD unlock
+    // has landed, and logs the outcome.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_CHANGE_PASSWORD")) {
+        QTimer::singleShot(900, &window, [service] {
+            const QString spec = qEnvironmentVariable("NIGHTLOCK_TEST_CHANGE_PASSWORD");
+            const qsizetype colon = spec.indexOf(QLatin1Char(':'));
+            const nightlock::VaultError error =
+                service->changePassword(spec.left(colon), spec.mid(colon + 1));
+            qInfo() << "NIGHTLOCK_TEST_CHANGE_PASSWORD:"
+                    << nightlock::errorMessage(error);
         });
     }
 

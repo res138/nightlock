@@ -8,8 +8,9 @@ class QVBoxLayout;
 
 // The standalone application-preferences window (⌘, or the gear
 // button). Obsidian-style split: the category list on the left, the
-// selected category's settings on the right. App-level only — no
-// vault data lives here, so it opens and survives a vault lock.
+// selected category's settings on the right. Opens fine while locked
+// (the Database page serves the first-run state), but every lock,
+// switch or sign-out closes it along with the other vault windows.
 class SettingsWindow : public QWidget {
     Q_OBJECT
 public:

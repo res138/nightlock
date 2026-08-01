@@ -4,6 +4,7 @@
 #include <QCursor>
 #include <QDebug>
 #include <QDesktopServices>
+#include <QDialog>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
@@ -598,9 +599,10 @@ QWidget* MainWindow::openGraphForScreenshot() {
     return graph_;
 }
 
-// The standalone Settings window, centered over the main window.
-// App-level preferences only, so it is not gated on the lock screen
-// and stays open through a vault lock. One at a time: a second call
+// The standalone Settings window, centered over the main window. Not
+// gated on the lock screen — the Database page must be reachable from
+// the first-run state — but closeVaultSession() shuts it together
+// with every other dependent window. One at a time: a second call
 // just brings it forward.
 SettingsWindow* MainWindow::openSettings() {
     if (settings_) {
@@ -651,6 +653,13 @@ void MainWindow::closeVaultSession() {
         graph_->close();
     if (search_)
         search_->close();
+    if (settings_)
+        settings_->close();
+    // Ad-hoc dialogs — entry editors, confirmation boxes — hold
+    // Entry*/Group* into the tree that is about to be wiped.
+    const auto dialogs = findChildren<QDialog*>();
+    for (QDialog* dialog : dialogs)
+        dialog->close();
     if (detail_->isWindow())
         dockDetail();
     // Views first, tree second: after lockAndWipe() every cached

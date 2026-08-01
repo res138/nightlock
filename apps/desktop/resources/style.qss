@@ -429,7 +429,8 @@ QPushButton#settingsInlineButton:hover {
 QPushButton#settingsInlineButton:disabled {
     color: @text-faint;
 }
-QLineEdit#settingsNumberField {
+QLineEdit#settingsNumberField,
+QLineEdit#settingsPasswordField {
     background: @bg-input;
     border: 1px solid @border-soft;
     border-radius: 7px;
@@ -439,7 +440,8 @@ QLineEdit#settingsNumberField {
     selection-background-color: @accent;
     selection-color: @accent-text;
 }
-QLineEdit#settingsNumberField:focus {
+QLineEdit#settingsNumberField:focus,
+QLineEdit#settingsPasswordField:focus {
     background: @bg-input-focus;
     border: 1px solid @accent;
 }

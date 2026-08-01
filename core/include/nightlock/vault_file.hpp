@@ -41,6 +41,11 @@ public:
     // previous image stays behind as "<path>.bak".
     VaultError save();
 
+    // True when `password` derives this open vault's key (same salt
+    // and params, constant-time compare). False on a locked vault —
+    // there is no key to compare against.
+    bool verifyPassword(std::string_view password) const;
+
     // New salt, new key, immediate save(). The old key is restored if
     // the save fails.
     VaultError changePassword(

@@ -43,6 +43,10 @@ bool deriveKey(secure::Bytes& keyOut, std::string_view password,
                std::span<const std::uint8_t, kSaltBytes> salt,
                const KdfParams& params);
 
+// Constant-time equality for secrets (key comparisons). The length
+// check is ordinary — sizes here are format constants, not secrets.
+bool secretEquals(std::span<const std::uint8_t> a, std::span<const std::uint8_t> b);
+
 // out = ciphertext || 16-byte tag. `ad` is authenticated, not encrypted.
 bool aeadSeal(std::vector<std::uint8_t>& out, const secure::Bytes& plaintext,
               std::span<const std::uint8_t, kNonceBytes> nonce,

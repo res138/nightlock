@@ -207,6 +207,25 @@ TEST_CASE("changePassword rotates the salt and invalidates the old password") {
     CHECK(reopened.value().root()->groups()[0]->entries()[0]->name == "GitHub");
 }
 
+TEST_CASE("verifyPassword accepts the current password only") {
+    const fs::path file = freshDir("verify") / "v.nlck";
+    auto vault = VaultFile::create(file, "right-pw", weakParams());
+    REQUIRE(vault);
+
+    CHECK(vault.value().verifyPassword("right-pw"));
+    CHECK_FALSE(vault.value().verifyPassword("wrong-pw"));
+    CHECK_FALSE(vault.value().verifyPassword(""));
+
+    // The check tracks a password change.
+    REQUIRE(vault.value().changePassword("next-pw") == VaultError::None);
+    CHECK_FALSE(vault.value().verifyPassword("right-pw"));
+    CHECK(vault.value().verifyPassword("next-pw"));
+
+    // A locked vault has no key to compare against.
+    vault.value().lock();
+    CHECK_FALSE(vault.value().verifyPassword("next-pw"));
+}
+
 TEST_CASE("lock drops the tree and further saves report NotOpen") {
     const fs::path file = freshDir("lock") / "v.nlck";
     auto vault = VaultFile::create(file, "pw", weakParams());

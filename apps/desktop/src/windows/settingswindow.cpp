@@ -477,6 +477,83 @@ QWidget* SettingsWindow::buildDatabasePage() {
     finishCard(rows);
     column->addWidget(card);
 
+    // Master-password change: three fields, verified and applied by
+    // the button row at the bottom. State checks happen at click time
+    // — the page can sit open across a lock or an unlock.
+    QVBoxLayout* passwordRows = nullptr;
+    QFrame* passwordCard = makeCard(passwordRows);
+
+    const auto passwordField = [](const QString& placeholder) {
+        auto* field = new QLineEdit;
+        field->setObjectName(QStringLiteral("settingsPasswordField"));
+        field->setEchoMode(QLineEdit::Password);
+        field->setPlaceholderText(placeholder);
+        field->setFixedWidth(200);
+        field->setAttribute(Qt::WA_MacShowFocusRect, false);
+        return field;
+    };
+    QLineEdit* currentPassword = passwordField(tr("Required"));
+    QLineEdit* newPassword = passwordField(tr("At least 1 character"));
+    QLineEdit* repeatPassword = passwordField(tr("Same as above"));
+    addRow(passwordRows, tr("Current password"), {}, currentPassword);
+    addRow(passwordRows, tr("New password"), {}, newPassword);
+    addRow(passwordRows, tr("Repeat new password"), {}, repeatPassword);
+
+    auto* applyPassword = inlineButton(tr("Change…"));
+    QLabel* passwordStatus =
+        addRow(passwordRows, tr("Change password"),
+               tr("Verifies the current password, then re-encrypts the vault."),
+               applyPassword);
+    const auto passwordVerdict = [passwordStatus](const QString& message, bool failed) {
+        passwordStatus->setStyleSheet(failed ? QStringLiteral("color:#D2605E;")
+                                             : QString());
+        passwordStatus->setText(message);
+    };
+    connect(applyPassword, &QPushButton::clicked, this,
+            [service, currentPassword, newPassword, repeatPassword, passwordVerdict] {
+                if (service->demoMode()) {
+                    passwordVerdict(tr("Demo mode has no real vault."), true);
+                    return;
+                }
+                if (!service->isUnlocked()) {
+                    passwordVerdict(tr("Unlock the vault first."), true);
+                    return;
+                }
+                if (newPassword->text().isEmpty()) {
+                    passwordVerdict(tr("Enter a new password."), true);
+                    newPassword->setFocus();
+                    return;
+                }
+                if (newPassword->text() != repeatPassword->text()) {
+                    passwordVerdict(tr("New passwords do not match."), true);
+                    repeatPassword->selectAll();
+                    repeatPassword->setFocus();
+                    return;
+                }
+                const nightlock::VaultError error = service->changePassword(
+                    currentPassword->text(), newPassword->text());
+                if (error == nightlock::VaultError::WrongPassword) {
+                    passwordVerdict(tr("Current password is incorrect."), true);
+                    currentPassword->selectAll();
+                    currentPassword->setFocus();
+                    return;
+                }
+                if (error != nightlock::VaultError::None) {
+                    passwordVerdict(
+                        QString::fromUtf8(nightlock::errorMessage(error)), true);
+                    return;
+                }
+                currentPassword->clear();
+                newPassword->clear();
+                repeatPassword->clear();
+                passwordVerdict(tr("Password changed."), false);
+            });
+    // Enter in the last field applies, like a small form.
+    connect(repeatPassword, &QLineEdit::returnPressed, applyPassword,
+            &QPushButton::click);
+    finishCard(passwordRows);
+    column->addWidget(passwordCard);
+
     QVBoxLayout* startupRows = nullptr;
     QFrame* startupCard = makeCard(startupRows);
 

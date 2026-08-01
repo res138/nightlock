@@ -55,6 +55,10 @@ public:
 
     nightlock::VaultError createNew(const QString& password);
     nightlock::VaultError unlock(const QString& password);
+    // Verifies `current` against the open vault, then re-encrypts and
+    // saves under `next`. NotOpen while locked or in demo mode,
+    // WrongPassword when `current` does not match.
+    nightlock::VaultError changePassword(const QString& current, const QString& next);
     nightlock::Group* root();
 
     // Debounced autosave: mutation points call this and a 500 ms

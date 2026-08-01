@@ -126,6 +126,27 @@ nightlock::VaultError VaultService::unlock(const QString& password) {
     return nightlock::VaultError::None;
 }
 
+nightlock::VaultError VaultService::changePassword(const QString& current,
+                                                   const QString& next) {
+    if (demoMode() || !vault_ || !vault_->isOpen())
+        return nightlock::VaultError::NotOpen;
+    nightlock::secure::String currentPw;
+    assignSecret(currentPw, current);
+    if (!vault_->verifyPassword(nightlock::secure::view(currentPw)))
+        return nightlock::VaultError::WrongPassword;
+    nightlock::secure::String nextPw;
+    assignSecret(nextPw, next);
+    const nightlock::VaultError error =
+        vault_->changePassword(nightlock::secure::view(nextPw));
+    if (error == nightlock::VaultError::None) {
+        // changePassword() saved the live tree — any debounced edit is
+        // on disk now.
+        debounce_.stop();
+        dirty_ = false;
+    }
+    return error;
+}
+
 nightlock::Group* VaultService::root() {
     if (demoRoot_)
         return demoRoot_.get();
