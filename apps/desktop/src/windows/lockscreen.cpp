@@ -120,6 +120,17 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     error_->setAlignment(Qt::AlignHCenter);
     error_->setFixedHeight(18);  // reserved, so nothing jumps on error
 
+    // Unlock mode's escape hatch, right under the input: the
+    // remembered vault may not be the one the user has the password
+    // for.
+    selectAnother_ = new QLabel(
+        QStringLiteral("<a style=\"color:#6E6A75;\" href=\"#select\">") +
+        tr("Select another Vault") + QStringLiteral("</a>"));
+    selectAnother_->setObjectName(QStringLiteral("lockLink"));
+    selectAnother_->setAlignment(Qt::AlignHCenter);
+    connect(selectAnother_, &QLabel::linkActivated, this,
+            [this] { emit openExistingRequested(); });
+
     // Create mode's escape hatch: point Nightlock at a vault file that
     // already exists instead of creating one.
     openExisting_ = new QLabel(
@@ -150,6 +161,8 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     layout->addWidget(locationHolder_, 0, Qt::AlignHCenter);
     layout->addSpacing(10);
     layout->addWidget(error_);
+    layout->addSpacing(2);
+    layout->addWidget(selectAnother_);
     layout->addStretch(6);
     layout->addWidget(openExisting_);
     layout->addSpacing(6);
@@ -166,6 +179,7 @@ void LockScreen::setMode(Mode mode) {
     confirmHolder_->setVisible(create);
     locationHolder_->setVisible(create);
     openExisting_->setVisible(create);
+    selectAnother_->setVisible(!create);
 }
 
 void LockScreen::setVaultTarget(const QString& path) {
