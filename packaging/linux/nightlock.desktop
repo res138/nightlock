@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Nightlock
+Comment=Encrypted password vault
+Exec=/usr/lib/nightlock/nightlock-desktop
+Icon=nightlock
+Terminal=false
+Categories=Utility;Security;
+StartupWMClass=nightlock-desktop

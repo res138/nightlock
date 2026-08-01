@@ -14,6 +14,8 @@
 
 #include <cmath>
 
+#include "respaths.hpp"
+
 namespace {
 
 constexpr int kFieldWidth = 300;
@@ -31,7 +33,7 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     auto* icon = new QLabel;
     icon->setAlignment(Qt::AlignHCenter);
     // The art ships huge; render it at 96pt, crisp on retina.
-    const QPixmap art(QStringLiteral(NIGHTLOCK_ICONS_DIR "/lock.png"));
+    const QPixmap art(respaths::icon(QStringLiteral("lock.png")));
     if (!art.isNull()) {
         QPixmap scaled =
             art.scaled(QSize(192, 192), Qt::KeepAspectRatio, Qt::SmoothTransformation);

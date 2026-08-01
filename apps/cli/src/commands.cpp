@@ -336,6 +336,13 @@ int runGen(const std::vector<std::string>& args) {
 std::filesystem::path defaultVaultPath() {
     if (const char* env = std::getenv("NIGHTLOCK_VAULT"); env && *env)
         return env;
+#ifdef _WIN32
+    if (const char* appdata = std::getenv("APPDATA"); appdata && *appdata)
+        return std::filesystem::path(appdata) / "Nightlock/Primary.nlck";
+    const char* home = std::getenv("USERPROFILE");
+    const std::filesystem::path base = home ? home : ".";
+    return base / "Nightlock/Primary.nlck";
+#else
     const char* home = std::getenv("HOME");
     const std::filesystem::path base = home ? home : ".";
 #ifdef __APPLE__
@@ -344,6 +351,7 @@ std::filesystem::path defaultVaultPath() {
     if (const char* xdg = std::getenv("XDG_DATA_HOME"); xdg && *xdg)
         return std::filesystem::path(xdg) / "nightlock/Primary.nlck";
     return base / ".local/share/nightlock/Primary.nlck";
+#endif
 #endif
 }
 

@@ -5,6 +5,8 @@
 #include <QHash>
 #include <QSettings>
 
+#include "respaths.hpp"
+
 #include <atomic>
 #include <mutex>
 #include <thread>
@@ -44,10 +46,9 @@ QString entryIconForId(const QString& id) {
 
 QStringList galleryIconPaths() {
     QStringList result;
-    // NIGHTLOCK_ICONS_DIR points at resources/icons in the source tree
-    // (set by CMake); a packaged build would ship the packs next to the
-    // binary and adjust this lookup.
-    QDir root(QStringLiteral(NIGHTLOCK_ICONS_DIR));
+    // Packaged builds ship the packs inside the app (respaths resolves
+    // them); dev builds read resources/icons in the source tree.
+    QDir root(respaths::iconsDir());
     const QStringList packs =
         root.entryList({QStringLiteral("P*")}, QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
     for (const QString& pack : packs) {

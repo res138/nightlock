@@ -10,6 +10,7 @@ qt_add_executable(nightlock-desktop
     src/fonts.cpp
     src/graphsettings.cpp
     src/hotkeys.cpp
+    src/respaths.cpp
     src/standardicons.cpp
     src/vaultservice.cpp
     src/models/grouptreemodel.cpp
@@ -39,8 +40,11 @@ qt_add_executable(nightlock-desktop
 target_include_directories(nightlock-desktop PRIVATE src)
 
 # The P* icon packs are loaded from disk at runtime — ~190 MB is too
-# much to embed as Qt resources. Dev builds read the source tree.
+# much to embed as Qt resources. Dev builds read the source tree
+# (these definitions); installed builds carry copies inside the
+# package, which respaths prefers when they exist.
 target_compile_definitions(nightlock-desktop PRIVATE
+    NIGHTLOCK_VERSION="${PROJECT_VERSION}"
     NIGHTLOCK_ICONS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
     # San Francisco for non-Apple platforms is side-loaded from here
     # (Apple's license keeps the files out of the repository).
@@ -52,4 +56,80 @@ if(APPLE)
 endif()
 target_link_libraries(nightlock-desktop PRIVATE Qt6::Widgets Qt6::Svg nightlock-core)
 
-set_target_properties(nightlock-desktop PROPERTIES OUTPUT_NAME nightlock)
+# --- application identity per platform ------------------------------
+if(APPLE)
+    set_source_files_properties(resources/nightlock.icns PROPERTIES
+        MACOSX_PACKAGE_LOCATION Resources)
+    target_sources(nightlock-desktop PRIVATE resources/nightlock.icns)
+    set_target_properties(nightlock-desktop PROPERTIES
+        OUTPUT_NAME Nightlock
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_BUNDLE_NAME Nightlock
+        MACOSX_BUNDLE_GUI_IDENTIFIER com.nightlock.Nightlock
+        MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+        MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
+        MACOSX_BUNDLE_ICON_FILE nightlock.icns)
+elseif(WIN32)
+    # The GUI is Nightlock.exe at the install root; the CLI keeps the
+    # lowercase name inside bin\ (the PATH entry), where the
+    # case-insensitive filesystem cannot clash the two.
+    target_sources(nightlock-desktop PRIVATE resources/nightlock.rc)
+    set_target_properties(nightlock-desktop PROPERTIES
+        OUTPUT_NAME Nightlock
+        WIN32_EXECUTABLE TRUE)
+else()
+    set_target_properties(nightlock-desktop PROPERTIES
+        OUTPUT_NAME nightlock-desktop)
+endif()
+
+# --- install layout (the packaging scripts build on this) -----------
+# macOS: everything inside Nightlock.app; the CLI ships as
+#   Contents/Helpers/nightlock (MacOS/ would collide with "Nightlock"
+#   on a case-insensitive disk) and is symlinked into PATH from there.
+# Windows: GUI + resources at the root, CLI in bin\ for the PATH.
+# Linux: GUI in lib/nightlock (bundled Qt lands next to it), the CLI
+#   is bin/nightlock, resources under share/nightlock.
+if(APPLE)
+    set(NIGHTLOCK_BUNDLE_RESOURCES Nightlock.app/Contents/Resources)
+    install(TARGETS nightlock-desktop BUNDLE DESTINATION .)
+    install(DIRECTORY resources/icons DESTINATION ${NIGHTLOCK_BUNDLE_RESOURCES})
+    install(DIRECTORY resources/fonts DESTINATION ${NIGHTLOCK_BUNDLE_RESOURCES})
+    if(TARGET nightlock-cli)
+        install(PROGRAMS $<TARGET_FILE:nightlock-cli>
+                DESTINATION Nightlock.app/Contents/Helpers RENAME nightlock)
+    endif()
+elseif(WIN32)
+    install(TARGETS nightlock-desktop RUNTIME DESTINATION .)
+    install(DIRECTORY resources/icons DESTINATION .)
+    install(DIRECTORY resources/fonts DESTINATION .)
+    if(TARGET nightlock-cli)
+        install(PROGRAMS $<TARGET_FILE:nightlock-cli>
+                DESTINATION bin RENAME nightlock.exe)
+    endif()
+else()
+    install(TARGETS nightlock-desktop RUNTIME DESTINATION lib/nightlock)
+    install(DIRECTORY resources/icons DESTINATION share/nightlock)
+    install(DIRECTORY resources/fonts DESTINATION share/nightlock)
+    if(TARGET nightlock-cli)
+        install(PROGRAMS $<TARGET_FILE:nightlock-cli>
+                DESTINATION bin RENAME nightlock)
+    endif()
+    install(FILES ${CMAKE_SOURCE_DIR}/packaging/linux/nightlock.desktop
+            DESTINATION share/applications)
+    install(FILES ${CMAKE_SOURCE_DIR}/packaging/linux/icons/nightlock-512.png
+            DESTINATION share/icons/hicolor/512x512/apps RENAME nightlock.png)
+    install(FILES ${CMAKE_SOURCE_DIR}/packaging/linux/icons/nightlock-256.png
+            DESTINATION share/icons/hicolor/256x256/apps RENAME nightlock.png)
+endif()
+
+# Qt runtime deployment at `cmake --install` time: frameworks into the
+# bundle on macOS, DLLs + plugins beside the exe on Windows. On Linux
+# packaging/linux/make_deb.sh bundles Qt instead — the generic deploy
+# path is not battle-tested enough there.
+if(APPLE OR WIN32)
+    qt_generate_deploy_app_script(
+        TARGET nightlock-desktop
+        OUTPUT_SCRIPT nightlock_deploy_script
+        NO_UNSUPPORTED_PLATFORM_ERROR)
+    install(SCRIPT ${nightlock_deploy_script})
+endif()

@@ -410,7 +410,8 @@ QWidget* SettingsWindow::buildGeneralPage() {
     QFrame* card = makeCard(rows);
 
     auto* checkUpdates = inlineButton(tr("Check for updates"));
-    addRow(rows, tr("Version 0.1"), tr("Development build with the demo vault."), checkUpdates);
+    addRow(rows, tr("Version %1").arg(QStringLiteral(NIGHTLOCK_VERSION)),
+           tr("Nightlock password manager."), checkUpdates);
 
     addRow(rows, tr("Automatic updates"),
            tr("Check for and download updates in the background."), new ToggleSwitch(true));
