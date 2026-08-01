@@ -7,13 +7,14 @@
 // The app's two configurable font roles (Settings → Appearance):
 // Primary is the interface font (San Francisco by default — not "the
 // system default", which would swap it for Segoe UI / DejaVu on a
-// Windows or Linux port), Secondary is the serif display font of the
-// tree, titles and entry names (Georgia by default). Choices come
-// from a fixed catalog with per-platform family aliases; a stored
-// choice whose font is missing on this system resolves to the first
-// available option instead. macOS ships SF built in; other platforms
-// side-load it from resources/fonts (the license forbids carrying the
-// files in the repository).
+// Windows or Linux port), Secondary is the display font of the tree,
+// titles and entry names (Georgia by default). Both pickers offer the
+// same fixed catalog — sans, serif and mono alike — with per-platform
+// family aliases; only the defaults differ per role. A stored choice
+// whose font is missing on this system resolves to the role's default
+// (then to the first available option). macOS ships SF built in;
+// other platforms side-load it from resources/fonts (the license
+// forbids carrying the files in the repository).
 namespace fonts {
 
 enum class Role { Primary, Secondary };
