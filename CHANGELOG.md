@@ -26,7 +26,7 @@ GitHub-generated release notes are a publication aid, not a second authoritative
 
 ### Fixed
 
-- Nothing yet.
+- Windows release staging now uses an absolute install prefix, as required by Qt 6.10 deployment.
 
 ### Security
 

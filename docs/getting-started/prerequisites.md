@@ -1,6 +1,6 @@
 # Development prerequisites
 
-**Status:** Reviewed for the 1.2.0 source baseline
+**Status:** Reviewed for the 1.2.1 source baseline
 
 **Audience:** Contributors preparing a first local build
 

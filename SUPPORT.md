@@ -11,7 +11,7 @@ Nightlock is under active development and does not yet offer a long-term-support
 | `main` | Active development | Best effort | Best effort |
 | Tagged historical versions | Historical | Not guaranteed | Not guaranteed |
 
-The current source version is `1.2.0`, with [VERSION](VERSION) as the authoritative source. Release tags must match it exactly with a leading `v`; see [CHANGELOG.md](CHANGELOG.md).
+The current source version is `1.2.1`, with [VERSION](VERSION) as the authoritative source. Release tags must match it exactly with a leading `v`; see [CHANGELOG.md](CHANGELOG.md).
 
 ## Platform baseline
 
