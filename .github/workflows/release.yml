@@ -72,7 +72,7 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure -C Release
       - name: Stage install
-        run: cmake --install build --config Release --prefix stage
+        run: cmake --install build --config Release --prefix "${{ github.workspace }}\stage"
       - name: Build installer
         shell: pwsh
         run: |

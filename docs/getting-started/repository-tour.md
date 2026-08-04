@@ -1,6 +1,6 @@
 # Repository tour
 
-**Status:** Reviewed for the 1.2.0 source baseline
+**Status:** Reviewed for the 1.2.1 source baseline
 
 **Audience:** Developers locating the correct change boundary
 
