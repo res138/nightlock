@@ -1,0 +1,121 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.1'
+          cache: true
+      - name: Configure (universal)
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DNIGHTLOCK_FORCE_VENDORED_SODIUM=ON
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Package DMG
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cmake --install build --prefix stage
+          bash packaging/macos/make_dmg.sh stage "Nightlock-$VERSION-macOS.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: Nightlock-*-macOS.dmg
+
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.1'
+          cache: true
+      - name: Configure
+        run: >
+          cmake -B build
+          -DNIGHTLOCK_FORCE_VENDORED_SODIUM=ON
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -C Release
+      - name: Stage install
+        run: cmake --install build --config Release --prefix stage
+      - name: Build installer
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          & "$env:ProgramFiles(x86)\Inno Setup 6\iscc.exe" `
+            /DStageDir="$PWD\stage" /DAppVersion=$version `
+            packaging\windows\nightlock.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: packaging/windows/Output/*.exe
+
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.1'
+          cache: true
+      - name: Build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libxkbcommon-dev patchelf
+      - name: Configure
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DNIGHTLOCK_FORCE_VENDORED_SODIUM=ON
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Package deb
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cmake --install build --prefix stage/usr
+          bash packaging/linux/make_deb.sh stage "$QT_ROOT_DIR" "$VERSION" \
+            "nightlock_${VERSION}_amd64.deb"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: nightlock_*_amd64.deb
+
+  publish:
+    needs: [macos, windows, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - name: Checksums
+        run: sha256sum Nightlock-* nightlock_* > SHA256SUMS
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            Nightlock-*-macOS.dmg
+            Nightlock-*-Windows-Setup.exe
+            nightlock_*_amd64.deb
+            SHA256SUMS

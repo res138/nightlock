@@ -48,10 +48,19 @@ std::optional<nightlock::VaultFile> openVault(const GlobalOptions& global,
 std::string formatDate(std::chrono::system_clock::time_point tp) {
     const std::time_t t = std::chrono::system_clock::to_time_t(tp);
     std::tm tm{};
+#ifdef _WIN32
+    localtime_s(&tm, &t);
+#else
     localtime_r(&t, &tm);
+#endif
     char buf[32];
     std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", &tm);
     return buf;
+}
+
+std::string printablePath(const std::filesystem::path& path) {
+    const auto utf8 = path.u8string();
+    return {utf8.begin(), utf8.end()};
 }
 
 void printTree(const nightlock::Group& group, int depth) {
@@ -83,7 +92,7 @@ int runInit(const GlobalOptions& global) {
                                    nightlock::secure::view(password));
     if (!vault)
         return failVault(vault.error());
-    std::printf("Created %s\n", global.vaultPath.c_str());
+    std::printf("Created %s\n", printablePath(global.vaultPath).c_str());
     return kExitOk;
 }
 
@@ -336,6 +345,13 @@ int runGen(const std::vector<std::string>& args) {
 std::filesystem::path defaultVaultPath() {
     if (const char* env = std::getenv("NIGHTLOCK_VAULT"); env && *env)
         return env;
+#ifdef _WIN32
+    if (const char* appdata = std::getenv("APPDATA"); appdata && *appdata)
+        return std::filesystem::path(appdata) / "Nightlock/Primary.nlck";
+    const char* home = std::getenv("USERPROFILE");
+    const std::filesystem::path base = home ? home : ".";
+    return base / "Nightlock/Primary.nlck";
+#else
     const char* home = std::getenv("HOME");
     const std::filesystem::path base = home ? home : ".";
 #ifdef __APPLE__
@@ -345,9 +361,11 @@ std::filesystem::path defaultVaultPath() {
         return std::filesystem::path(xdg) / "nightlock/Primary.nlck";
     return base / ".local/share/nightlock/Primary.nlck";
 #endif
+#endif
 }
 
 void printUsage() {
+    const std::string vaultPath = printablePath(defaultVaultPath());
     std::printf(
         "nightlock — encrypted password vault\n"
         "\n"
@@ -370,7 +388,7 @@ void printUsage() {
         "  --password-stdin    read passphrases as stdin lines (scripts)\n"
         "  -h, --help          this help\n"
         "  -V, --version       version\n",
-        defaultVaultPath().c_str());
+        vaultPath.c_str());
 }
 
 int runCommand(const std::string& command, const GlobalOptions& global,

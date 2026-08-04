@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "appearancesettings.hpp"
+#include "respaths.hpp"
 
 namespace fonts {
 namespace {
@@ -21,7 +22,7 @@ void loadBundledFonts() {
     if (loaded)
         return;
     loaded = true;
-    const QDir dir(QStringLiteral(NIGHTLOCK_FONTS_DIR));
+    const QDir dir(respaths::fontsDir());
     const QStringList files =
         dir.entryList({QStringLiteral("*.otf"), QStringLiteral("*.ttf")}, QDir::Files);
     for (const QString& file : files)
@@ -181,7 +182,7 @@ void applyApplicationFont() {
         qWarning("None of the interface fonts are available: drop the SF Pro *.otf "
                  "files into %s (https://developer.apple.com/fonts/). Falling back "
                  "to the platform font.",
-                 NIGHTLOCK_FONTS_DIR);
+                 qPrintable(respaths::fontsDir()));
     QFont font = QApplication::font();
     // The whole alias chain goes in, so glyphs missing from one cut
     // (e.g. ⌘) resolve from the next instead of a random substitute.

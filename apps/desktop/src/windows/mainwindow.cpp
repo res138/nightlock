@@ -37,6 +37,7 @@
 #include "hotkeys.hpp"
 #include "models/grouptreemodel.hpp"
 #include "qsecure.hpp"
+#include "respaths.hpp"
 #include "standardicons.hpp"
 #include "vaultservice.hpp"
 #include "widgets/entrydetailview.hpp"
@@ -682,7 +683,7 @@ void MainWindow::showLockScreen(bool create) {
     lockScreen_->raise();
     // Keynote-style: the Dock icon wears a padlock while locked.
     QGuiApplication::setWindowIcon(
-        QIcon(QStringLiteral(NIGHTLOCK_ICONS_DIR "/appicon-locked.png")));
+        QIcon(respaths::icon(QStringLiteral("appicon-locked.png"))));
 }
 
 void MainWindow::updateVaultTitle() {
@@ -798,7 +799,7 @@ void MainWindow::finishUnlock(nightlock::Group* root) {
     lockScreen_->hide();
     // The Dock loses its lock badge together with the screen.
     QGuiApplication::setWindowIcon(
-        QIcon(QStringLiteral(NIGHTLOCK_ICONS_DIR "/appicon.png")));
+        QIcon(respaths::icon(QStringLiteral("appicon.png"))));
 }
 
 void MainWindow::debugLock(bool fail) {

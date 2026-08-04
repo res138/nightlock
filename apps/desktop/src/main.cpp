@@ -11,6 +11,7 @@
 #include "appearancesettings.hpp"
 #include "demovault.hpp"
 #include "fonts.hpp"
+#include "respaths.hpp"
 #include "standardicons.hpp"
 #include "vaultservice.hpp"
 #include "windows/entryeditdialog.hpp"
@@ -31,9 +32,9 @@ int main(int argc, char* argv[]) {
     appearancesettings::applyStylesheet();
 
     // Dock icon for the running process (the squircle render of the
-    // logo); resources/nightlock.icns carries the same art for a
-    // future .app bundle.
-    QApplication::setWindowIcon(QIcon(QStringLiteral(NIGHTLOCK_ICONS_DIR "/appicon.png")));
+    // logo); resources/nightlock.icns carries the same art for the
+    // .app bundle.
+    QApplication::setWindowIcon(QIcon(respaths::icon(QStringLiteral("appicon.png"))));
 
     // NIGHTLOCK_DEMO=1 runs on the in-memory mockup vault (no disk
     // I/O, unlock password "nightlock") — the screenshot/debug hooks
