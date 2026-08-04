@@ -8,7 +8,7 @@
 | Language | English only |
 | Documentation model | Docs as code, versioned with the implementation |
 | Diagram standard | Mermaid using `graph TD` unless an exception is explicitly approved |
-| Initial baseline | Nightlock 0.2.0, repository state after PR #10 |
+| Initial baseline | Nightlock 1.2.0 source line, based on the repository state after PR #10 |
 
 ## Implementation progress
 
@@ -151,7 +151,7 @@ graph TD
 
 ### 6.1 Single source of truth
 
-- Product version comes from CMake and release tags, not duplicated prose.
+- Product version comes from `VERSION`; CMake, release tags, and prose must agree with it.
 - CLI reference is generated from, or tested against, `nightlock --help`.
 - Vault constants in prose are checked against source constants where practical.
 - Supported CI platforms are derived from the workflow matrix or verified against it.
@@ -802,7 +802,7 @@ graph TD
 Required runbook:
 
 1. verify a clean, green `main` commit;
-2. select a semantic version and synchronize the CMake project version;
+2. select a semantic version and update the authoritative `VERSION` file;
 3. prepare release notes and compatibility warnings;
 4. create an annotated `v*` tag at the intended commit;
 5. push the tag and observe all platform jobs;
@@ -1030,7 +1030,7 @@ Create `.github/workflows/docs.yml` with:
 ### 12.4 Drift detection to implement
 
 1. Capture `nightlock --help` and compare it with the committed generated reference.
-2. Parse or assert the CMake project version in release documentation tests.
+2. Parse or assert the authoritative `VERSION` value in release documentation tests.
 3. Assert documented CMake options exist.
 4. Assert the documented CI matrix matches workflow runner labels.
 5. Assert release artifact patterns match `release.yml`.

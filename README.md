@@ -1,7 +1,11 @@
 # Nightlock
 
-[![Build](https://github.com/res138/nightlock/actions/workflows/build.yml/badge.svg)](https://github.com/res138/nightlock/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/res138/nightlock?display_name=tag&sort=semver&label=release)](https://github.com/res138/nightlock/releases/latest)
+[![Build](https://github.com/res138/nightlock/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/res138/nightlock/actions/workflows/build.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
+[![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?logo=cplusplus&logoColor=white)](CMakeLists.txt)
+[![Qt 6](https://img.shields.io/badge/Qt-6-41CD52?logo=qt&logoColor=white)](docs/getting-started/prerequisites.md)
+[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-555555)](SUPPORT.md)
 
 Nightlock is a cross-platform encrypted password vault with a Qt desktop application and a command-line interface. Both front ends use the same C++20 core for the domain model, password generation, authenticated encryption, serialization, and atomic persistence.
 
@@ -10,7 +14,7 @@ Nightlock is a cross-platform encrypted password vault with a Qt desktop applica
 
 ## Project status
 
-Nightlock is under active development. The current source version is `0.2.0`. Build and test jobs run on macOS 14, Windows Server 2022, and Ubuntu 22.04; these runner labels describe the CI baseline, not a complete end-user support guarantee. See [SUPPORT.md](SUPPORT.md) for the current support policy.
+Nightlock is under active development. The current source version is `1.2.0`, read from [VERSION](VERSION). Build and test jobs run on macOS 14, Windows Server 2022, and Ubuntu 22.04; these runner labels describe the CI baseline, not a complete end-user support guarantee. See [SUPPORT.md](SUPPORT.md) for the current support policy.
 
 Release packages are currently unsigned. Treat operating-system warnings and artifact-origin verification as material security limitations. See the [release workflow](.github/workflows/release.yml) and the planned release-security documentation before distributing binaries.
 

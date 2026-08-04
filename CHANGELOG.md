@@ -14,7 +14,7 @@ GitHub-generated release notes are a publication aid, not a second authoritative
 
 ### Changed
 
-- Nothing yet.
+- Reconciled project versioning at `1.2.0` and made `VERSION` authoritative for CMake, application metadata, and release-tag validation.
 
 ### Deprecated
 
@@ -34,6 +34,6 @@ GitHub-generated release notes are a publication aid, not a second authoritative
 
 ## Historical versions
 
-Tags `alpha-0.1`, `alpha-0.2`, and `v1.1` predate this changelog policy and do not align with the current CMake version `0.2.0`. Their contents have not been reconstructed because an incomplete retrospective changelog would be misleading. A dedicated versioning decision must reconcile historical tags before the next public release.
+Tags `alpha-0.1`, `alpha-0.2`, and the release now named `v1.1.0` predate this changelog policy. The `v1.1.0` release used an internal CMake version of `0.1.0`; this historical mismatch is preserved rather than rewriting published artifacts. Starting with `v1.2.0`, the release tag, package metadata, and application version must match [VERSION](VERSION).
 
 [Unreleased]: https://github.com/res138/nightlock/compare/main...HEAD

@@ -5,7 +5,26 @@ on:
     tags: ['v*']
 
 jobs:
+  validate-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Match source version to release tag
+        shell: bash
+        run: |
+          NIGHTLOCK_SOURCE_VERSION="$(tr -d '[:space:]' < VERSION)"
+          NIGHTLOCK_TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [[ ! "$NIGHTLOCK_SOURCE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid VERSION: $NIGHTLOCK_SOURCE_VERSION"
+            exit 1
+          fi
+          if [[ "$NIGHTLOCK_SOURCE_VERSION" != "$NIGHTLOCK_TAG_VERSION" ]]; then
+            echo "Tag $NIGHTLOCK_TAG_VERSION does not match VERSION $NIGHTLOCK_SOURCE_VERSION"
+            exit 1
+          fi
+
   macos:
+    needs: validate-version
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
@@ -26,15 +45,16 @@ jobs:
         run: ctest --test-dir build --output-on-failure
       - name: Package DMG
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          NIGHTLOCK_PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
           cmake --install build --prefix stage
-          bash packaging/macos/make_dmg.sh stage "Nightlock-$VERSION-macOS.dmg"
+          bash packaging/macos/make_dmg.sh stage "Nightlock-$NIGHTLOCK_PACKAGE_VERSION-macOS.dmg"
       - uses: actions/upload-artifact@v4
         with:
           name: macos
           path: Nightlock-*-macOS.dmg
 
   windows:
+    needs: validate-version
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
@@ -57,9 +77,9 @@ jobs:
         shell: pwsh
         run: |
           choco install innosetup -y --no-progress
-          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          $nightlockVersion = $env:GITHUB_REF_NAME.TrimStart('v')
           & "$env:ProgramFiles(x86)\Inno Setup 6\iscc.exe" `
-            /DStageDir="$PWD\stage" /DAppVersion=$version `
+            /DStageDir="$PWD\stage" /DAppVersion=$nightlockVersion `
             packaging\windows\nightlock.iss
       - uses: actions/upload-artifact@v4
         with:
@@ -67,6 +87,7 @@ jobs:
           path: packaging/windows/Output/*.exe
 
   linux:
+    needs: validate-version
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -90,10 +111,10 @@ jobs:
         run: ctest --test-dir build --output-on-failure
       - name: Package deb
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          NIGHTLOCK_PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
           cmake --install build --prefix stage/usr
-          bash packaging/linux/make_deb.sh stage "$QT_ROOT_DIR" "$VERSION" \
-            "nightlock_${VERSION}_amd64.deb"
+          bash packaging/linux/make_deb.sh stage "$QT_ROOT_DIR" "$NIGHTLOCK_PACKAGE_VERSION" \
+            "nightlock_${NIGHTLOCK_PACKAGE_VERSION}_amd64.deb"
       - uses: actions/upload-artifact@v4
         with:
           name: linux
