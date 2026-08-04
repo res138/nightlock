@@ -14,7 +14,7 @@ Nightlock is a cross-platform encrypted password vault with a Qt desktop applica
 
 ## Project status
 
-Nightlock is under active development. The current source version is `1.2.1`, read from [VERSION](VERSION). Build and test jobs run on macOS 14, Windows Server 2022, and Ubuntu 22.04; these runner labels describe the CI baseline, not a complete end-user support guarantee. See [SUPPORT.md](SUPPORT.md) for the current support policy.
+Nightlock is under active development. The current source version is `1.2.2`, read from [VERSION](VERSION). Build and test jobs run on macOS 14, Windows Server 2022, and Ubuntu 22.04; these runner labels describe the CI baseline, not a complete end-user support guarantee. See [SUPPORT.md](SUPPORT.md) for the current support policy.
 
 Release packages are currently unsigned. Treat operating-system warnings and artifact-origin verification as material security limitations. See the [release workflow](.github/workflows/release.yml) and the planned release-security documentation before distributing binaries.
 

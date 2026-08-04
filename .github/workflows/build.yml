@@ -38,3 +38,17 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure -C Release
+
+      - name: Stage Windows package
+        if: runner.os == 'Windows'
+        run: cmake --install build --config Release --prefix "${{ github.workspace }}\stage"
+
+      - name: Build Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $nightlockVersion = (Get-Content VERSION -Raw).Trim()
+          ./packaging/windows/build_installer.ps1 `
+            -StageDir "$PWD\stage" `
+            -AppVersion $nightlockVersion

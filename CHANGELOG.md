@@ -27,6 +27,7 @@ GitHub-generated release notes are a publication aid, not a second authoritative
 ### Fixed
 
 - Windows release staging now uses an absolute install prefix, as required by Qt 6.10 deployment.
+- Windows packaging now resolves Inno Setup through the platform API and is exercised by pull-request CI before release tags are created.
 
 ### Security
 
