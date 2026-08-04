@@ -10,6 +10,12 @@ add_executable(nightlock-tests
 )
 
 target_link_libraries(nightlock-tests PRIVATE nightlock-core)
+# doctest's lightweight std forward declarations are incompatible with
+# MSVC's string_view stream operators. Use the real standard headers in
+# every test translation unit instead of relying on incidental includes.
+target_compile_definitions(nightlock-tests PRIVATE
+    DOCTEST_CONFIG_USE_STD_HEADERS
+)
 # Tests reach internal headers (TLV reader, serializer) directly.
 target_include_directories(nightlock-tests PRIVATE
     ${CMAKE_SOURCE_DIR}/third_party

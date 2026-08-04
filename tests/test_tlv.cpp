@@ -2,10 +2,6 @@
 
 #include <format/tlv.hpp>
 
-// MSVC: doctest stringifies string_view comparisons through
-// operator<<, whose definition needs the complete basic_ostream.
-#include <ostream>
-
 using namespace nightlock;
 using namespace nightlock::format;
 

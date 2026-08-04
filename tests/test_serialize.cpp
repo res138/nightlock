@@ -3,10 +3,6 @@
 #include <format/serialize.hpp>
 #include <format/tlv.hpp>
 
-// MSVC: doctest stringifies string_view comparisons through
-// operator<<, whose definition needs the complete basic_ostream.
-#include <ostream>
-
 #include <chrono>
 
 using namespace nightlock;
