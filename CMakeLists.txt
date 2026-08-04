@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(nightlock VERSION 0.2.0 LANGUAGES CXX)
+file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/VERSION" NIGHTLOCK_VERSION LIMIT_COUNT 1)
+if(NOT NIGHTLOCK_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+    message(FATAL_ERROR "VERSION must contain a semantic version such as 1.2.0")
+endif()
+
+project(nightlock VERSION "${NIGHTLOCK_VERSION}" LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

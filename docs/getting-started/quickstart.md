@@ -1,6 +1,7 @@
 # Developer quickstart
 
-**Status:** Reviewed for the 0.2.0 source baseline  
+**Status:** Reviewed for the 1.2.0 source baseline
+
 **Audience:** Contributors who have completed the prerequisites
 
 All examples assume the repository root as the current directory. Use a synthetic vault during development.
