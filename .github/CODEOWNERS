@@ -1,0 +1,23 @@
+# Default ownership. Replace individual ownership with teams as the project grows.
+* @res138
+
+# Security-sensitive core and specifications.
+/core/src/crypto/ @res138
+/core/src/format/ @res138
+/core/src/secure/ @res138
+/core/src/vault/ @res138
+/docs/security.md @res138
+/docs/format.md @res138
+/docs/security/ @res138
+
+# Build, packaging, release, and supply chain.
+/.github/workflows/ @res138
+/cmake/ @res138
+/packaging/ @res138
+/THIRD_PARTY_NOTICES.md @res138
+/docs/operations/ @res138
+
+# Documentation governance and decisions.
+/docs/governance/ @res138
+/docs/adr/ @res138
+/docs/rfcs/ @res138

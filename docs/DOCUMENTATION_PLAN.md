@@ -2,13 +2,19 @@
 
 | Field | Value |
 |---|---|
-| Status | Proposed implementation plan |
+| Status | Active implementation plan |
 | Audience | Maintainers, contributors, security reviewers, release engineers, and future technical writers |
 | Scope | Developer and operator documentation for the entire Nightlock repository |
 | Language | English only |
 | Documentation model | Docs as code, versioned with the implementation |
 | Diagram standard | Mermaid using `graph TD` unless an exception is explicitly approved |
 | Initial baseline | Nightlock 0.2.0, repository state after PR #10 |
+
+## Implementation progress
+
+The first NL10 increment establishes root entry points, onboarding, governance, GitHub review contracts, and five evidence-linked retrospective ADRs. Deep architecture, security, reference, engineering-quality, operations, generated-reference, and documentation-site work remains staged in the roadmap below.
+
+The audit in Section 4 records the pre-implementation baseline and is intentionally preserved as historical input to the program.
 
 ## 1. Executive objective
 
@@ -72,7 +78,7 @@ This program does not:
 - replace source-level comments for local invariants;
 - freeze design decisions that should remain open through an ADR or RFC process.
 
-## 4. Current-state audit
+## 4. Baseline audit before implementation
 
 ### 4.1 Existing strengths
 
@@ -190,8 +196,10 @@ Use precise labels:
 README.md
 CONTRIBUTING.md
 SECURITY.md
+SUPPORT.md
 CHANGELOG.md
 CODE_OF_CONDUCT.md
+THIRD_PARTY_NOTICES.md
 docs/
   README.md
   DOCUMENTATION_PLAN.md
@@ -207,6 +215,12 @@ docs/
     debugging.md
     coding-standards.md
     dependencies.md
+    static-analysis.md
+    sanitizers.md
+    fuzzing.md
+    coverage.md
+    performance.md
+    accessibility.md
     platform-notes.md
   architecture/
     overview.md
@@ -222,6 +236,7 @@ docs/
     secret-lifecycle.md
     cryptography.md
     secure-development.md
+    privacy-and-telemetry.md
     vulnerability-response.md
   reference/
     cli.md
@@ -231,10 +246,12 @@ docs/
     environment-variables.md
     exit-codes.md
     package-layouts.md
+    licenses.md
   operations/
     ci.md
     releasing.md
     release-validation.md
+    release-security.md
     rollback.md
     troubleshooting.md
     incident-response.md
@@ -346,6 +363,26 @@ Required content:
 - disclosure policy;
 - explicit prohibition on reporting live secrets in public issues;
 - links to the technical threat model and security design documents.
+
+#### `SUPPORT.md`
+
+Required content:
+
+- supported Nightlock release lines;
+- supported operating systems and CPU architectures;
+- minimum supported Qt, compiler, CMake, and system-library versions;
+- vault-format compatibility guarantees;
+- end-of-life and deprecation rules;
+- the difference between community support, security support, and best-effort troubleshooting;
+- migration expectations when support is removed.
+
+#### `CHANGELOG.md`
+
+Use a human-curated Keep a Changelog structure and Semantic Versioning. Maintain an `Unreleased` section with Added, Changed, Deprecated, Removed, Fixed, and Security categories. GitHub Release notes may be generated from the changelog, but they must not become a conflicting second source of release history. Every release procedure must move relevant entries from `Unreleased` into a dated version section and link the version comparison.
+
+#### `THIRD_PARTY_NOTICES.md`
+
+Inventory every dependency and redistributed asset, including Qt modules and plugins, libsodium, doctest, packaging tools, icon packs, and fonts. Record version, purpose, linkage or packaging mode, license, copyright, upstream source, redistribution status, required notices, and whether the component ships in end-user artifacts. Include the notices file in packaged artifacts where required and verify it during release validation.
 
 ### 8.2 Getting-started set
 
@@ -602,6 +639,10 @@ Document algorithm identifiers, parameters, test vectors, domain assumptions, no
 
 Provide review checklists for parser changes, memory handling, format evolution, platform APIs, dependency updates, logs, diagnostics, crash dumps, clipboard behavior, and test data.
 
+#### `docs/security/privacy-and-telemetry.md`
+
+State whether Nightlock performs network access, telemetry, update checks, crash reporting, or diagnostic upload. Document local settings and metadata, clipboard exposure, operating-system integrations, and the review requirements for introducing any outbound data flow. Absence of telemetry must be treated as a testable product property rather than an implied promise.
+
 ### 8.5 Reference set
 
 #### `docs/reference/cli.md`
@@ -720,6 +761,20 @@ For Qt, libsodium, the libsodium CMake wrapper, doctest, GitHub Actions, Inno Se
 - rollback procedure;
 - license location.
 
+#### Engineering-quality guides
+
+Create dedicated, command-oriented guides for:
+
+- C++ formatting and coding standards;
+- `clang-tidy` or the selected static-analysis suite, including suppression policy;
+- AddressSanitizer, UndefinedBehaviorSanitizer, LeakSanitizer, and future ThreadSanitizer use;
+- coverage measurement with risk-based expectations rather than a vanity percentage;
+- fuzzing of the vault header, TLV reader, decrypted payload parser, and recovery paths;
+- performance baselines for KDF latency, large-vault open/save, memory use, startup, and resource loading;
+- desktop accessibility requirements for keyboard navigation, focus order, contrast, screen readers, reduced motion, and platform conventions.
+
+Each guide must define the local command, CI schedule, ownership, failure triage, exception process, retained artifacts, and graduation criteria for becoming merge-blocking.
+
 ### 8.7 Operations set
 
 #### `docs/operations/ci.md`
@@ -763,6 +818,10 @@ Include explicit caveats for current ad-hoc/unsigned packaging and the resulting
 #### `docs/operations/release-validation.md`
 
 Define a per-platform checklist covering installation, launch, CLI availability, Qt plugin loading, resource discovery, vault create/open/save, password change, backup creation, uninstall, and checksum verification.
+
+#### `docs/operations/release-security.md`
+
+Document the artifact trust chain: pinned and verified build inputs, least-privilege workflow permissions, dependency checksums, software bill of materials (SBOM), GitHub artifact attestations or equivalent provenance, Windows Authenticode signing, macOS Developer ID signing and notarization, checksum publication, signature verification, key custody, key rotation, compromise response, and revocation. The current unsigned state must remain explicit until signing is implemented; checksums produced by the same workflow are integrity metadata, not independent proof of origin.
 
 #### `docs/operations/troubleshooting.md`
 
@@ -815,6 +874,7 @@ graph TD
 - ADRs record accepted, cross-cutting, durable technical decisions.
 - RFCs propose substantial changes before implementation.
 - ADRs are immutable after acceptance except for status and typo corrections; superseding decisions create a new ADR.
+- ADRs written after an implementation already exists must use `Accepted retrospectively` status, link the introducing commits, and never invent historical alternatives or discussions that cannot be evidenced.
 - Every ADR includes context, decision, alternatives, consequences, security impact, compatibility impact, operational impact, and validation evidence.
 - Every RFC includes motivation, detailed design, migration, rejected alternatives, test plan, documentation plan, rollout, rollback, and unresolved questions.
 
@@ -1216,6 +1276,16 @@ Exit criteria:
 | DOC-038 | P2 | Performance and scale notes | DOC-009, DOC-017 | Current limits and measurement method recorded |
 | DOC-039 | P2 | Compatibility and migration policy | DOC-030 | Format evolution checklist approved |
 | DOC-040 | P2 | Documentation health metrics | DOC-034, DOC-036 | Quarterly report template available |
+| DOC-041 | P0 | Changelog and release-note policy | DOC-002, DOC-012 | One authoritative version history and validated release procedure |
+| DOC-042 | P0 | Support and compatibility policy | DOC-004, DOC-030 | Supported versions, platforms, and EOL rules are explicit |
+| DOC-043 | P0 | Third-party notices and license inventory | DOC-023 | Redistributed dependencies and assets have verified notices |
+| DOC-044 | P0 | Release supply-chain security plan | DOC-012, DOC-023 | Signing, SBOM, provenance, verification, and compromise procedures are specified |
+| DOC-045 | P1 | Static-analysis and formatting guides | DOC-002, DOC-017 | Local and CI commands plus suppression rules are reviewed |
+| DOC-046 | P1 | Sanitizer test guide and CI design | DOC-017 | ASan/UBSan run is reproducible and failures are actionable |
+| DOC-047 | P1 | Vault and TLV fuzzing guide | DOC-015, DOC-017 | Corpus, harness targets, triage, and retained reproducers are specified |
+| DOC-048 | P1 | Risk-based coverage policy | DOC-017 | Critical parser, persistence, crypto-facade, and error paths are mapped |
+| DOC-049 | P2 | Performance baseline and regression policy | DOC-017 | Repeatable benchmarks and alert thresholds are documented |
+| DOC-050 | P1 | Privacy, telemetry, and accessibility documentation | DOC-010, DOC-015 | Outbound-data posture and desktop accessibility expectations are explicit |
 
 ## 16. Definition of done for documentation work
 
