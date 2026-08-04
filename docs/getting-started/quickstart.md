@@ -1,6 +1,6 @@
 # Developer quickstart
 
-**Status:** Reviewed for the 1.2.1 source baseline
+**Status:** Reviewed for the 1.2.2 source baseline
 
 **Audience:** Contributors who have completed the prerequisites
 

@@ -78,9 +78,9 @@ jobs:
         run: |
           choco install innosetup -y --no-progress
           $nightlockVersion = $env:GITHUB_REF_NAME.TrimStart('v')
-          & "$env:ProgramFiles(x86)\Inno Setup 6\iscc.exe" `
-            /DStageDir="$PWD\stage" /DAppVersion=$nightlockVersion `
-            packaging\windows\nightlock.iss
+          ./packaging/windows/build_installer.ps1 `
+            -StageDir "$PWD\stage" `
+            -AppVersion $nightlockVersion
       - uses: actions/upload-artifact@v4
         with:
           name: windows
