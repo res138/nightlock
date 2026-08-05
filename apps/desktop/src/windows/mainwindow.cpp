@@ -19,6 +19,7 @@
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QScrollBar>
+#include <QShortcut>
 #include <QStyle>
 #include <QTimer>
 #include <QToolButton>
@@ -34,6 +35,7 @@
 #include <nightlock/group.hpp>
 
 #include "appearancesettings.hpp"
+#include "graphsettings.hpp"
 #include "hotkeys.hpp"
 #include "models/grouptreemodel.hpp"
 #include "qsecure.hpp"
@@ -223,8 +225,9 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
                   });
     hotkeys::bind(QStringLiteral("search"), tr("Search"), QKeySequence(QKeySequence::Find), this,
                   [this] { openSearch(); });
-    hotkeys::bind(QStringLiteral("graph"), tr("NetGraph view"),
-                  QKeySequence(QStringLiteral("Ctrl+G")), this, [this] { openGraph(); });
+    graphShortcut_ = hotkeys::bind(QStringLiteral("graph"), tr("NetGraph view"),
+                                   QKeySequence(QStringLiteral("Ctrl+G")), this,
+                                   [this] { openGraph(); });
     hotkeys::bind(QStringLiteral("lock"), tr("Lock vault"),
                   QKeySequence(QStringLiteral("Ctrl+L")), this, [this] { lockVault(); });
     hotkeys::bind(QStringLiteral("toggle-folder-panel"), tr("Toggle folder panel"),
@@ -276,6 +279,10 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
         if (auto* entry = entryModel_->entry(list_->currentIndex()))
             editEntry(entry);
     });
+
+    connect(graphsettings::notifier(), &graphsettings::Notifier::changed, this,
+            &MainWindow::syncNetGraphAvailability);
+    syncNetGraphAvailability();
 
     new OverlayScrollBar(tree_);
     new OverlayScrollBar(list_);
@@ -335,9 +342,9 @@ QWidget* MainWindow::buildTreeHeader() {
     auto* searchButton = headerButton(QStringLiteral("search"), tr("Search"));
     connect(searchButton, &QToolButton::clicked, this, &MainWindow::openSearch);
     layout->addWidget(searchButton);
-    auto* graphButton = headerButton(QStringLiteral("graph"), tr("NetGraph"));
-    connect(graphButton, &QToolButton::clicked, this, &MainWindow::openGraph);
-    layout->addWidget(graphButton);
+    graphButton_ = headerButton(QStringLiteral("graph"), tr("NetGraph"));
+    connect(graphButton_, &QToolButton::clicked, this, &MainWindow::openGraph);
+    layout->addWidget(graphButton_);
     auto* lockButton = headerButton(QStringLiteral("lock"), tr("Lock vault"));
     connect(lockButton, &QToolButton::clicked, this, &MainWindow::lockVault);
     layout->addWidget(lockButton);
@@ -535,7 +542,7 @@ void MainWindow::selectEntryNamed(const QString& name) {
 // The window is rebuilt from scratch on every open, so it always
 // shows a fresh snapshot of the vault.
 void MainWindow::openGraph() {
-    if (lockScreen_->isVisible())
+    if (graphsettings::disabled() || lockScreen_->isVisible())
         return;
     if (graph_) {
         graph_->raise();
@@ -548,6 +555,16 @@ void MainWindow::openGraph() {
     connect(graph_, &GraphWindow::nodeActivated, this, &MainWindow::revealInVault);
     graph_->resize(900, 640);
     graph_->show();
+}
+
+void MainWindow::syncNetGraphAvailability() {
+    const bool isDisabled = graphsettings::disabled();
+    if (graphButton_)
+        graphButton_->setVisible(!graphsettings::hideIcon());
+    if (graphShortcut_)
+        graphShortcut_->setEnabled(!isDisabled);
+    if (isDisabled && graph_)
+        graph_->close();
 }
 
 // Jump to a spot in the vault — from a graph-node click or a search

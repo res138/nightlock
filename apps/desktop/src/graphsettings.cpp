@@ -5,6 +5,10 @@
 namespace graphsettings {
 namespace {
 
+constexpr auto kDisabledKey = "netgraph/disabled";
+constexpr auto kHideIconKey = "netgraph/hide-icon";
+constexpr auto kHideButtonKey = "netgraph/hide-button";
+
 struct Default {
     const char* key;
     qreal value;
@@ -36,6 +40,57 @@ Config& cache() {
 }
 
 }  // namespace
+
+bool disabled() {
+    return QSettings().value(QLatin1String(kDisabledKey), false).toBool();
+}
+
+bool hideIcon() {
+    return disabled() || QSettings().value(QLatin1String(kHideIconKey), false).toBool();
+}
+
+bool hideButton() {
+    return disabled() || QSettings().value(QLatin1String(kHideButtonKey), false).toBool();
+}
+
+void setDisabled(bool isDisabled) {
+    QSettings settings;
+    bool changed = settings.value(QLatin1String(kDisabledKey), false).toBool() != isDisabled;
+    if (changed)
+        settings.setValue(QLatin1String(kDisabledKey), isDisabled);
+    if (isDisabled) {
+        if (!settings.value(QLatin1String(kHideIconKey), false).toBool()) {
+            settings.setValue(QLatin1String(kHideIconKey), true);
+            changed = true;
+        }
+        if (!settings.value(QLatin1String(kHideButtonKey), false).toBool()) {
+            settings.setValue(QLatin1String(kHideButtonKey), true);
+            changed = true;
+        }
+    }
+    if (changed)
+        notifier()->notify();
+}
+
+void setHideIcon(bool hidden) {
+    if (disabled() && !hidden)
+        return;
+    QSettings settings;
+    if (settings.value(QLatin1String(kHideIconKey), false).toBool() == hidden)
+        return;
+    settings.setValue(QLatin1String(kHideIconKey), hidden);
+    notifier()->notify();
+}
+
+void setHideButton(bool hidden) {
+    if (disabled() && !hidden)
+        return;
+    QSettings settings;
+    if (settings.value(QLatin1String(kHideButtonKey), false).toBool() == hidden)
+        return;
+    settings.setValue(QLatin1String(kHideButtonKey), hidden);
+    notifier()->notify();
+}
 
 Config config() {
     return cache();

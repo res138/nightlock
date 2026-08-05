@@ -9,6 +9,7 @@ class QHBoxLayout;
 class QLabel;
 class QListView;
 class QMenu;
+class QShortcut;
 class QSplitter;
 class QToolButton;
 class QVariantAnimation;
@@ -157,6 +158,7 @@ private:
 
     void openGraph();
     void refreshGraph();
+    void syncNetGraphAvailability();
     SearchWindow* openSearch();
     SettingsWindow* openSettings();
     void lockVault();
@@ -187,8 +189,10 @@ private:
     QLabel* pathLabel_;
     QHBoxLayout* listHeaderLayout_;
     QToolButton* filterButton_;
+    QToolButton* graphButton_ = nullptr;
     QToolButton* reopenTreeButton_;   // lives in the list header, shown
                                       // only while the tree pane is hidden
+    QShortcut* graphShortcut_ = nullptr;
     EntryDetailView* detail_;
     GraphWindow* graph_ = nullptr;     // the one graph window, if open
     SearchWindow* search_ = nullptr;   // the one search window, if open

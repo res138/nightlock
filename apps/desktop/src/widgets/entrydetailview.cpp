@@ -13,6 +13,7 @@
 #include <QVBoxLayout>
 
 #include "appearancesettings.hpp"
+#include "graphsettings.hpp"
 
 #include <array>
 
@@ -240,6 +241,12 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
             });
     graphButton_->setIconSize(QSize(17, 17));
     connect(graphButton_, &QPushButton::clicked, this, &EntryDetailView::graphRequested);
+    const auto syncGraphButton = [this] {
+        graphButton_->setVisible(!graphsettings::hideButton());
+    };
+    connect(graphsettings::notifier(), &graphsettings::Notifier::changed, this,
+            syncGraphButton);
+    syncGraphButton();
     layout->addWidget(graphButton_);
 
     layout->addStretch(1);

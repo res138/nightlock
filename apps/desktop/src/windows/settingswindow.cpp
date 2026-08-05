@@ -71,6 +71,7 @@ protected:
     void paintEvent(QPaintEvent*) override {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
+        painter.setOpacity(isEnabled() ? 1.0 : 0.45);
         const QColor off = appearancesettings::palette().toggleOff;
         const QColor on = appearancesettings::accentColor();
         const auto lerp = [this](int a, int b) { return a + qRound((b - a) * pos_); };
@@ -678,6 +679,47 @@ QWidget* SettingsWindow::buildHotkeysPage() {
 QWidget* SettingsWindow::buildGraphPage() {
     QVBoxLayout* column = nullptr;
     QWidget* page = makePage(column);
+
+    // Master availability controls sit first and separately from the
+    // graph's simulation/edge configuration. The master switch forces
+    // both entry points hidden and locks their switches until NetGraph
+    // is enabled again.
+    QVBoxLayout* availability = nullptr;
+    QFrame* availabilityCard = makeCard(availability);
+    auto* disableGraph = new ToggleSwitch(graphsettings::disabled());
+    auto* hideIcon = new ToggleSwitch(graphsettings::hideIcon());
+    auto* hideButton = new ToggleSwitch(graphsettings::hideButton());
+
+    const auto syncAvailability = [hideIcon, hideButton](bool disabled) {
+        if (disabled) {
+            hideIcon->setChecked(true);
+            hideButton->setChecked(true);
+        }
+        hideIcon->setEnabled(!disabled);
+        hideButton->setEnabled(!disabled);
+        hideIcon->setCursor(disabled ? Qt::ArrowCursor : Qt::PointingHandCursor);
+        hideButton->setCursor(disabled ? Qt::ArrowCursor : Qt::PointingHandCursor);
+    };
+
+    connect(disableGraph, &QAbstractButton::toggled, disableGraph,
+            [syncAvailability](bool disabled) {
+                graphsettings::setDisabled(disabled);
+                syncAvailability(disabled);
+            });
+    connect(hideIcon, &QAbstractButton::toggled, hideIcon,
+            [](bool hidden) { graphsettings::setHideIcon(hidden); });
+    connect(hideButton, &QAbstractButton::toggled, hideButton,
+            [](bool hidden) { graphsettings::setHideButton(hidden); });
+
+    addRow(availability, tr("Disable NetGraph"),
+           tr("Turn off NetGraph completely, including its hotkey."), disableGraph);
+    addRow(availability, tr("Hide NetGraph Icon"),
+           tr("Hide the NetGraph icon above the directories."), hideIcon);
+    addRow(availability, tr("Hide NetGraph Button"),
+           tr("Hide Show in NetGraph in the entry viewer."), hideButton);
+    finishCard(availability);
+    syncAvailability(disableGraph->isChecked());
+    column->addWidget(availabilityCard);
 
     // The force-simulation knobs, applied to an open graph live.
     QVBoxLayout* forces = nullptr;
