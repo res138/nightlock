@@ -33,6 +33,12 @@ inline constexpr std::uint16_t kTagEntryIcon = 0x0307;
 inline constexpr std::uint16_t kTagEntryNote = 0x0308;
 inline constexpr std::uint16_t kTagEntryCode = 0x0309;
 inline constexpr std::uint16_t kTagEntryPattern = 0x030A;
+inline constexpr std::uint16_t kTagEntryPreset = 0x030B;
+inline constexpr std::uint16_t kTagEntryField = 0x030C;
+inline constexpr std::uint16_t kTagFieldLabel = 0x0C01;
+inline constexpr std::uint16_t kTagFieldValue = 0x0C02;
+inline constexpr std::uint16_t kTagFieldSecret = 0x0C03;
+inline constexpr std::uint16_t kTagFieldCustom = 0x0C04;
 
 enum class ParseResult {
     Ok,

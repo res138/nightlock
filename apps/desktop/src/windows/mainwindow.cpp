@@ -1074,7 +1074,8 @@ void MainWindow::editEntry(nightlock::Entry* entry) {
     const bool changed = entry->name != before.name || entry->login != before.login ||
                          entry->password != before.password || entry->url != before.url ||
                          entry->note != before.note || entry->icon != before.icon ||
-                         entry->pattern != before.pattern;
+                         entry->pattern != before.pattern || entry->preset != before.preset ||
+                         entry->fields != before.fields;
     if (changed) {
         entry->modified = std::chrono::system_clock::now();
         VaultService::instance()->markDirty();

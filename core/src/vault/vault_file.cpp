@@ -49,6 +49,8 @@ void wipeTree(Group& group) {
     for (const auto& entry : group.entries()) {
         secure::wipe(entry->password);
         secure::wipe(entry->code);
+        for (EntryField& field : entry->fields)
+            secure::wipe(field.value);
     }
     for (const auto& child : group.groups())
         wipeTree(*child);

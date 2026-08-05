@@ -15,6 +15,9 @@ public:
     explicit CopyLabel(QWidget* parent = nullptr);
 
     void setText(const QString& text);
+    void setClipboardText(const QString& text);
+    void setLeadingIconVisible(bool visible);
+    void setContentAlignment(Qt::Alignment alignment);
 
     // Also used by the NIGHTLOCK_TEST_SPOILER hook.
     void copyAndFlash();
@@ -27,7 +30,10 @@ protected:
 
 private:
     QString text_;
+    QString clipboardText_;
     QTimer* hold_;
     QVariantAnimation* flash_;
+    bool leadingIconVisible_ = false;
+    Qt::Alignment contentAlignment_ = Qt::AlignRight;
     qreal copied_ = 0;  // 0..1 crossfade to the "Copied" flash
 };

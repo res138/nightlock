@@ -26,6 +26,7 @@
 
 #include "appearancesettings.hpp"
 #include "fonts.hpp"
+#include "generalsettings.hpp"
 #include "graphsettings.hpp"
 #include "hotkeys.hpp"
 #include "vaultservice.hpp"
@@ -419,6 +420,18 @@ QWidget* SettingsWindow::buildGeneralPage() {
 
     addRow(rows, tr("Language"), tr("Changes the interface language."),
            new DropdownButton({tr("English")}, 0));
+
+    auto* presets = new ToggleSwitch(generalsettings::presetsEnabled());
+    connect(presets, &QAbstractButton::toggled, presets,
+            [](bool enabled) { generalsettings::setPresetsEnabled(enabled); });
+    addRow(rows, tr("Enable Presets"),
+           tr("Show preset selection when creating an entry."), presets);
+
+    auto* customFields = new ToggleSwitch(generalsettings::allowCustomFields());
+    connect(customFields, &QAbstractButton::toggled, customFields,
+            [](bool allowed) { generalsettings::setAllowCustomFields(allowed); });
+    addRow(rows, tr("Allow custom fields"),
+           tr("Allow entry forms to add and remove user-defined fields."), customFields);
     finishCard(rows);
 
     column->addWidget(card);

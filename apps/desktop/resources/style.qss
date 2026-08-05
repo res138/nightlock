@@ -97,17 +97,35 @@ QFrame#card {
     border: 1px solid @border-soft;
     border-radius: 9px;
 }
+QFrame#seedStack {
+    background: transparent;
+    border: none;
+}
+QFrame#seedWordsCard {
+    background: @bg-card;
+    border: 1px solid @border-soft;
+    border-radius: 9px;
+}
+QFrame#seedCopyInset {
+    background: transparent;
+    border: none;
+}
+QFrame#seedCopyBar {
+    background: @bg-card;
+    border: 1px solid @border-soft;
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
 QFrame#fieldRow {
     border: none;
-    border-bottom: 1px solid @border-row;
     background: transparent;
 }
-QFrame#fieldRow[lastVisible="true"] {
-    border-bottom: none;
-}
-QFrame#fieldRowLast {
+QFrame#fieldSeparator {
     border: none;
-    background: transparent;
+    background: @border-row;
 }
 QLabel#fieldLabel {
     font-size: 12px;
@@ -154,11 +172,6 @@ QDialog#entryEditDialog QPlainTextEdit {
     selection-background-color: @accent;
     selection-color: @accent-text;
 }
-QDialog#entryEditDialog QLineEdit:focus,
-QDialog#entryEditDialog QPlainTextEdit:focus {
-    background: @bg-input-focus;
-    border: 1px solid @accent;
-}
 QToolButton#iconPickerButton {
     background: transparent;
     border: none;
@@ -201,6 +214,22 @@ QToolButton#iconPickerAdd {
     font-size: 20px;
     color: @text-strong;
 }
+QPushButton#customFieldAdd {
+    background: transparent;
+    border: none;
+    padding: 2px 0;
+    color: @text;
+    font-size: 12px;
+    font-weight: 600;
+}
+QPushButton#customFieldRemove {
+    background: transparent;
+    border: none;
+    color: @text-muted;
+    font-size: 20px;
+    min-width: 24px;
+    max-width: 24px;
+}
 
 QWidget#searchWindow {
     background: @bg;
@@ -236,9 +265,6 @@ QListView#iconGallery {
 }
 QListView#iconGallery::item {
     border-radius: 9px;
-}
-QListView#iconGallery::item:hover {
-    background: @overlay-hover;
 }
 
 QScrollArea[floatingWindow="true"] {

@@ -22,8 +22,12 @@ public:
     void reveal();
     void copyAndFlash();
     void conceal();
+    void setCoordinatedReveal(bool enabled);
 
     QSize sizeHint() const override;
+
+signals:
+    void revealRequested();
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -54,6 +58,7 @@ private:
     QTimer* copiedHold_;
     QVariantAnimation* revealAnimation_ = nullptr;
     QVariantAnimation* copiedAnimation_ = nullptr;
+    bool coordinatedReveal_ = false;
     qreal reveal_ = 0;  // 0 = particle cloud, 1 = secret shown
     qreal copied_ = 0;  // 0..1 crossfade to the "Copied" flash
 };

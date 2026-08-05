@@ -43,6 +43,8 @@ void checkEqual(const Group& a, const Group& b) {
         CHECK(x.note == y.note);
         CHECK(x.code == y.code);
         CHECK(x.pattern == y.pattern);
+        CHECK(x.preset == y.preset);
+        CHECK(x.fields == y.fields);
     }
     REQUIRE(a.groups().size() == b.groups().size());
     for (std::size_t i = 0; i < a.groups().size(); ++i)
@@ -65,6 +67,17 @@ TEST_CASE("vault round-trips through the payload") {
     full.note = "primary account";
     full.code = "803 059";
     full.pattern = Pattern::Halo;
+    full.preset = EntryPreset::BankCard;
+    EntryField cardholder;
+    cardholder.label = "Cardholder Name";
+    cardholder.value = "Octo Cat";
+    full.fields.push_back(std::move(cardholder));
+    EntryField cvv;
+    cvv.label = "CVV";
+    cvv.value = "123";
+    cvv.secret = true;
+    cvv.custom = true;
+    full.fields.push_back(std::move(cvv));
     banking.addEntry(std::move(full));
 
     banking.addEntry(makeEntry("Zeta"));   // order matters:

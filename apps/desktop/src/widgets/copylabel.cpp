@@ -47,6 +47,7 @@ CopyLabel::CopyLabel(QWidget* parent) : QWidget(parent) {
 
 void CopyLabel::setText(const QString& text) {
     text_ = text;
+    clipboardText_ = text;
     hold_->stop();
     flash_->stop();
     copied_ = 0;
@@ -54,8 +55,25 @@ void CopyLabel::setText(const QString& text) {
     update();
 }
 
+void CopyLabel::setClipboardText(const QString& text) {
+    clipboardText_ = text;
+}
+
+void CopyLabel::setLeadingIconVisible(bool visible) {
+    if (leadingIconVisible_ == visible)
+        return;
+    leadingIconVisible_ = visible;
+    updateGeometry();
+    update();
+}
+
+void CopyLabel::setContentAlignment(Qt::Alignment alignment) {
+    contentAlignment_ = alignment;
+    update();
+}
+
 void CopyLabel::copyAndFlash() {
-    QGuiApplication::clipboard()->setText(text_);
+    QGuiApplication::clipboard()->setText(clipboardText_);
     flash_->stop();
     flash_->setStartValue(copied_);
     flash_->setEndValue(1.0);
@@ -65,31 +83,54 @@ void CopyLabel::copyAndFlash() {
 
 QSize CopyLabel::sizeHint() const {
     const int text = QFontMetrics(font()).horizontalAdvance(text_);
-    return {qBound(70, text + 8, 260), kHeight};
+    constexpr int kIconSize = 13;
+    constexpr int kGap = 5;
+    const int iconWidth = leadingIconVisible_ ? kIconSize + kGap : 0;
+    return {qBound(70, text + iconWidth + 8, 260), kHeight};
 }
 
 void CopyLabel::paintEvent(QPaintEvent*) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
+    constexpr int kIconSize = 13;
+    constexpr int kGap = 5;
+    static const QIcon copyIcon =
+        appearancesettings::themedMenuIcon(QStringLiteral("copy"));
+    const auto alignedX = [this](int contentWidth) {
+        if (contentAlignment_.testFlag(Qt::AlignHCenter))
+            return (width() - contentWidth) / 2;
+        if (contentAlignment_.testFlag(Qt::AlignLeft))
+            return 0;
+        return width() - contentWidth;
+    };
 
     if (copied_ < 1.0) {
         painter.setOpacity(1.0 - copied_);
         painter.setPen(textColor());
-        painter.drawText(rect(), Qt::AlignRight | Qt::AlignVCenter | Qt::TextSingleLine,
-                         text_);
+        if (leadingIconVisible_) {
+            const QFontMetrics metrics(font());
+            const int textWidth = metrics.horizontalAdvance(text_);
+            const int x = alignedX(textWidth + kGap + kIconSize);
+            copyIcon.paint(&painter,
+                           QRect(x, (height() - kIconSize) / 2, kIconSize, kIconSize));
+            painter.drawText(QRect(x + kIconSize + kGap, 0, textWidth, height()),
+                             Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine,
+                             text_);
+        } else {
+            painter.drawText(rect(), contentAlignment_ | Qt::AlignVCenter |
+                                         Qt::TextSingleLine,
+                             text_);
+        }
     }
 
     if (copied_ > 0.0) {
         painter.setOpacity(copied_);
         const QString label = QStringLiteral("Copied");
         const QFontMetrics metrics(font());
-        constexpr int kIconSize = 13;
-        constexpr int kGap = 5;
         const int textWidth = metrics.horizontalAdvance(label);
         const qreal slide = (1.0 - copied_) * 4.0;  // gentle rise-in
-        const int x = width() - textWidth - kGap - kIconSize;
+        const int x = alignedX(textWidth + kGap + kIconSize);
         const QRectF iconRect(x, (height() - kIconSize) / 2.0 + slide, kIconSize, kIconSize);
-        static const QIcon copyIcon = appearancesettings::themedMenuIcon(QStringLiteral("copy"));
         copyIcon.paint(&painter, iconRect.toRect());
         painter.setPen(textColor());
         painter.drawText(QRectF(x + kIconSize + kGap, slide, textWidth, height()),

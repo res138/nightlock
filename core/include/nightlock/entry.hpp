@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <string>
+#include <vector>
 
 #include "secure.hpp"
 
@@ -24,9 +25,34 @@ enum class Pattern {
     Halo,           // halftone dot grid peaking on a ring around the icon
 };
 
-// Classic password entry. name, login, password and both dates are
-// required; the rest is optional and empty when unset. The secret
-// fields live in secure::String — pinned pages, zeroized on free.
+// The form used when an entry was created. Classic keeps the original
+// Nightlock fields; the other presets only change labels and add a
+// small schema of extra fields. The selector itself is Add-only, but
+// the id is stored so Edit and the detail viewer keep the right labels.
+enum class EntryPreset {
+    Classic = 0,
+    Wifi,
+    BankCard,
+    BrowserBookmark,
+    CryptoWallet,
+};
+
+// One preset-defined or user-defined field. Values use secure storage
+// because a custom field can contain secrets even when its current
+// display mode is plain text.
+struct EntryField {
+    std::string label;
+    secure::String value;
+    bool secret = false;
+    bool custom = false;
+
+    bool operator==(const EntryField&) const = default;
+};
+
+// Password-manager entry. Name and dates form the common core; a
+// preset gives the classic fields contextual labels and may add more
+// fields. Secret values live in secure::String — pinned pages and
+// explicitly wiped when the vault locks.
 struct Entry {
     std::string name;
     std::string login;
@@ -39,6 +65,8 @@ struct Entry {
     std::string note;
     secure::String code;  // 2FA one-time code
     Pattern pattern = Pattern::None;  // detail-view background pattern
+    EntryPreset preset = EntryPreset::Classic;
+    std::vector<EntryField> fields;
 };
 
 }  // namespace nightlock

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QList>
 #include <QScrollArea>
 
 class CopyLabel;
@@ -61,10 +62,14 @@ protected:
 private:
     struct FieldRow {
         QFrame* frame = nullptr;
+        QFrame* separator = nullptr;
+        QLabel* name = nullptr;
         QLabel* value = nullptr;
         QHBoxLayout* layout = nullptr;
     };
     FieldRow makeRow(QVBoxLayout* cardLayout, const QString& label, bool last = false);
+    void applyPresetLabels(int preset);
+    void clearAdditionalFields();
     void refreshUrlText();
     void refreshLastVisibleRow();
     void updatePatternGeometry();
@@ -80,6 +85,14 @@ private:
     QLabel* titleLabel_;
     QLabel* noteLabel_;
     QFrame* fieldsCard_;
+    QVBoxLayout* fieldsLayout_;
+    QWidget* seedSection_;
+    QLabel* seedHeader_;
+    QFrame* seedCard_;
+    CopyLabel* seedCopy_;
+    QVBoxLayout* seedFieldsLayout_;
+    QWidget* customSection_;
+    QVBoxLayout* customFieldsLayout_;
     QLabel* metaHeader_;  // pattern-zone anchor when the card hides
     PatternBackdrop* patternBackdrop_;
     FieldRow loginRow_;
@@ -89,6 +102,10 @@ private:
     FieldRow urlRow_;
     QString url_;  // shown link, re-colored on a theme switch
     FieldRow codeRow_;
+    QList<FieldRow> additionalRows_;
+    QList<FieldRow> seedRows_;
+    QList<SpoilerLabel*> seedSpoilers_;
+    QList<FieldRow> customRows_;
     FieldRow createdRow_;
     FieldRow modifiedRow_;
     QPushButton* graphButton_;

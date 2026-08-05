@@ -1,6 +1,7 @@
 #include "iconpicker.hpp"
 
 #include <QButtonGroup>
+#include <QFile>
 #include <QFileInfo>
 #include <QGridLayout>
 #include <QIcon>
@@ -41,7 +42,8 @@ IconPicker::IconPicker(QWidget* parent)
     defaultButton->setToolTip(fallback.title);
     buttons_->addButton(defaultButton, 0);
 
-    // The user's fifteen most recent gallery picks.
+    // The user's fourteen most recent gallery picks. Together with
+    // the default icon, this keeps the main picker at 15 choices.
     for (const QString& path : standardicons::recentIconPaths()) {
         auto* button = makeIconButton();
         button->setIcon(QIcon(path));
@@ -73,6 +75,10 @@ QString IconPicker::selectedIconValue() const {
 }
 
 void IconPicker::setSelectedIconValue(const QString& value) {
+    if (!value.isEmpty() && !QFile::exists(value)) {
+        buttons_->button(0)->setChecked(true);
+        return;
+    }
     const int id = static_cast<int>(values_.indexOf(value));
     if (id >= 0) {
         buttons_->button(id)->setChecked(true);

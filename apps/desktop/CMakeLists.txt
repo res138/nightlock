@@ -8,6 +8,7 @@ qt_add_executable(nightlock-desktop
     src/demovault.cpp
     src/appearancesettings.cpp
     src/fonts.cpp
+    src/generalsettings.cpp
     src/graphsettings.cpp
     src/hotkeys.cpp
     src/respaths.cpp

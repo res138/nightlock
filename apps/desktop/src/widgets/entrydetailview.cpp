@@ -15,8 +15,6 @@
 #include "appearancesettings.hpp"
 #include "graphsettings.hpp"
 
-#include <array>
-
 #include <nightlock/entry.hpp>
 
 #include "copylabel.hpp"
@@ -178,29 +176,92 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
 
     fieldsCard_ = new QFrame;
     fieldsCard_->setObjectName(QStringLiteral("card"));
-    auto* fieldsLayout = new QVBoxLayout(fieldsCard_);
-    fieldsLayout->setContentsMargins(16, 2, 16, 2);
-    fieldsLayout->setSpacing(0);
-    loginRow_ = makeRow(fieldsLayout, tr("Login"));
+    fieldsLayout_ = new QVBoxLayout(fieldsCard_);
+    fieldsLayout_->setContentsMargins(16, 2, 16, 2);
+    fieldsLayout_->setSpacing(0);
+    loginRow_ = makeRow(fieldsLayout_, tr("Login"));
     // The login copies on click with the same "Copied" flash as the
     // password (just without the spoiler).
     loginRow_.value->hide();
     loginCopy_ = new CopyLabel;
     loginRow_.layout->addWidget(loginCopy_);
-    passwordRow_ = makeRow(fieldsLayout, tr("Password"));
+    passwordRow_ = makeRow(fieldsLayout_, tr("Password"));
     // The password hides behind a Telegram-style particle spoiler
     // instead of asterisks.
     passwordRow_.value->hide();
     passwordSpoiler_ = new SpoilerLabel;
     passwordRow_.layout->addWidget(passwordSpoiler_);
-    urlRow_ = makeRow(fieldsLayout, tr("URL"));
+    urlRow_ = makeRow(fieldsLayout_, tr("URL"));
     urlRow_.value->setTextFormat(Qt::RichText);
     urlRow_.value->setTextInteractionFlags(Qt::TextBrowserInteraction);
     urlRow_.value->setOpenExternalLinks(true);
-    codeRow_ = makeRow(fieldsLayout, tr("Code"));
+    codeRow_ = makeRow(fieldsLayout_, tr("Code"));
     codeRow_.layout->insertWidget(codeRow_.layout->count() - 1, new TotpRing);
     layout->addWidget(fieldsCard_);
     layout->addSpacing(kSectionGap);
+
+    seedSection_ = new QWidget;
+    auto* seedSectionLayout = new QVBoxLayout(seedSection_);
+    seedSectionLayout->setContentsMargins(0, 0, 0, 0);
+    seedSectionLayout->setSpacing(12);
+    seedHeader_ = new QLabel(tr("Seedphrase"));
+    seedHeader_->setObjectName(QStringLiteral("metaHeader"));
+    seedSectionLayout->addWidget(seedHeader_);
+    seedCard_ = new QFrame;
+    seedCard_->setObjectName(QStringLiteral("seedStack"));
+    auto* seedCardLayout = new QVBoxLayout(seedCard_);
+    seedCardLayout->setContentsMargins(0, 0, 0, 0);
+    seedCardLayout->setSpacing(0);
+    auto* seedCopyInset = new QFrame;
+    seedCopyInset->setObjectName(QStringLiteral("seedCopyInset"));
+    auto* seedCopyInsetLayout = new QHBoxLayout(seedCopyInset);
+    seedCopyInsetLayout->setContentsMargins(18, 0, 18, 0);
+    seedCopyInsetLayout->setSpacing(0);
+    auto* seedCopyBar = new QFrame;
+    seedCopyBar->setObjectName(QStringLiteral("seedCopyBar"));
+    auto* seedCopyLayout = new QHBoxLayout(seedCopyBar);
+    seedCopyLayout->setContentsMargins(14, 7, 14, 7);
+    seedCopyLayout->setSpacing(0);
+    seedCopy_ = new CopyLabel;
+    seedCopy_->setText(tr("Copy phrase"));
+    seedCopy_->setLeadingIconVisible(true);
+    seedCopy_->setContentAlignment(Qt::AlignCenter);
+    seedCopy_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    seedCopyLayout->addWidget(seedCopy_);
+    seedCopyInsetLayout->addWidget(seedCopyBar);
+    seedCardLayout->addWidget(seedCopyInset);
+    auto* seedRows = new QFrame;
+    seedRows->setObjectName(QStringLiteral("seedWordsCard"));
+    seedFieldsLayout_ = new QVBoxLayout(seedRows);
+    seedFieldsLayout_->setContentsMargins(16, 2, 16, 2);
+    seedFieldsLayout_->setSpacing(0);
+    seedCardLayout->addWidget(seedRows);
+    seedSectionLayout->addWidget(seedCard_);
+    seedSectionLayout->addSpacing(kSectionGap);
+    layout->addWidget(seedSection_);
+    seedSection_->hide();
+
+    const auto makeSection = [layout](const QString& title, QWidget*& section,
+                                      QLabel*& header, QVBoxLayout*& rows) {
+        section = new QWidget;
+        auto* sectionLayout = new QVBoxLayout(section);
+        sectionLayout->setContentsMargins(0, 0, 0, 0);
+        sectionLayout->setSpacing(12);
+        header = new QLabel(title);
+        header->setObjectName(QStringLiteral("metaHeader"));
+        sectionLayout->addWidget(header);
+        auto* card = new QFrame;
+        card->setObjectName(QStringLiteral("card"));
+        rows = new QVBoxLayout(card);
+        rows->setContentsMargins(16, 2, 16, 2);
+        rows->setSpacing(0);
+        sectionLayout->addWidget(card);
+        sectionLayout->addSpacing(kSectionGap);
+        layout->addWidget(section);
+        section->hide();
+    };
+    QLabel* customHeader = nullptr;
+    makeSection(tr("Custom"), customSection_, customHeader, customFieldsLayout_);
 
     metaHeader_ = new QLabel(tr("Meta"));
     metaHeader_->setObjectName(QStringLiteral("metaHeader"));
@@ -311,9 +372,13 @@ void EntryDetailView::updatePatternGeometry() {
         layout->activate();  // the card must sit at its final position
     // A fieldless entry hides the whole card; its stale geometry can't
     // anchor the zone, so the Meta header takes over.
-    const QWidget* below = fieldsCard_->isHidden()
-                               ? static_cast<const QWidget*>(metaHeader_)
-                               : fieldsCard_;
+    const QWidget* below = !fieldsCard_->isHidden()
+                               ? static_cast<const QWidget*>(fieldsCard_)
+                           : !seedSection_->isHidden()
+                               ? seedSection_
+                           : !customSection_->isHidden()
+                               ? customSection_
+                               : static_cast<const QWidget*>(metaHeader_);
     patternBackdrop_->setGeometry(0, 0, content_->width(), below->geometry().top());
     patternBackdrop_->setIconCenterY(iconLabel_->geometry().center().y());
 }
@@ -395,6 +460,7 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
                                                  iconLabel_->devicePixelRatioF()));
 
     titleLabel_->setText(QString::fromStdString(entry->name));
+    applyPresetLabels(static_cast<int>(entry->preset));
 
     noteLabel_->setVisible(!entry->note.empty());
     noteLabel_->setText(QString::fromStdString(entry->note));
@@ -414,8 +480,82 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     codeRow_.frame->setVisible(!entry->code.empty());
     codeRow_.value->setText(toQString(entry->code));
 
+    clearAdditionalFields();
+    QString cryptoAsset;
+    QStringList seedWords;
+    const auto populateRow = [](FieldRow& row, const nightlock::EntryField& field) {
+        if (field.secret) {
+            row.value->hide();
+            auto* spoiler = new SpoilerLabel;
+            spoiler->setSecret(toQString(field.value));
+            row.layout->addWidget(spoiler);
+        } else {
+            row.value->setText(toQString(field.value));
+        }
+    };
+    for (const nightlock::EntryField& field : entry->fields) {
+        if (field.value.empty())
+            continue;
+        if (entry->preset == nightlock::EntryPreset::CryptoWallet && !field.custom &&
+            field.label == "Coin") {
+            cryptoAsset = toQString(field.value);
+            continue;
+        }
+        if (entry->preset == nightlock::EntryPreset::CryptoWallet && !field.custom) {
+            bool isWord = false;
+            QString::fromStdString(field.label).toInt(&isWord);
+            if (!isWord)
+                continue;
+        }
+        if (field.custom) {
+            FieldRow row = makeRow(customFieldsLayout_, QString::fromStdString(field.label));
+            populateRow(row, field);
+            customRows_.append(row);
+        } else if (entry->preset == nightlock::EntryPreset::CryptoWallet) {
+            FieldRow row = makeRow(seedFieldsLayout_, QString::fromStdString(field.label));
+            row.value->hide();
+            auto* spoiler = new SpoilerLabel;
+            spoiler->setSecret(toQString(field.value));
+            spoiler->setCoordinatedReveal(true);
+            connect(spoiler, &SpoilerLabel::revealRequested, this, [this] {
+                for (SpoilerLabel* seedSpoiler : seedSpoilers_)
+                    seedSpoiler->reveal();
+            });
+            row.layout->addWidget(spoiler);
+            seedSpoilers_.append(spoiler);
+            seedWords.append(toQString(field.value));
+            seedRows_.append(row);
+        } else {
+            FieldRow row = makeRow(fieldsLayout_, QString::fromStdString(field.label));
+            populateRow(row, field);
+            additionalRows_.append(row);
+        }
+    }
+
+    const auto cryptoTitle = [](const QString& id) {
+        if (id == QLatin1String("eth")) return QStringLiteral("Ethereum");
+        if (id == QLatin1String("sol")) return QStringLiteral("Solana");
+        if (id == QLatin1String("bnb")) return QStringLiteral("BNB (BNB Smart Chain)");
+        if (id == QLatin1String("usdt-erc20")) return QStringLiteral("USDT (Ethereum ERC-20)");
+        if (id == QLatin1String("usdt-trc20")) return QStringLiteral("USDT (Tron TRC-20)");
+        if (id == QLatin1String("ada")) return QStringLiteral("Cardano");
+        if (id == QLatin1String("xmr")) return QStringLiteral("Monero");
+        return QStringLiteral("Bitcoin");
+    };
+    if (entry->preset == nightlock::EntryPreset::CryptoWallet && !cryptoAsset.isEmpty()) {
+        FieldRow row = makeRow(fieldsLayout_, tr("Currency"));
+        row.value->setText(cryptoTitle(cryptoAsset));
+        additionalRows_.append(row);
+    }
+    seedHeader_->setText(tr("Seedphrase"));
+    seedCopy_->setText(tr("Copy phrase"));
+    seedCopy_->setClipboardText(seedWords.join(QLatin1Char(' ')));
+    seedSection_->setVisible(!seedRows_.isEmpty());
+    customSection_->setVisible(!customRows_.isEmpty());
+
     fieldsCard_->setVisible(!entry->login.empty() || !entry->password.empty() ||
-                            !entry->url.empty() || !entry->code.empty());
+                            !entry->url.empty() || !entry->code.empty() ||
+                            !additionalRows_.isEmpty());
 
     createdRow_.value->setText(formatDate(entry->created));
     modifiedRow_.value->setText(formatDate(entry->modified));
@@ -429,43 +569,106 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
 // The last visible row of the fields card must not draw its bottom
 // border; which row that is depends on the entry's optional fields.
 void EntryDetailView::refreshLastVisibleRow() {
-    const std::array rows = {loginRow_.frame, passwordRow_.frame, urlRow_.frame, codeRow_.frame};
+    QList<FieldRow> rows = {loginRow_, passwordRow_, urlRow_, codeRow_};
+    for (const FieldRow& row : additionalRows_)
+        rows.append(row);
 
-    QFrame* lastVisible = nullptr;
-    for (auto* frame : rows)
-        if (!frame->isHidden())
-            lastVisible = frame;
-
-    for (auto* frame : rows) {
-        const bool isLast = frame == lastVisible;
-        if (frame->property("lastVisible").toBool() != isLast) {
-            frame->setProperty("lastVisible", isLast);
-            frame->style()->unpolish(frame);
-            frame->style()->polish(frame);
+    const auto updateSeparators = [](const QList<FieldRow>& cardRows) {
+        const QFrame* lastVisible = nullptr;
+        for (const FieldRow& row : cardRows)
+            if (!row.frame->isHidden())
+                lastVisible = row.frame;
+        for (const FieldRow& row : cardRows) {
+            const bool show = !row.frame->isHidden() && row.frame != lastVisible;
+            row.separator->setVisible(show);
         }
+    };
+    updateSeparators(rows);
+
+    QList<FieldRow> seedFrames;
+    for (const FieldRow& row : seedRows_)
+        seedFrames.append(row);
+    updateSeparators(seedFrames);
+
+    QList<FieldRow> customFrames;
+    for (const FieldRow& row : customRows_)
+        customFrames.append(row);
+    updateSeparators(customFrames);
+}
+
+void EntryDetailView::applyPresetLabels(int presetValue) {
+    const auto preset = static_cast<nightlock::EntryPreset>(presetValue);
+    QString login = tr("Login");
+    QString password = tr("Password");
+    QString url = tr("URL");
+    switch (preset) {
+        case nightlock::EntryPreset::Classic:
+            break;
+        case nightlock::EntryPreset::Wifi:
+            login = tr("SSID");
+            break;
+        case nightlock::EntryPreset::BankCard:
+            login = tr("Card Number");
+            password = tr("PIN");
+            break;
+        case nightlock::EntryPreset::BrowserBookmark:
+            break;
+        case nightlock::EntryPreset::CryptoWallet:
+            break;
     }
+    loginRow_.name->setText(login);
+    passwordRow_.name->setText(password);
+    urlRow_.name->setText(url);
+}
+
+void EntryDetailView::clearAdditionalFields() {
+    for (const FieldRow& row : additionalRows_)
+        delete row.frame;
+    for (const FieldRow& row : seedRows_)
+        delete row.frame;
+    for (const FieldRow& row : customRows_)
+        delete row.frame;
+    additionalRows_.clear();
+    seedRows_.clear();
+    seedSpoilers_.clear();
+    customRows_.clear();
+    seedSection_->hide();
+    customSection_->hide();
 }
 
 EntryDetailView::FieldRow EntryDetailView::makeRow(QVBoxLayout* cardLayout,
                                                    const QString& label, bool last) {
     FieldRow row;
     row.frame = new QFrame;
-    row.frame->setObjectName(last ? QStringLiteral("fieldRowLast")
-                                  : QStringLiteral("fieldRow"));
-    row.layout = new QHBoxLayout(row.frame);
+    row.frame->setObjectName(QStringLiteral("fieldRow"));
+    auto* rowLayout = new QVBoxLayout(row.frame);
+    rowLayout->setContentsMargins(0, 0, 0, 0);
+    rowLayout->setSpacing(0);
+
+    auto* content = new QWidget;
+    row.layout = new QHBoxLayout(content);
     row.layout->setContentsMargins(2, 13, 2, 13);
     row.layout->setSpacing(8);
 
-    auto* name = new QLabel(label);
-    name->setObjectName(QStringLiteral("fieldLabel"));
+    row.name = new QLabel(label);
+    row.name->setObjectName(QStringLiteral("fieldLabel"));
+    row.name->setTextFormat(Qt::PlainText);
     row.value = new QLabel;
     row.value->setObjectName(QStringLiteral("fieldValue"));
+    row.value->setTextFormat(Qt::PlainText);
     row.value->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     row.value->setTextInteractionFlags(Qt::TextSelectableByMouse);
 
-    row.layout->addWidget(name);
+    row.layout->addWidget(row.name);
     row.layout->addStretch(1);
     row.layout->addWidget(row.value);
+
+    rowLayout->addWidget(content);
+    row.separator = new QFrame;
+    row.separator->setObjectName(QStringLiteral("fieldSeparator"));
+    row.separator->setFixedHeight(1);
+    row.separator->setVisible(!last);
+    rowLayout->addWidget(row.separator);
 
     cardLayout->addWidget(row.frame);
     return row;

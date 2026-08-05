@@ -8,7 +8,7 @@ class QGridLayout;
 class QToolButton;
 
 // Exclusive grid of icon buttons for the entry dialog: the default
-// icon, up to ten recently used pack icons, and a trailing "+" button
+// icon, up to fourteen recently used pack icons, and a trailing "+" button
 // that requests one more from the gallery (the chosen icon appears as
 // an extra selectable button). Wraps into rows as the set grows.
 class IconPicker : public QWidget {
