@@ -306,6 +306,19 @@ int main(int argc, char* argv[]) {
         });
     }
 
+    // Debug hook: NIGHTLOCK_SCREENSHOT_GENERATOR=<path> opens the
+    // independent password generator, saves it and exits.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_GENERATOR")) {
+        QTimer::singleShot(800, &window, [&window] {
+            QWidget* generator = window.openPasswordGeneratorForScreenshot();
+            QTimer::singleShot(400, generator, [generator] {
+                generator->grab().save(
+                    qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_GENERATOR"));
+                QApplication::quit();
+            });
+        });
+    }
+
     // Debug hook: NIGHTLOCK_SCREENSHOT_SETTINGS=<path> opens the
     // Settings window, saves it and exits. NIGHTLOCK_SETTINGS_PAGE=<n>
     // picks the category row first (0-based, default General).

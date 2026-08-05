@@ -43,8 +43,8 @@ void stopGalleryPreload();
 // Pre-decoded image for a pack icon; null if not (yet) cached.
 QImage cachedGalleryImage(const QString& path);
 
-// The last icons the user picked (most recent first, up to 10),
-// persisted across runs.
+// The last icons the user picked (most recent first, up to 14),
+// persisted across runs. Missing files are pruned on read.
 QStringList recentIconPaths();
 void addRecentIconPath(const QString& path);
 

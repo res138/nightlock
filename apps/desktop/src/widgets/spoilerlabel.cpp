@@ -134,6 +134,10 @@ void SpoilerLabel::conceal() {
     animateReveal(0.0);
 }
 
+void SpoilerLabel::setCoordinatedReveal(bool enabled) {
+    coordinatedReveal_ = enabled;
+}
+
 void SpoilerLabel::animateReveal(qreal target) {
     if (qFuzzyCompare(reveal_, target))
         return;
@@ -243,6 +247,10 @@ void SpoilerLabel::resizeEvent(QResizeEvent* event) {
 void SpoilerLabel::mousePressEvent(QMouseEvent* event) {
     if (event->button() != Qt::LeftButton)
         return;
+    if (coordinatedReveal_) {
+        emit revealRequested();
+        return;
+    }
     if (reveal_ < 0.5)
         reveal();
     else
@@ -251,7 +259,8 @@ void SpoilerLabel::mousePressEvent(QMouseEvent* event) {
 
 void SpoilerLabel::leaveEvent(QEvent* event) {
     QWidget::leaveEvent(event);
-    conceal();
+    if (!coordinatedReveal_)
+        conceal();
 }
 
 void SpoilerLabel::hideEvent(QHideEvent* event) {

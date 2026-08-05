@@ -16,16 +16,11 @@
 namespace {
 
 constexpr int kFieldHeight = 34;   // matches the dialog line edits
-constexpr qreal kFieldRadius = 7;
-constexpr int kPadLeft = 10;
+constexpr int kPadLeft = 2;
 constexpr int kChevronPad = 14;    // chevron center inset from the right
 constexpr int kChevronMs = 130;    // same tempo as the NlMenu reveal
 
-// Theme-following looks of the closed field, matching the dialog's
-// line edits on either scheme.
-QColor fieldBackground() { return appearancesettings::palette().input; }
 QColor fieldBorder() { return appearancesettings::palette().border; }
-QColor openBorder() { return appearancesettings::palette().ink; }
 QColor fieldText() { return appearancesettings::palette().ink; }
 QColor chevronColor() { return appearancesettings::palette().muted; }
 
@@ -122,11 +117,9 @@ void PatternPicker::paintEvent(QPaintEvent*) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
 
-    // Same idle/focused looks as the dialog's QLineEdit fields.
-    painter.setPen(menuOpen_ ? openBorder() : fieldBorder());
-    painter.setBrush(menuOpen_ ? appearancesettings::palette().window : fieldBackground());
-    painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5),
-                            kFieldRadius, kFieldRadius);
+    painter.setPen(QPen(fieldBorder(), 1));
+    painter.drawLine(QPointF(0, height() - 0.5),
+                     QPointF(width(), height() - 0.5));
 
     painter.setPen(fieldText());
     painter.drawText(rect().adjusted(kPadLeft, 0, -2 * kChevronPad, 0),

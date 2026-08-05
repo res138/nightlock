@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QList>
 #include <QScrollArea>
 
 class CopyLabel;
@@ -13,6 +14,7 @@ class QVBoxLayout;
 class SpoilerLabel;
 
 namespace nightlock {
+enum class EntryColor;
 struct Entry;
 }
 
@@ -45,6 +47,8 @@ public:
 signals:
     // The pencil button in the top-right corner was clicked.
     void editRequested();
+    // The key button beside Edit opens the standalone generator.
+    void passwordGeneratorRequested();
     // The "Показать в графе" button under the meta card was clicked.
     void graphRequested();
     // The grip was dragged far enough while docked: float me.
@@ -61,16 +65,24 @@ protected:
 private:
     struct FieldRow {
         QFrame* frame = nullptr;
+        QFrame* separator = nullptr;
+        QLabel* name = nullptr;
         QLabel* value = nullptr;
         QHBoxLayout* layout = nullptr;
     };
     FieldRow makeRow(QVBoxLayout* cardLayout, const QString& label, bool last = false);
+    void applyPresetLabels(int preset);
+    void clearAdditionalFields();
     void refreshUrlText();
     void refreshLastVisibleRow();
+    void refreshCardColors();
+    void syncGeneratorVisibility();
     void updatePatternGeometry();
 
     QWidget* content_;
+    QWidget* headerFade_;
     QWidget* grip_;
+    QToolButton* generatorButton_;
     QToolButton* editButton_;
     QWidget* floatingControls_;
     QWidget* floatingBackdrop_;
@@ -80,6 +92,14 @@ private:
     QLabel* titleLabel_;
     QLabel* noteLabel_;
     QFrame* fieldsCard_;
+    QVBoxLayout* fieldsLayout_;
+    QWidget* seedSection_;
+    QLabel* seedHeader_;
+    QFrame* seedCard_;
+    CopyLabel* seedCopy_;
+    QVBoxLayout* seedFieldsLayout_;
+    QWidget* customSection_;
+    QVBoxLayout* customFieldsLayout_;
     QLabel* metaHeader_;  // pattern-zone anchor when the card hides
     PatternBackdrop* patternBackdrop_;
     FieldRow loginRow_;
@@ -88,7 +108,12 @@ private:
     SpoilerLabel* passwordSpoiler_;
     FieldRow urlRow_;
     QString url_;  // shown link, re-colored on a theme switch
+    nightlock::EntryColor entryColor_;
     FieldRow codeRow_;
+    QList<FieldRow> additionalRows_;
+    QList<FieldRow> seedRows_;
+    QList<SpoilerLabel*> seedSpoilers_;
+    QList<FieldRow> customRows_;
     FieldRow createdRow_;
     FieldRow modifiedRow_;
     QPushButton* graphButton_;

@@ -42,6 +42,23 @@ void writeEntry(TlvWriter& w, const Entry& entry) {
         w.string(kTagEntryCode, secure::view(entry.code));
     if (entry.pattern != Pattern::None)
         w.u32(kTagEntryPattern, static_cast<std::uint32_t>(entry.pattern));
+    if (entry.preset != EntryPreset::Classic)
+        w.u32(kTagEntryPreset, static_cast<std::uint32_t>(entry.preset));
+    if (entry.color != EntryColor::None)
+        w.u32(kTagEntryColor, static_cast<std::uint32_t>(entry.color));
+    for (const EntryField& field : entry.fields) {
+        if (field.label.empty())
+            continue;
+        const std::size_t fieldToken = w.beginContainer(kTagEntryField);
+        w.string(kTagFieldLabel, field.label);
+        if (!field.value.empty())
+            w.string(kTagFieldValue, secure::view(field.value));
+        if (field.secret)
+            w.u32(kTagFieldSecret, 1);
+        if (field.custom)
+            w.u32(kTagFieldCustom, 1);
+        w.endContainer(fieldToken);
+    }
     w.endContainer(token);
 }
 
@@ -56,6 +73,43 @@ void writeGroup(TlvWriter& w, const Group& group) {
     for (const auto& entry : group.entries())
         writeEntry(w, *entry);
     w.endContainer(token);
+}
+
+ParseResult readField(TlvReader records, Entry& entry) {
+    EntryField field;
+    while (records.next()) {
+        switch (records.tag()) {
+            case kTagFieldLabel:
+                field.label = std::string(records.valueString());
+                break;
+            case kTagFieldValue:
+                field.value.assign(records.valueString());
+                break;
+            case kTagFieldSecret: {
+                const auto value = records.valueU32();
+                if (!value)
+                    return ParseResult::Malformed;
+                field.secret = *value != 0;
+                break;
+            }
+            case kTagFieldCustom: {
+                const auto value = records.valueU32();
+                if (!value)
+                    return ParseResult::Malformed;
+                field.custom = *value != 0;
+                break;
+            }
+            default:
+                if (records.tag() & kCriticalTagBit)
+                    return ParseResult::Unsupported;
+                break;
+        }
+    }
+    if (records.malformed())
+        return ParseResult::Malformed;
+    if (!field.label.empty())
+        entry.fields.push_back(std::move(field));
+    return ParseResult::Ok;
 }
 
 ParseResult readEntry(TlvReader records, Group& parent) {
@@ -106,6 +160,30 @@ ParseResult readEntry(TlvReader records, Group& parent) {
                 entry.pattern = *value <= static_cast<std::uint32_t>(Pattern::Halo)
                                     ? static_cast<Pattern>(*value)
                                     : Pattern::None;
+                break;
+            }
+            case kTagEntryPreset: {
+                const auto value = records.valueU32();
+                if (!value)
+                    return ParseResult::Malformed;
+                entry.preset = *value <= static_cast<std::uint32_t>(EntryPreset::CryptoWallet)
+                                   ? static_cast<EntryPreset>(*value)
+                                   : EntryPreset::Classic;
+                break;
+            }
+            case kTagEntryColor: {
+                const auto value = records.valueU32();
+                if (!value)
+                    return ParseResult::Malformed;
+                entry.color = *value <= static_cast<std::uint32_t>(EntryColor::Purple)
+                                  ? static_cast<EntryColor>(*value)
+                                  : EntryColor::None;
+                break;
+            }
+            case kTagEntryField: {
+                const ParseResult field = readField(records.container(), entry);
+                if (field != ParseResult::Ok)
+                    return field;
                 break;
             }
             default:

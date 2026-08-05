@@ -3,10 +3,9 @@
 #include <QObject>
 #include <QString>
 
-// Numeric knobs of the NetGraph force simulation, edited on the
-// Settings → NetGraph page. Values persist via QSettings and reach a
-// running simulation immediately: it reads config() every tick, and
-// notifier() lets views re-warm their layout on a change.
+// NetGraph availability and numeric force-simulation knobs, edited on
+// the Settings → NetGraph page. Values persist via QSettings and
+// notifier() lets every affected view update immediately.
 namespace graphsettings {
 
 // Field keys — also the QSettings suffixes under "netgraph/".
@@ -14,6 +13,16 @@ inline constexpr const char* kCenterForce = "center-force";
 inline constexpr const char* kRepelForce = "repel-force";
 inline constexpr const char* kLinkForce = "link-force";
 inline constexpr const char* kLinkDistance = "link-distance";
+
+// Availability switches. Disabling NetGraph forces both presentation
+// switches on and prevents them from being cleared until it is enabled
+// again.
+bool disabled();
+bool hideIcon();
+bool hideButton();
+void setDisabled(bool disabled);
+void setHideIcon(bool hidden);
+void setHideButton(bool hidden);
 
 struct Config {
     qreal centerForce;   // pull toward the canvas center

@@ -19,6 +19,7 @@
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QScrollBar>
+#include <QShortcut>
 #include <QStyle>
 #include <QTimer>
 #include <QToolButton>
@@ -34,6 +35,8 @@
 #include <nightlock/group.hpp>
 
 #include "appearancesettings.hpp"
+#include "generalsettings.hpp"
+#include "graphsettings.hpp"
 #include "hotkeys.hpp"
 #include "models/grouptreemodel.hpp"
 #include "qsecure.hpp"
@@ -50,6 +53,7 @@
 #include "windows/entryeditdialog.hpp"
 #include "windows/graphwindow.hpp"
 #include "windows/lockscreen.hpp"
+#include "windows/passwordgeneratorwindow.hpp"
 #include "windows/settingswindow.hpp"
 
 #ifdef Q_OS_MACOS
@@ -223,8 +227,12 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
                   });
     hotkeys::bind(QStringLiteral("search"), tr("Search"), QKeySequence(QKeySequence::Find), this,
                   [this] { openSearch(); });
-    hotkeys::bind(QStringLiteral("graph"), tr("NetGraph view"),
-                  QKeySequence(QStringLiteral("Ctrl+G")), this, [this] { openGraph(); });
+    graphShortcut_ = hotkeys::bind(QStringLiteral("graph"), tr("NetGraph view"),
+                                   QKeySequence(QStringLiteral("Ctrl+G")), this,
+                                   [this] { openGraph(); });
+    hotkeys::bind(QStringLiteral("password-generator"), tr("Password generator"),
+                  QKeySequence(QStringLiteral("Ctrl+Shift+G")), this,
+                  [this] { openPasswordGenerator(); });
     hotkeys::bind(QStringLiteral("lock"), tr("Lock vault"),
                   QKeySequence(QStringLiteral("Ctrl+L")), this, [this] { lockVault(); });
     hotkeys::bind(QStringLiteral("toggle-folder-panel"), tr("Toggle folder panel"),
@@ -276,6 +284,15 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
         if (auto* entry = entryModel_->entry(list_->currentIndex()))
             editEntry(entry);
     });
+    connect(detail_, &EntryDetailView::passwordGeneratorRequested, this,
+            [this] { openPasswordGenerator(); });
+
+    connect(graphsettings::notifier(), &graphsettings::Notifier::changed, this,
+            &MainWindow::syncNetGraphAvailability);
+    syncNetGraphAvailability();
+    connect(generalsettings::notifier(), &generalsettings::Notifier::changed, this,
+            &MainWindow::syncGeneralToolbarVisibility);
+    syncGeneralToolbarVisibility();
 
     new OverlayScrollBar(tree_);
     new OverlayScrollBar(list_);
@@ -328,19 +345,20 @@ QWidget* MainWindow::buildTreeHeader() {
     layout->addWidget(closePane);
     layout->addStretch(1);
 
-    auto* newFolder = headerButton(QStringLiteral("folder-plus"), tr("New folder"));
-    connect(newFolder, &QToolButton::clicked, this, [this] { addFolderTo(currentGroup()); });
-    layout->addWidget(newFolder);
+    newFolderButton_ = headerButton(QStringLiteral("folder-plus"), tr("New folder"));
+    connect(newFolderButton_, &QToolButton::clicked, this,
+            [this] { addFolderTo(currentGroup()); });
+    layout->addWidget(newFolderButton_);
 
-    auto* searchButton = headerButton(QStringLiteral("search"), tr("Search"));
-    connect(searchButton, &QToolButton::clicked, this, &MainWindow::openSearch);
-    layout->addWidget(searchButton);
-    auto* graphButton = headerButton(QStringLiteral("graph"), tr("NetGraph"));
-    connect(graphButton, &QToolButton::clicked, this, &MainWindow::openGraph);
-    layout->addWidget(graphButton);
-    auto* lockButton = headerButton(QStringLiteral("lock"), tr("Lock vault"));
-    connect(lockButton, &QToolButton::clicked, this, &MainWindow::lockVault);
-    layout->addWidget(lockButton);
+    searchButton_ = headerButton(QStringLiteral("search"), tr("Search"));
+    connect(searchButton_, &QToolButton::clicked, this, &MainWindow::openSearch);
+    layout->addWidget(searchButton_);
+    graphButton_ = headerButton(QStringLiteral("graph"), tr("NetGraph"));
+    connect(graphButton_, &QToolButton::clicked, this, &MainWindow::openGraph);
+    layout->addWidget(graphButton_);
+    lockButton_ = headerButton(QStringLiteral("lock"), tr("Lock vault"));
+    connect(lockButton_, &QToolButton::clicked, this, &MainWindow::lockVault);
+    layout->addWidget(lockButton_);
     auto* settingsButton = headerButton(QStringLiteral("settings"), tr("Settings"));
     connect(settingsButton, &QToolButton::clicked, this, &MainWindow::openSettings);
     layout->addWidget(settingsButton);
@@ -535,7 +553,7 @@ void MainWindow::selectEntryNamed(const QString& name) {
 // The window is rebuilt from scratch on every open, so it always
 // shows a fresh snapshot of the vault.
 void MainWindow::openGraph() {
-    if (lockScreen_->isVisible())
+    if (graphsettings::disabled() || lockScreen_->isVisible())
         return;
     if (graph_) {
         graph_->raise();
@@ -548,6 +566,27 @@ void MainWindow::openGraph() {
     connect(graph_, &GraphWindow::nodeActivated, this, &MainWindow::revealInVault);
     graph_->resize(900, 640);
     graph_->show();
+}
+
+void MainWindow::syncNetGraphAvailability() {
+    const bool isDisabled = graphsettings::disabled();
+    if (graphButton_)
+        graphButton_->setVisible(!graphsettings::hideIcon());
+    if (graphShortcut_)
+        graphShortcut_->setEnabled(!isDisabled);
+    if (isDisabled && graph_)
+        graph_->close();
+}
+
+void MainWindow::syncGeneralToolbarVisibility() {
+    if (newFolderButton_)
+        newFolderButton_->setVisible(!generalsettings::hideNewFolderButton());
+    if (searchButton_)
+        searchButton_->setVisible(!generalsettings::hideSearchIcon());
+    if (lockButton_)
+        lockButton_->setVisible(!generalsettings::hideLockButton());
+    if (list_)
+        list_->viewport()->update();
 }
 
 // Jump to a spot in the vault — from a graph-node click or a search
@@ -589,6 +628,23 @@ SearchWindow* MainWindow::openSearch() {
     search_->move(geometry().center() - QPoint(search_->width() / 2, search_->height() / 2));
     search_->show();
     return search_;
+}
+
+PasswordGeneratorWindow* MainWindow::openPasswordGenerator() {
+    if (passwordGenerator_) {
+        passwordGenerator_->raise();
+        passwordGenerator_->activateWindow();
+        return passwordGenerator_;
+    }
+    passwordGenerator_ = new PasswordGeneratorWindow;
+    connect(passwordGenerator_, &QObject::destroyed, this,
+            [this] { passwordGenerator_ = nullptr; });
+    connect(this, &QObject::destroyed, passwordGenerator_, &QWidget::close);
+    passwordGenerator_->move(
+        geometry().center() -
+        QPoint(passwordGenerator_->width() / 2, passwordGenerator_->height() / 2));
+    passwordGenerator_->show();
+    return passwordGenerator_;
 }
 
 QWidget* MainWindow::openGraphForScreenshot() {
@@ -642,6 +698,10 @@ QWidget* MainWindow::openSearchForScreenshot(const QString& query) {
     return window;
 }
 
+QWidget* MainWindow::openPasswordGeneratorForScreenshot() {
+    return openPasswordGenerator();
+}
+
 // The lock icon / ⌘L: windows showing vault data close, the floating
 // detail docks back, the models drop their pointers into the tree,
 // the decrypted tree and key are wiped, and the lock screen covers
@@ -660,6 +720,8 @@ void MainWindow::closeVaultSession() {
         search_->close();
     if (settings_)
         settings_->close();
+    if (passwordGenerator_)
+        passwordGenerator_->close();
     // Ad-hoc dialogs — entry editors, confirmation boxes — hold
     // Entry*/Group* into the tree that is about to be wiped.
     const auto dialogs = findChildren<QDialog*>();
@@ -1057,7 +1119,8 @@ void MainWindow::editEntry(nightlock::Entry* entry) {
     const bool changed = entry->name != before.name || entry->login != before.login ||
                          entry->password != before.password || entry->url != before.url ||
                          entry->note != before.note || entry->icon != before.icon ||
-                         entry->pattern != before.pattern;
+                         entry->pattern != before.pattern || entry->preset != before.preset ||
+                         entry->fields != before.fields;
     if (changed) {
         entry->modified = std::chrono::system_clock::now();
         VaultService::instance()->markDirty();

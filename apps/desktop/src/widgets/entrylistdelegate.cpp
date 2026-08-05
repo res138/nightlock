@@ -3,7 +3,9 @@
 #include <QPainter>
 
 #include "appearancesettings.hpp"
+#include "entrycolors.hpp"
 #include "fonts.hpp"
+#include "generalsettings.hpp"
 #include "models/entrylistmodel.hpp"
 
 namespace {
@@ -27,6 +29,14 @@ void EntryListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
         painter->setPen(Qt::NoPen);
         painter->setBrush(appearancesettings::accentColor());
         painter->drawRoundedRect(content, 10, 10);
+    } else if (generalsettings::entryColorsEnabled()) {
+        const auto color = static_cast<nightlock::EntryColor>(
+            index.data(EntryListModel::ColorRole).toInt());
+        if (color != nightlock::EntryColor::None) {
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(entrycolors::subtleFill(color));
+            painter->drawRoundedRect(content, 10, 10);
+        }
     }
 
     const QIcon icon = index.data(Qt::DecorationRole).value<QIcon>();
@@ -48,12 +58,16 @@ void EntryListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
     QFont loginFont = option.font;
     loginFont.setPointSize(11);
     painter->setFont(loginFont);
+    const bool strongSubtitle = index.data(EntryListModel::SubtitleStrongRole).toBool();
     QColor selectedLogin = appearancesettings::accentTextColor();
-    selectedLogin.setAlpha(190);
-    painter->setPen(selected ? selectedLogin : appearancesettings::palette().muted);
+    if (!strongSubtitle)
+        selectedLogin.setAlpha(190);
+    painter->setPen(selected ? selectedLogin
+                             : strongSubtitle ? appearancesettings::palette().ink
+                                              : appearancesettings::palette().muted);
     const QRect loginRect(textLeft, nameRect.bottom() + 2, textWidth, 16);
     painter->drawText(loginRect, Qt::AlignLeft | Qt::AlignVCenter,
-                      index.data(EntryListModel::LoginRole).toString());
+                      index.data(EntryListModel::SubtitleRole).toString());
 
     painter->restore();
 }

@@ -9,6 +9,7 @@ class QHBoxLayout;
 class QLabel;
 class QListView;
 class QMenu;
+class QShortcut;
 class QSplitter;
 class QToolButton;
 class QVariantAnimation;
@@ -18,6 +19,7 @@ class GroupTreeModel;
 class GroupTreeView;
 class LockScreen;
 class NlMenu;
+class PasswordGeneratorWindow;
 class SearchWindow;
 class SettingsWindow;
 
@@ -103,6 +105,9 @@ public:
     // Debug hook for NIGHTLOCK_SCREENSHOT_SEARCH: opens the search
     // popup, pre-fills `query` and returns it for grabbing.
     QWidget* openSearchForScreenshot(const QString& query);
+    // Debug hook for NIGHTLOCK_SCREENSHOT_GENERATOR: opens the
+    // standalone password generator and returns it for grabbing.
+    QWidget* openPasswordGeneratorForScreenshot();
     // Debug hook for NIGHTLOCK_SCREENSHOT_SETTINGS: opens the Settings
     // window on the given category row and returns it for grabbing.
     QWidget* openSettingsForScreenshot(int category);
@@ -157,7 +162,10 @@ private:
 
     void openGraph();
     void refreshGraph();
+    void syncNetGraphAvailability();
+    void syncGeneralToolbarVisibility();
     SearchWindow* openSearch();
+    PasswordGeneratorWindow* openPasswordGenerator();
     SettingsWindow* openSettings();
     void lockVault();
     // Closes every vault-showing surface and wipes the session.
@@ -187,10 +195,16 @@ private:
     QLabel* pathLabel_;
     QHBoxLayout* listHeaderLayout_;
     QToolButton* filterButton_;
+    QToolButton* newFolderButton_ = nullptr;
+    QToolButton* searchButton_ = nullptr;
+    QToolButton* graphButton_ = nullptr;
+    QToolButton* lockButton_ = nullptr;
     QToolButton* reopenTreeButton_;   // lives in the list header, shown
                                       // only while the tree pane is hidden
+    QShortcut* graphShortcut_ = nullptr;
     EntryDetailView* detail_;
     GraphWindow* graph_ = nullptr;     // the one graph window, if open
+    PasswordGeneratorWindow* passwordGenerator_ = nullptr;
     SearchWindow* search_ = nullptr;   // the one search window, if open
     SettingsWindow* settings_ = nullptr;  // the one settings window, if open
     LockScreen* lockScreen_ = nullptr; // covers the window while locked

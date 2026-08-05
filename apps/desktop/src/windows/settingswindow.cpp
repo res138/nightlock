@@ -26,6 +26,7 @@
 
 #include "appearancesettings.hpp"
 #include "fonts.hpp"
+#include "generalsettings.hpp"
 #include "graphsettings.hpp"
 #include "hotkeys.hpp"
 #include "vaultservice.hpp"
@@ -71,6 +72,7 @@ protected:
     void paintEvent(QPaintEvent*) override {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
+        painter.setOpacity(isEnabled() ? 1.0 : 0.45);
         const QColor off = appearancesettings::palette().toggleOff;
         const QColor on = appearancesettings::accentColor();
         const auto lerp = [this](int a, int b) { return a + qRound((b - a) * pos_); };
@@ -418,6 +420,48 @@ QWidget* SettingsWindow::buildGeneralPage() {
 
     addRow(rows, tr("Language"), tr("Changes the interface language."),
            new DropdownButton({tr("English")}, 0));
+
+    auto* presets = new ToggleSwitch(generalsettings::presetsEnabled());
+    connect(presets, &QAbstractButton::toggled, presets,
+            [](bool enabled) { generalsettings::setPresetsEnabled(enabled); });
+    addRow(rows, tr("Enable Presets"),
+           tr("Show preset selection when creating an entry."), presets);
+
+    auto* customFields = new ToggleSwitch(generalsettings::allowCustomFields());
+    connect(customFields, &QAbstractButton::toggled, customFields,
+            [](bool allowed) { generalsettings::setAllowCustomFields(allowed); });
+    addRow(rows, tr("Allow custom fields"),
+           tr("Allow entry forms to add and remove user-defined fields."), customFields);
+
+    auto* entryColors = new ToggleSwitch(generalsettings::entryColorsEnabled());
+    connect(entryColors, &QAbstractButton::toggled, entryColors,
+            [](bool enabled) { generalsettings::setEntryColorsEnabled(enabled); });
+    addRow(rows, tr("Enable Entry Colors"),
+           tr("Allow subtle per-entry colors in the entry list."), entryColors);
+
+    auto* hideSearch = new ToggleSwitch(generalsettings::hideSearchIcon());
+    connect(hideSearch, &QAbstractButton::toggled, hideSearch,
+            [](bool hidden) { generalsettings::setHideSearchIcon(hidden); });
+    addRow(rows, tr("Hide Search Icon"),
+           tr("Hide the Search icon from the main toolbar."), hideSearch);
+
+    auto* hideLock = new ToggleSwitch(generalsettings::hideLockButton());
+    connect(hideLock, &QAbstractButton::toggled, hideLock,
+            [](bool hidden) { generalsettings::setHideLockButton(hidden); });
+    addRow(rows, tr("Hide Lock Button"),
+           tr("Hide the Lock button from the main toolbar."), hideLock);
+
+    auto* hideNewFolder = new ToggleSwitch(generalsettings::hideNewFolderButton());
+    connect(hideNewFolder, &QAbstractButton::toggled, hideNewFolder,
+            [](bool hidden) { generalsettings::setHideNewFolderButton(hidden); });
+    addRow(rows, tr("Hide New Folder Button"),
+           tr("Hide the New Folder button from the main toolbar."), hideNewFolder);
+
+    auto* hideGenerator = new ToggleSwitch(generalsettings::hideGeneratorIcon());
+    connect(hideGenerator, &QAbstractButton::toggled, hideGenerator,
+            [](bool hidden) { generalsettings::setHideGeneratorIcon(hidden); });
+    addRow(rows, tr("Hide Generator Icon"),
+           tr("Hide the password generator icon from Entry View."), hideGenerator);
     finishCard(rows);
 
     column->addWidget(card);
@@ -678,6 +722,47 @@ QWidget* SettingsWindow::buildHotkeysPage() {
 QWidget* SettingsWindow::buildGraphPage() {
     QVBoxLayout* column = nullptr;
     QWidget* page = makePage(column);
+
+    // Master availability controls sit first and separately from the
+    // graph's simulation/edge configuration. The master switch forces
+    // both entry points hidden and locks their switches until NetGraph
+    // is enabled again.
+    QVBoxLayout* availability = nullptr;
+    QFrame* availabilityCard = makeCard(availability);
+    auto* disableGraph = new ToggleSwitch(graphsettings::disabled());
+    auto* hideIcon = new ToggleSwitch(graphsettings::hideIcon());
+    auto* hideButton = new ToggleSwitch(graphsettings::hideButton());
+
+    const auto syncAvailability = [hideIcon, hideButton](bool disabled) {
+        if (disabled) {
+            hideIcon->setChecked(true);
+            hideButton->setChecked(true);
+        }
+        hideIcon->setEnabled(!disabled);
+        hideButton->setEnabled(!disabled);
+        hideIcon->setCursor(disabled ? Qt::ArrowCursor : Qt::PointingHandCursor);
+        hideButton->setCursor(disabled ? Qt::ArrowCursor : Qt::PointingHandCursor);
+    };
+
+    connect(disableGraph, &QAbstractButton::toggled, disableGraph,
+            [syncAvailability](bool disabled) {
+                graphsettings::setDisabled(disabled);
+                syncAvailability(disabled);
+            });
+    connect(hideIcon, &QAbstractButton::toggled, hideIcon,
+            [](bool hidden) { graphsettings::setHideIcon(hidden); });
+    connect(hideButton, &QAbstractButton::toggled, hideButton,
+            [](bool hidden) { graphsettings::setHideButton(hidden); });
+
+    addRow(availability, tr("Disable NetGraph"),
+           tr("Turn off NetGraph completely, including its hotkey."), disableGraph);
+    addRow(availability, tr("Hide NetGraph Icon"),
+           tr("Hide the NetGraph icon above the directories."), hideIcon);
+    addRow(availability, tr("Hide NetGraph Button"),
+           tr("Hide Show in NetGraph in the entry viewer."), hideButton);
+    finishCard(availability);
+    syncAvailability(disableGraph->isChecked());
+    column->addWidget(availabilityCard);
 
     // The force-simulation knobs, applied to an open graph live.
     QVBoxLayout* forces = nullptr;

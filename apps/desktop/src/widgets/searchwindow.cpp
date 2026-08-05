@@ -11,6 +11,7 @@
 #include <QVBoxLayout>
 
 #include "appearancesettings.hpp"
+#include "qsecure.hpp"
 
 #include <functional>
 
@@ -105,7 +106,7 @@ SearchWindow::SearchWindow(nightlock::Group* root, QWidget* parent)
 
     field_ = new QLineEdit;
     field_->setObjectName(QStringLiteral("searchField"));
-    field_->setPlaceholderText(tr("Name, Login, URL or Note"));
+    field_->setPlaceholderText(tr("Name, Login, URL, Note or field"));
     field_->setClearButtonEnabled(true);
     field_->setAttribute(Qt::WA_MacShowFocusRect, false);
     field_->installEventFilter(this);
@@ -178,10 +179,15 @@ void SearchWindow::rebuildIndex() {
             hit.sub = QString::fromStdString(group->path());
             if (!login.isEmpty())
                 hit.sub += QStringLiteral(" · ") + login;
-            hit.haystack = (hit.name + QLatin1Char('\n') + login + QLatin1Char('\n') +
-                            QString::fromStdString(entry->url) + QLatin1Char('\n') +
-                            QString::fromStdString(entry->note))
-                               .toLower();
+            hit.haystack = hit.name + QLatin1Char('\n') + login + QLatin1Char('\n') +
+                           QString::fromStdString(entry->url) + QLatin1Char('\n') +
+                           QString::fromStdString(entry->note);
+            for (const nightlock::EntryField& field : entry->fields) {
+                hit.haystack += QLatin1Char('\n') + QString::fromStdString(field.label);
+                if (!field.secret)
+                    hit.haystack += QLatin1Char('\n') + toQString(field.value);
+            }
+            hit.haystack = hit.haystack.toLower();
             all_.push_back(std::move(hit));
         }
         for (const auto& sub : group->groups())

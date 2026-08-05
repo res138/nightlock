@@ -196,6 +196,24 @@ QVariant EntryListModel::data(const QModelIndex& index, int role) const {
         return QString::fromStdString(e->name);
     case LoginRole:
         return QString::fromStdString(e->login);
+    case SubtitleRole:
+        switch (e->preset) {
+            case nightlock::EntryPreset::Classic:
+                return QString::fromStdString(e->login);
+            case nightlock::EntryPreset::Wifi:
+                return tr("Wi-Fi Hotspot");
+            case nightlock::EntryPreset::BankCard:
+                return tr("Bank Card");
+            case nightlock::EntryPreset::BrowserBookmark:
+                return tr("Browser Bookmark");
+            case nightlock::EntryPreset::CryptoWallet:
+                return tr("cryptowallet");
+        }
+        return {};
+    case SubtitleStrongRole:
+        return e->preset != nightlock::EntryPreset::Classic;
+    case ColorRole:
+        return static_cast<int>(e->color);
     case Qt::DecorationRole:
         if (!e->icon.empty())
             return QIcon(QString::fromStdString(e->icon));
