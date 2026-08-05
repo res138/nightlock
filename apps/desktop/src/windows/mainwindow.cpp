@@ -53,6 +53,7 @@
 #include "windows/entryeditdialog.hpp"
 #include "windows/graphwindow.hpp"
 #include "windows/lockscreen.hpp"
+#include "windows/passwordgeneratorwindow.hpp"
 #include "windows/settingswindow.hpp"
 
 #ifdef Q_OS_MACOS
@@ -229,6 +230,9 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     graphShortcut_ = hotkeys::bind(QStringLiteral("graph"), tr("NetGraph view"),
                                    QKeySequence(QStringLiteral("Ctrl+G")), this,
                                    [this] { openGraph(); });
+    hotkeys::bind(QStringLiteral("password-generator"), tr("Password generator"),
+                  QKeySequence(QStringLiteral("Ctrl+Shift+G")), this,
+                  [this] { openPasswordGenerator(); });
     hotkeys::bind(QStringLiteral("lock"), tr("Lock vault"),
                   QKeySequence(QStringLiteral("Ctrl+L")), this, [this] { lockVault(); });
     hotkeys::bind(QStringLiteral("toggle-folder-panel"), tr("Toggle folder panel"),
@@ -280,6 +284,8 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
         if (auto* entry = entryModel_->entry(list_->currentIndex()))
             editEntry(entry);
     });
+    connect(detail_, &EntryDetailView::passwordGeneratorRequested, this,
+            [this] { openPasswordGenerator(); });
 
     connect(graphsettings::notifier(), &graphsettings::Notifier::changed, this,
             &MainWindow::syncNetGraphAvailability);
@@ -624,6 +630,23 @@ SearchWindow* MainWindow::openSearch() {
     return search_;
 }
 
+PasswordGeneratorWindow* MainWindow::openPasswordGenerator() {
+    if (passwordGenerator_) {
+        passwordGenerator_->raise();
+        passwordGenerator_->activateWindow();
+        return passwordGenerator_;
+    }
+    passwordGenerator_ = new PasswordGeneratorWindow;
+    connect(passwordGenerator_, &QObject::destroyed, this,
+            [this] { passwordGenerator_ = nullptr; });
+    connect(this, &QObject::destroyed, passwordGenerator_, &QWidget::close);
+    passwordGenerator_->move(
+        geometry().center() -
+        QPoint(passwordGenerator_->width() / 2, passwordGenerator_->height() / 2));
+    passwordGenerator_->show();
+    return passwordGenerator_;
+}
+
 QWidget* MainWindow::openGraphForScreenshot() {
     openGraph();
     // NIGHTLOCK_GRAPH_FOCUS=<entry name> replays the Show-in-Graph
@@ -675,6 +698,10 @@ QWidget* MainWindow::openSearchForScreenshot(const QString& query) {
     return window;
 }
 
+QWidget* MainWindow::openPasswordGeneratorForScreenshot() {
+    return openPasswordGenerator();
+}
+
 // The lock icon / ⌘L: windows showing vault data close, the floating
 // detail docks back, the models drop their pointers into the tree,
 // the decrypted tree and key are wiped, and the lock screen covers
@@ -693,6 +720,8 @@ void MainWindow::closeVaultSession() {
         search_->close();
     if (settings_)
         settings_->close();
+    if (passwordGenerator_)
+        passwordGenerator_->close();
     // Ad-hoc dialogs — entry editors, confirmation boxes — hold
     // Entry*/Group* into the tree that is about to be wiped.
     const auto dialogs = findChildren<QDialog*>();

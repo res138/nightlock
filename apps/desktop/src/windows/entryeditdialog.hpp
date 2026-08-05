@@ -58,6 +58,7 @@ private:
     void addPresetFields(nightlock::EntryPreset preset);
     void addCryptoFields(const QString& assetId);
     void setCryptoAsset(const QString& assetId);
+    void refreshSaveAvailability();
     void addExtraField(const QString& label, bool secret, bool custom,
                        const QString& value = {});
     void clearExtraFields();

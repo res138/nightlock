@@ -342,6 +342,8 @@ EntryDetailView::EntryDetailView(QWidget* parent)
 
     connect(generalsettings::notifier(), &generalsettings::Notifier::changed, this,
             &EntryDetailView::refreshCardColors);
+    connect(generalsettings::notifier(), &generalsettings::Notifier::changed, this,
+            &EntryDetailView::syncGeneratorVisibility);
 
     layout->addStretch(1);
 
@@ -377,6 +379,9 @@ EntryDetailView::EntryDetailView(QWidget* parent)
         button->raise();
         return button;
     };
+    generatorButton_ = makeCornerButton(QStringLiteral("dice"), tr("Password generator"));
+    connect(generatorButton_, &QToolButton::clicked, this,
+            &EntryDetailView::passwordGeneratorRequested);
     editButton_ = makeCornerButton(QStringLiteral("edit"), tr("Edit entry"));
     connect(editButton_, &QToolButton::clicked, this, &EntryDetailView::editRequested);
 
@@ -399,6 +404,7 @@ void EntryDetailView::resizeEvent(QResizeEvent* event) {
     // Centered on the grip row, mirroring the floating traffic lights.
     const int buttonY = kGripGap + (kGripHeight - editButton_->height()) / 2;
     editButton_->move(width() - editButton_->width() - 14, buttonY);
+    generatorButton_->move(editButton_->x() - generatorButton_->width() - 4, buttonY);
     floatingBackdrop_->setGeometry(rect());
     updatePatternGeometry();
 }
@@ -486,6 +492,7 @@ void EntryDetailView::refreshUrlText() {
 void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     content_->setVisible(entry != nullptr);
     editButton_->setVisible(entry != nullptr);
+    syncGeneratorVisibility();
     if (!entry) {
         entryColor_ = nightlock::EntryColor::None;
         refreshCardColors();
@@ -609,6 +616,11 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
 
     patternBackdrop_->setEntry(entry);
     updatePatternGeometry();
+}
+
+void EntryDetailView::syncGeneratorVisibility() {
+    generatorButton_->setVisible(content_->isVisible() &&
+                                 !generalsettings::hideGeneratorIcon());
 }
 
 void EntryDetailView::refreshCardColors() {

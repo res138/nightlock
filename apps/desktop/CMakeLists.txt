@@ -36,6 +36,7 @@ qt_add_executable(nightlock-desktop
     src/windows/graphwindow.cpp
     src/windows/lockscreen.cpp
     src/windows/mainwindow.cpp
+    src/windows/passwordgeneratorwindow.cpp
     src/windows/settingswindow.cpp
     resources/resources.qrc
 )

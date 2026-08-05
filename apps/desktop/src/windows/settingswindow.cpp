@@ -456,6 +456,12 @@ QWidget* SettingsWindow::buildGeneralPage() {
             [](bool hidden) { generalsettings::setHideNewFolderButton(hidden); });
     addRow(rows, tr("Hide New Folder Button"),
            tr("Hide the New Folder button from the main toolbar."), hideNewFolder);
+
+    auto* hideGenerator = new ToggleSwitch(generalsettings::hideGeneratorIcon());
+    connect(hideGenerator, &QAbstractButton::toggled, hideGenerator,
+            [](bool hidden) { generalsettings::setHideGeneratorIcon(hidden); });
+    addRow(rows, tr("Hide Generator Icon"),
+           tr("Hide the password generator icon from Entry View."), hideGenerator);
     finishCard(rows);
 
     column->addWidget(card);

@@ -15,6 +15,7 @@ public:
     explicit CopyLabel(QWidget* parent = nullptr);
 
     void setText(const QString& text);
+    QString text() const { return text_; }
     void setClipboardText(const QString& text);
     void setLeadingIconVisible(bool visible);
     void setContentAlignment(Qt::Alignment alignment);

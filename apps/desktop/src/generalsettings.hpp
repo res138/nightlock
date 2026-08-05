@@ -23,6 +23,9 @@ void setHideLockButton(bool hidden);
 bool hideNewFolderButton();
 void setHideNewFolderButton(bool hidden);
 
+bool hideGeneratorIcon();
+void setHideGeneratorIcon(bool hidden);
+
 class Notifier : public QObject {
     Q_OBJECT
 public:

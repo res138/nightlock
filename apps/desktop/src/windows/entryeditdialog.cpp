@@ -110,10 +110,10 @@ protected:
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
         painter.setPen(QPen(palette.border, 1));
-        painter.setBrush(palette.input);
-        painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), 7, 7);
+        painter.drawLine(QPointF(0, height() - 0.5),
+                         QPointF(width(), height() - 0.5));
         painter.setPen(palette.ink);
-        painter.drawText(rect().adjusted(10, 0, -30, 0),
+        painter.drawText(rect().adjusted(2, 0, -30, 0),
                          Qt::AlignLeft | Qt::AlignVCenter, options_.value(current_));
 
         painter.translate(width() - 15, height() / 2.0);
@@ -306,7 +306,7 @@ EntryEditDialog::EntryEditDialog(Mode mode, QWidget* parent)
     auto* credentialsLayout = new QHBoxLayout(credentialsField_);
     credentialsLayout->setContentsMargins(0, 0, 0, 0);
     credentialsLayout->setSpacing(12);
-    loginField_ = makeField(tr("Login"), loginEdit_, false, &loginCaption_);
+    loginField_ = makeField(tr("Login"), loginEdit_, true, &loginCaption_);
     passwordField_ = makeField(tr("Password"), passwordEdit_, false, &passwordCaption_);
     credentialsLayout->addWidget(loginField_, 1);
     credentialsLayout->addWidget(passwordField_, 1);
@@ -333,32 +333,26 @@ EntryEditDialog::EntryEditDialog(Mode mode, QWidget* parent)
     }
 
     noteEdit_ = new QPlainTextEdit;
-    noteEdit_->setFixedHeight(74);
+    noteEdit_->setFixedHeight(34);
     noteEdit_->setTabChangesFocus(true);
     noteField_ = makeField(tr("Note"), noteEdit_);
     layout->addWidget(noteField_);
 
     layout->addSpacing(6);
-    auto* buttons = new QHBoxLayout;
-    buttons->setSpacing(10);
-    auto* cancelButton = new QPushButton(tr("Cancel"));
-    cancelButton->setObjectName(QStringLiteral("ghostButton"));
     saveButton_ = new QPushButton(mode == Mode::Add ? tr("Add") : tr("Save"));
     saveButton_->setObjectName(QStringLiteral("primaryButton"));
     saveButton_->setDefault(true);
-    buttons->addStretch(1);
-    buttons->addWidget(cancelButton);
-    buttons->addWidget(saveButton_);
-    layout->addLayout(buttons);
+    saveButton_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    layout->addWidget(saveButton_);
 
-    connect(cancelButton, &QPushButton::clicked, this, &QDialog::reject);
     connect(saveButton_, &QPushButton::clicked, this, &QDialog::accept);
 
-    // Only the name is required.
+    // Name and the preset's visible login-equivalent field are required.
     saveButton_->setEnabled(false);
-    connect(nameEdit_, &QLineEdit::textChanged, this, [this](const QString& text) {
-        saveButton_->setEnabled(!text.trimmed().isEmpty());
-    });
+    connect(nameEdit_, &QLineEdit::textChanged, this,
+            [this] { refreshSaveAvailability(); });
+    connect(loginEdit_, &QLineEdit::textChanged, this,
+            [this] { refreshSaveAvailability(); });
 
     setPreset(EntryPreset::Classic, false);
 
@@ -489,7 +483,8 @@ void EntryEditDialog::setPreset(EntryPreset preset, bool resetValues) {
             showUrl = false;
             break;
     }
-    loginCaption_->setText(login);
+    loginCaption_->setText(
+        login + QStringLiteral(" <span style=\"color:#FF3B30;\">*</span>"));
     passwordCaption_->setText(password);
     urlCaption_->setText(url);
     loginField_->setVisible(showLogin);
@@ -507,6 +502,7 @@ void EntryEditDialog::setPreset(EntryPreset preset, bool resetValues) {
     addPresetFields(preset);
     for (const auto& [label, value, secret] : customValues)
         addExtraField(label, secret, true, value);
+    refreshSaveAvailability();
 
     // A long preset can leave the overlay viewport scrolled down.
     // Rebuilding another preset must always restore the same top and
@@ -515,6 +511,13 @@ void EntryEditDialog::setPreset(EntryPreset preset, bool resetValues) {
         scroll_->verticalScrollBar()->setValue(0);
         scroll_->horizontalScrollBar()->setValue(0);
     });
+}
+
+void EntryEditDialog::refreshSaveAvailability() {
+    const bool nameReady = !nameEdit_->text().trimmed().isEmpty();
+    const bool loginReady = !loginField_->isVisible() ||
+                            !loginEdit_->text().trimmed().isEmpty();
+    saveButton_->setEnabled(nameReady && loginReady);
 }
 
 void EntryEditDialog::addPresetFields(EntryPreset preset) {

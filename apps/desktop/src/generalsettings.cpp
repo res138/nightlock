@@ -10,6 +10,7 @@ constexpr auto kEnableEntryColorsKey = "general/enable-entry-colors";
 constexpr auto kHideSearchIconKey = "general/hide-search-icon";
 constexpr auto kHideLockButtonKey = "general/hide-lock-button";
 constexpr auto kHideNewFolderButtonKey = "general/hide-new-folder-button";
+constexpr auto kHideGeneratorIconKey = "general/hide-generator-icon";
 
 bool readBool(const char* key) {
     return QSettings().value(QLatin1String(key), false).toBool();
@@ -70,6 +71,14 @@ bool hideNewFolderButton() {
 
 void setHideNewFolderButton(bool hidden) {
     writeBool(kHideNewFolderButtonKey, hidden);
+}
+
+bool hideGeneratorIcon() {
+    return readBool(kHideGeneratorIconKey);
+}
+
+void setHideGeneratorIcon(bool hidden) {
+    writeBool(kHideGeneratorIconKey, hidden);
 }
 
 Notifier* notifier() {

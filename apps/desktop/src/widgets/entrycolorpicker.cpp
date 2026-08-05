@@ -54,14 +54,14 @@ void EntryColorPicker::paintEvent(QPaintEvent*) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setPen(QPen(palette.border, 1));
-    painter.setBrush(underMouse() ? palette.inputHover : palette.input);
-    painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), 7, 7);
+    painter.drawLine(QPointF(0, height() - 0.5),
+                     QPointF(width(), height() - 0.5));
 
     painter.setPen(Qt::NoPen);
     painter.setBrush(entrycolors::swatch(value_));
-    painter.drawEllipse(QRectF(12, height() / 2.0 - 4, 8, 8));
+    painter.drawEllipse(QRectF(2, height() / 2.0 - 4, 8, 8));
     painter.setPen(palette.ink);
-    painter.drawText(rect().adjusted(27, 0, -30, 0),
+    painter.drawText(rect().adjusted(17, 0, -30, 0),
                      Qt::AlignVCenter | Qt::AlignLeft, entrycolors::title(value_));
     appearancesettings::themedMenuIcon(QStringLiteral("chevron-down"))
         .paint(&painter, QRect(width() - 22, (height() - 12) / 2, 12, 12));

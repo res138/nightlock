@@ -47,6 +47,8 @@ public:
 signals:
     // The pencil button in the top-right corner was clicked.
     void editRequested();
+    // The key button beside Edit opens the standalone generator.
+    void passwordGeneratorRequested();
     // The "Показать в графе" button under the meta card was clicked.
     void graphRequested();
     // The grip was dragged far enough while docked: float me.
@@ -74,11 +76,13 @@ private:
     void refreshUrlText();
     void refreshLastVisibleRow();
     void refreshCardColors();
+    void syncGeneratorVisibility();
     void updatePatternGeometry();
 
     QWidget* content_;
     QWidget* headerFade_;
     QWidget* grip_;
+    QToolButton* generatorButton_;
     QToolButton* editButton_;
     QWidget* floatingControls_;
     QWidget* floatingBackdrop_;
