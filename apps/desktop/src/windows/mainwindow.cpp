@@ -35,6 +35,7 @@
 #include <nightlock/group.hpp>
 
 #include "appearancesettings.hpp"
+#include "generalsettings.hpp"
 #include "graphsettings.hpp"
 #include "hotkeys.hpp"
 #include "models/grouptreemodel.hpp"
@@ -283,6 +284,9 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     connect(graphsettings::notifier(), &graphsettings::Notifier::changed, this,
             &MainWindow::syncNetGraphAvailability);
     syncNetGraphAvailability();
+    connect(generalsettings::notifier(), &generalsettings::Notifier::changed, this,
+            &MainWindow::syncGeneralToolbarVisibility);
+    syncGeneralToolbarVisibility();
 
     new OverlayScrollBar(tree_);
     new OverlayScrollBar(list_);
@@ -335,19 +339,20 @@ QWidget* MainWindow::buildTreeHeader() {
     layout->addWidget(closePane);
     layout->addStretch(1);
 
-    auto* newFolder = headerButton(QStringLiteral("folder-plus"), tr("New folder"));
-    connect(newFolder, &QToolButton::clicked, this, [this] { addFolderTo(currentGroup()); });
-    layout->addWidget(newFolder);
+    newFolderButton_ = headerButton(QStringLiteral("folder-plus"), tr("New folder"));
+    connect(newFolderButton_, &QToolButton::clicked, this,
+            [this] { addFolderTo(currentGroup()); });
+    layout->addWidget(newFolderButton_);
 
-    auto* searchButton = headerButton(QStringLiteral("search"), tr("Search"));
-    connect(searchButton, &QToolButton::clicked, this, &MainWindow::openSearch);
-    layout->addWidget(searchButton);
+    searchButton_ = headerButton(QStringLiteral("search"), tr("Search"));
+    connect(searchButton_, &QToolButton::clicked, this, &MainWindow::openSearch);
+    layout->addWidget(searchButton_);
     graphButton_ = headerButton(QStringLiteral("graph"), tr("NetGraph"));
     connect(graphButton_, &QToolButton::clicked, this, &MainWindow::openGraph);
     layout->addWidget(graphButton_);
-    auto* lockButton = headerButton(QStringLiteral("lock"), tr("Lock vault"));
-    connect(lockButton, &QToolButton::clicked, this, &MainWindow::lockVault);
-    layout->addWidget(lockButton);
+    lockButton_ = headerButton(QStringLiteral("lock"), tr("Lock vault"));
+    connect(lockButton_, &QToolButton::clicked, this, &MainWindow::lockVault);
+    layout->addWidget(lockButton_);
     auto* settingsButton = headerButton(QStringLiteral("settings"), tr("Settings"));
     connect(settingsButton, &QToolButton::clicked, this, &MainWindow::openSettings);
     layout->addWidget(settingsButton);
@@ -565,6 +570,15 @@ void MainWindow::syncNetGraphAvailability() {
         graphShortcut_->setEnabled(!isDisabled);
     if (isDisabled && graph_)
         graph_->close();
+}
+
+void MainWindow::syncGeneralToolbarVisibility() {
+    if (newFolderButton_)
+        newFolderButton_->setVisible(!generalsettings::hideNewFolderButton());
+    if (searchButton_)
+        searchButton_->setVisible(!generalsettings::hideSearchIcon());
+    if (lockButton_)
+        lockButton_->setVisible(!generalsettings::hideLockButton());
 }
 
 // Jump to a spot in the vault — from a graph-node click or a search

@@ -159,6 +159,7 @@ private:
     void openGraph();
     void refreshGraph();
     void syncNetGraphAvailability();
+    void syncGeneralToolbarVisibility();
     SearchWindow* openSearch();
     SettingsWindow* openSettings();
     void lockVault();
@@ -189,7 +190,10 @@ private:
     QLabel* pathLabel_;
     QHBoxLayout* listHeaderLayout_;
     QToolButton* filterButton_;
+    QToolButton* newFolderButton_ = nullptr;
+    QToolButton* searchButton_ = nullptr;
     QToolButton* graphButton_ = nullptr;
+    QToolButton* lockButton_ = nullptr;
     QToolButton* reopenTreeButton_;   // lives in the list header, shown
                                       // only while the tree pane is hidden
     QShortcut* graphShortcut_ = nullptr;

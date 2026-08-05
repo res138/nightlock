@@ -432,6 +432,24 @@ QWidget* SettingsWindow::buildGeneralPage() {
             [](bool allowed) { generalsettings::setAllowCustomFields(allowed); });
     addRow(rows, tr("Allow custom fields"),
            tr("Allow entry forms to add and remove user-defined fields."), customFields);
+
+    auto* hideSearch = new ToggleSwitch(generalsettings::hideSearchIcon());
+    connect(hideSearch, &QAbstractButton::toggled, hideSearch,
+            [](bool hidden) { generalsettings::setHideSearchIcon(hidden); });
+    addRow(rows, tr("Hide Search Icon"),
+           tr("Hide the Search icon from the main toolbar."), hideSearch);
+
+    auto* hideLock = new ToggleSwitch(generalsettings::hideLockButton());
+    connect(hideLock, &QAbstractButton::toggled, hideLock,
+            [](bool hidden) { generalsettings::setHideLockButton(hidden); });
+    addRow(rows, tr("Hide Lock Button"),
+           tr("Hide the Lock button from the main toolbar."), hideLock);
+
+    auto* hideNewFolder = new ToggleSwitch(generalsettings::hideNewFolderButton());
+    connect(hideNewFolder, &QAbstractButton::toggled, hideNewFolder,
+            [](bool hidden) { generalsettings::setHideNewFolderButton(hidden); });
+    addRow(rows, tr("Hide New Folder Button"),
+           tr("Hide the New Folder button from the main toolbar."), hideNewFolder);
     finishCard(rows);
 
     column->addWidget(card);
