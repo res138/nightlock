@@ -75,6 +75,7 @@ private:
     void updatePatternGeometry();
 
     QWidget* content_;
+    QWidget* headerFade_;
     QWidget* grip_;
     QToolButton* editButton_;
     QWidget* floatingControls_;

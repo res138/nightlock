@@ -4,6 +4,7 @@
 #include <QFrame>
 #include <QIcon>
 #include <QLabel>
+#include <QLinearGradient>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPushButton>
@@ -30,6 +31,7 @@ constexpr int kIconSize = 58;
 constexpr int kDetachThreshold = 12;  // px of grip travel before undocking
 constexpr int kGripHeight = 22;
 constexpr int kGripGap = 12;          // equal gap above and below the grip
+constexpr int kHeaderFadeHeight = 68;
 constexpr int kSectionGap = 14;       // one vertical rhythm between all sections
 constexpr qreal kFloatingRadius = 10;  // matches the main window corners
 
@@ -88,6 +90,30 @@ protected:
 private:
     EntryDetailView* view_;
     bool pressed_ = false;
+};
+
+// Keeps the fixed grip/edit strip legible while the entry contents
+// scroll underneath it. The solid top dissolves before it reaches the
+// entry header, avoiding a hard toolbar edge.
+class ScrollHeaderFade : public QWidget {
+public:
+    explicit ScrollHeaderFade(QWidget* parent) : QWidget(parent) {
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        connect(appearancesettings::notifier(), &appearancesettings::Notifier::changed,
+                this, qOverload<>(&QWidget::update));
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QColor solid = appearancesettings::palette().window;
+        QColor clear = solid;
+        clear.setAlpha(0);
+        QLinearGradient gradient(0, 0, 0, height());
+        gradient.setColorAt(0.0, solid);
+        gradient.setColorAt(0.52, solid);
+        gradient.setColorAt(1.0, clear);
+        QPainter(this).fillRect(rect(), gradient);
+    }
 };
 
 // Bottom-most layer of the floating window: the rounded white panel
@@ -321,6 +347,11 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
 
     setWidget(content_);
 
+    // Fixed visual layer above the scrolling viewport and below all
+    // interactive header controls.
+    headerFade_ = new ScrollHeaderFade(this);
+    headerFade_->raise();
+
     // Overlay child of the scroll area itself (not the content), so it
     // stays put while scrolling and remains visible with no entry.
     grip_ = new DragHandle(this);
@@ -356,6 +387,7 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
 
 void EntryDetailView::resizeEvent(QResizeEvent* event) {
     QScrollArea::resizeEvent(event);
+    headerFade_->setGeometry(0, 0, width(), kHeaderFadeHeight);
     grip_->move((width() - grip_->width()) / 2, kGripGap);
     // Centered on the grip row, mirroring the floating traffic lights.
     const int buttonY = kGripGap + (kGripHeight - editButton_->height()) / 2;
