@@ -44,6 +44,7 @@ void checkEqual(const Group& a, const Group& b) {
         CHECK(x.code == y.code);
         CHECK(x.pattern == y.pattern);
         CHECK(x.preset == y.preset);
+        CHECK(x.color == y.color);
         CHECK(x.fields == y.fields);
     }
     REQUIRE(a.groups().size() == b.groups().size());
@@ -68,6 +69,7 @@ TEST_CASE("vault round-trips through the payload") {
     full.code = "803 059";
     full.pattern = Pattern::Halo;
     full.preset = EntryPreset::BankCard;
+    full.color = EntryColor::Purple;
     EntryField cardholder;
     cardholder.label = "Cardholder Name";
     cardholder.value = "Octo Cat";

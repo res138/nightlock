@@ -35,6 +35,7 @@ inline constexpr std::uint16_t kTagEntryCode = 0x0309;
 inline constexpr std::uint16_t kTagEntryPattern = 0x030A;
 inline constexpr std::uint16_t kTagEntryPreset = 0x030B;
 inline constexpr std::uint16_t kTagEntryField = 0x030C;
+inline constexpr std::uint16_t kTagEntryColor = 0x030D;
 inline constexpr std::uint16_t kTagFieldLabel = 0x0C01;
 inline constexpr std::uint16_t kTagFieldValue = 0x0C02;
 inline constexpr std::uint16_t kTagFieldSecret = 0x0C03;

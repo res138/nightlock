@@ -212,6 +212,8 @@ QVariant EntryListModel::data(const QModelIndex& index, int role) const {
         return {};
     case SubtitleStrongRole:
         return e->preset != nightlock::EntryPreset::Classic;
+    case ColorRole:
+        return static_cast<int>(e->color);
     case Qt::DecorationRole:
         if (!e->icon.empty())
             return QIcon(QString::fromStdString(e->icon));

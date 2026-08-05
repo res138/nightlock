@@ -84,6 +84,7 @@ milliseconds since the Unix epoch.
 | `0x030A` |           | Pattern, u32 enum                          |
 | `0x030B` |           | Entry preset, u32 enum                     |
 | `0x030C` | yes       | Additional entry field                     |
+| `0x030D` |           | Entry list color, u32 enum                  |
 | `0x0C01` |           | Field label                                |
 | `0x0C02` |           | Field value (secure storage)               |
 | `0x0C03` |           | Secret display flag, u32 boolean           |
@@ -98,6 +99,7 @@ Rules:
   survives a round trip.
 - Unknown **Pattern** values decode as `None` (decorative data must not
   brick a vault written by a newer build).
+- Unknown **Entry list color** values likewise decode as `None`.
 
 ### Versioning
 

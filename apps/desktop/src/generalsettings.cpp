@@ -6,6 +6,7 @@ namespace generalsettings {
 namespace {
 constexpr auto kEnablePresetsKey = "general/enable-presets";
 constexpr auto kAllowCustomFieldsKey = "general/allow-custom-fields";
+constexpr auto kEnableEntryColorsKey = "general/enable-entry-colors";
 constexpr auto kHideSearchIconKey = "general/hide-search-icon";
 constexpr auto kHideLockButtonKey = "general/hide-lock-button";
 constexpr auto kHideNewFolderButtonKey = "general/hide-new-folder-button";
@@ -37,6 +38,14 @@ bool allowCustomFields() {
 
 void setAllowCustomFields(bool allowed) {
     writeBool(kAllowCustomFieldsKey, allowed);
+}
+
+bool entryColorsEnabled() {
+    return readBool(kEnableEntryColorsKey);
+}
+
+void setEntryColorsEnabled(bool enabled) {
+    writeBool(kEnableEntryColorsKey, enabled);
 }
 
 bool hideSearchIcon() {

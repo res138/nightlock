@@ -44,6 +44,8 @@ void writeEntry(TlvWriter& w, const Entry& entry) {
         w.u32(kTagEntryPattern, static_cast<std::uint32_t>(entry.pattern));
     if (entry.preset != EntryPreset::Classic)
         w.u32(kTagEntryPreset, static_cast<std::uint32_t>(entry.preset));
+    if (entry.color != EntryColor::None)
+        w.u32(kTagEntryColor, static_cast<std::uint32_t>(entry.color));
     for (const EntryField& field : entry.fields) {
         if (field.label.empty())
             continue;
@@ -167,6 +169,15 @@ ParseResult readEntry(TlvReader records, Group& parent) {
                 entry.preset = *value <= static_cast<std::uint32_t>(EntryPreset::CryptoWallet)
                                    ? static_cast<EntryPreset>(*value)
                                    : EntryPreset::Classic;
+                break;
+            }
+            case kTagEntryColor: {
+                const auto value = records.valueU32();
+                if (!value)
+                    return ParseResult::Malformed;
+                entry.color = *value <= static_cast<std::uint32_t>(EntryColor::Purple)
+                                  ? static_cast<EntryColor>(*value)
+                                  : EntryColor::None;
                 break;
             }
             case kTagEntryField: {

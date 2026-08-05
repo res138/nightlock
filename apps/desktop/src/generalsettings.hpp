@@ -11,6 +11,9 @@ void setPresetsEnabled(bool enabled);
 bool allowCustomFields();
 void setAllowCustomFields(bool allowed);
 
+bool entryColorsEnabled();
+void setEntryColorsEnabled(bool enabled);
+
 bool hideSearchIcon();
 void setHideSearchIcon(bool hidden);
 

@@ -7,6 +7,7 @@
 #include <vector>
 
 class QCheckBox;
+class EntryColorPicker;
 class IconPicker;
 class QLabel;
 class PatternPicker;
@@ -70,6 +71,8 @@ private:
     QScrollArea* scroll_ = nullptr;
     IconPicker* iconPicker_;
     PatternPicker* patternPicker_;
+    EntryColorPicker* colorPicker_;
+    QWidget* colorField_;
     QLineEdit* nameEdit_;
     QLineEdit* loginEdit_;
     QLineEdit* passwordEdit_;

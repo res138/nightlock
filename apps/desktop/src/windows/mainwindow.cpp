@@ -579,6 +579,8 @@ void MainWindow::syncGeneralToolbarVisibility() {
         searchButton_->setVisible(!generalsettings::hideSearchIcon());
     if (lockButton_)
         lockButton_->setVisible(!generalsettings::hideLockButton());
+    if (list_)
+        list_->viewport()->update();
 }
 
 // Jump to a spot in the vault — from a graph-node click or a search

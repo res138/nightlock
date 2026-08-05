@@ -433,6 +433,12 @@ QWidget* SettingsWindow::buildGeneralPage() {
     addRow(rows, tr("Allow custom fields"),
            tr("Allow entry forms to add and remove user-defined fields."), customFields);
 
+    auto* entryColors = new ToggleSwitch(generalsettings::entryColorsEnabled());
+    connect(entryColors, &QAbstractButton::toggled, entryColors,
+            [](bool enabled) { generalsettings::setEntryColorsEnabled(enabled); });
+    addRow(rows, tr("Enable Entry Colors"),
+           tr("Allow subtle per-entry colors in the entry list."), entryColors);
+
     auto* hideSearch = new ToggleSwitch(generalsettings::hideSearchIcon());
     connect(hideSearch, &QAbstractButton::toggled, hideSearch,
             [](bool hidden) { generalsettings::setHideSearchIcon(hidden); });

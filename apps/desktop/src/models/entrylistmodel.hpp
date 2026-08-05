@@ -20,6 +20,7 @@ public:
         LoginRole,
         SubtitleRole,
         SubtitleStrongRole,
+        ColorRole,
     };
 
     // Display order of the list. Custom is the group's own order (the

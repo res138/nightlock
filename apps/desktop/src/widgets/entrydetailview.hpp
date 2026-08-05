@@ -14,6 +14,7 @@ class QVBoxLayout;
 class SpoilerLabel;
 
 namespace nightlock {
+enum class EntryColor;
 struct Entry;
 }
 
@@ -72,6 +73,7 @@ private:
     void clearAdditionalFields();
     void refreshUrlText();
     void refreshLastVisibleRow();
+    void refreshCardColors();
     void updatePatternGeometry();
 
     QWidget* content_;
@@ -102,6 +104,7 @@ private:
     SpoilerLabel* passwordSpoiler_;
     FieldRow urlRow_;
     QString url_;  // shown link, re-colored on a theme switch
+    nightlock::EntryColor entryColor_;
     FieldRow codeRow_;
     QList<FieldRow> additionalRows_;
     QList<FieldRow> seedRows_;

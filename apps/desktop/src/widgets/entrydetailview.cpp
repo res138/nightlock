@@ -14,6 +14,8 @@
 #include <QVBoxLayout>
 
 #include "appearancesettings.hpp"
+#include "entrycolors.hpp"
+#include "generalsettings.hpp"
 #include "graphsettings.hpp"
 
 #include <nightlock/entry.hpp>
@@ -169,7 +171,8 @@ private:
 
 }  // namespace
 
-EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
+EntryDetailView::EntryDetailView(QWidget* parent)
+    : QScrollArea(parent), entryColor_(nightlock::EntryColor::None) {
     setWidgetResizable(true);
     new OverlayScrollBar(this);
 
@@ -325,6 +328,7 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
             [this, tintGraphGlyph] {
                 tintGraphGlyph();
                 refreshUrlText();
+                refreshCardColors();
             });
     graphButton_->setIconSize(QSize(17, 17));
     connect(graphButton_, &QPushButton::clicked, this, &EntryDetailView::graphRequested);
@@ -335,6 +339,9 @@ EntryDetailView::EntryDetailView(QWidget* parent) : QScrollArea(parent) {
             syncGraphButton);
     syncGraphButton();
     layout->addWidget(graphButton_);
+
+    connect(generalsettings::notifier(), &generalsettings::Notifier::changed, this,
+            &EntryDetailView::refreshCardColors);
 
     layout->addStretch(1);
 
@@ -479,8 +486,14 @@ void EntryDetailView::refreshUrlText() {
 void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     content_->setVisible(entry != nullptr);
     editButton_->setVisible(entry != nullptr);
-    if (!entry)
+    if (!entry) {
+        entryColor_ = nightlock::EntryColor::None;
+        refreshCardColors();
         return;
+    }
+
+    entryColor_ = entry->color;
+    refreshCardColors();
 
     const QString iconPath = entry->icon.empty() ? QStringLiteral(":/icons/entry.png")
                                                  : QString::fromStdString(entry->icon);
@@ -596,6 +609,32 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
 
     patternBackdrop_->setEntry(entry);
     updatePatternGeometry();
+}
+
+void EntryDetailView::refreshCardColors() {
+    const nightlock::EntryColor effective = generalsettings::entryColorsEnabled()
+                                                  ? entryColor_
+                                                  : nightlock::EntryColor::None;
+    if (effective == nightlock::EntryColor::None) {
+        setStyleSheet({});
+        return;
+    }
+
+    const entrycolors::DetailPalette colors = entrycolors::detailPalette(effective);
+    const QString background = colors.background.name(QColor::HexRgb);
+    const QString border = colors.border.name(QColor::HexRgb);
+    const QString separator = colors.separator.name(QColor::HexRgb);
+    setStyleSheet(QStringLiteral(
+                      "QFrame#card, QFrame#seedWordsCard {"
+                      " background: %1; border: 1px solid %2; border-radius: 9px;"
+                      "}"
+                      "QFrame#seedCopyBar {"
+                      " background: %1; border: 1px solid %2; border-bottom: none;"
+                      " border-top-left-radius: 8px; border-top-right-radius: 8px;"
+                      " border-bottom-left-radius: 0; border-bottom-right-radius: 0;"
+                      "}"
+                      "QFrame#fieldSeparator { border: none; background: %3; }")
+                      .arg(background, border, separator));
 }
 
 // The last visible row of the fields card must not draw its bottom

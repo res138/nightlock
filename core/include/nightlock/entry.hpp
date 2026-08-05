@@ -37,6 +37,19 @@ enum class EntryPreset {
     CryptoWallet,
 };
 
+// Optional list-row tint selected per entry. Rendering remains an
+// application preference; the stored choice survives while colors
+// are globally disabled.
+enum class EntryColor {
+    None = 0,
+    Red,
+    Orange,
+    Yellow,
+    Green,
+    Blue,
+    Purple,
+};
+
 // One preset-defined or user-defined field. Values use secure storage
 // because a custom field can contain secrets even when its current
 // display mode is plain text.
@@ -66,6 +79,7 @@ struct Entry {
     secure::String code;  // 2FA one-time code
     Pattern pattern = Pattern::None;  // detail-view background pattern
     EntryPreset preset = EntryPreset::Classic;
+    EntryColor color = EntryColor::None;
     std::vector<EntryField> fields;
 };
 

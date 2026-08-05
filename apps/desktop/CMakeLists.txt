@@ -6,6 +6,7 @@ set(CMAKE_AUTORCC ON)
 qt_add_executable(nightlock-desktop
     src/main.cpp
     src/demovault.cpp
+    src/entrycolors.cpp
     src/appearancesettings.cpp
     src/fonts.cpp
     src/generalsettings.cpp
@@ -18,6 +19,7 @@ qt_add_executable(nightlock-desktop
     src/models/entrylistmodel.cpp
     src/widgets/copylabel.cpp
     src/widgets/entrydetailview.cpp
+    src/widgets/entrycolorpicker.cpp
     src/widgets/entrylistdelegate.cpp
     src/widgets/frostedpanel.cpp
     src/widgets/grouptreeview.cpp

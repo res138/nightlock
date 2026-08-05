@@ -25,6 +25,7 @@
 #include "generalsettings.hpp"
 #include "qsecure.hpp"
 #include "widgets/icongallerypopup.hpp"
+#include "widgets/entrycolorpicker.hpp"
 #include "widgets/iconpicker.hpp"
 #include "widgets/nlmenu.hpp"
 #include "widgets/overlayscrollbar.hpp"
@@ -287,6 +288,14 @@ EntryEditDialog::EntryEditDialog(Mode mode, QWidget* parent)
         patternPicker_->setValue(PatternPicker::randomOption());
     layout->addWidget(makeField(tr("Pattern"), patternPicker_));
 
+    colorPicker_ = new EntryColorPicker;
+    colorField_ = makeField(tr("Color"), colorPicker_);
+    const bool showEntryColors = generalsettings::entryColorsEnabled();
+    // Keep the immutable Classic baseline independent of optional
+    // features; the field is revealed only after the viewport freezes.
+    colorField_->hide();
+    layout->addWidget(colorField_);
+
     nameEdit_ = new QLineEdit;
     nameEdit_->setMinimumWidth(384);  // keeps the fixed dialog ~440px wide
     layout->addWidget(makeField(tr("Name"), nameEdit_, true));
@@ -363,6 +372,7 @@ EntryEditDialog::EntryEditDialog(Mode mode, QWidget* parent)
     form->setFixedWidth(classicSize.width());
     scroll_->setFixedSize(classicSize);
     setFixedSize(classicSize);
+    colorField_->setVisible(showEntryColors);
 }
 
 void EntryEditDialog::setEntry(const nightlock::Entry& entry) {
@@ -384,6 +394,7 @@ void EntryEditDialog::setEntry(const nightlock::Entry& entry) {
     noteEdit_->setPlainText(QString::fromStdString(entry.note));
     iconPicker_->setSelectedIconValue(QString::fromStdString(entry.icon));
     patternPicker_->setValue(entry.pattern);
+    colorPicker_->setValue(entry.color);
 
     // Preset fields are matched onto the current built-in schema so a
     // later app version may add a field without losing older values.
@@ -417,6 +428,7 @@ void EntryEditDialog::applyTo(nightlock::Entry& entry) const {
     entry.note = noteEdit_->toPlainText().trimmed().toStdString();
     entry.icon = iconPicker_->selectedIconValue().toStdString();
     entry.pattern = patternPicker_->value();
+    entry.color = colorPicker_->value();
     entry.preset = preset_;
     entry.fields.clear();
     for (const ExtraFieldEditor& editor : extraFields_) {
