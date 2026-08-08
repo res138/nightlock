@@ -36,6 +36,12 @@ public:
     // Clears the fields and error state and focuses the input.
     void reset();
 
+    // Touch ID is offered only for an existing vault that has opted
+    // in. Busy state prevents duplicate macOS authentication sheets.
+    void setTouchIdAvailable(bool available);
+    void setTouchIdBusy(bool busy);
+    void showTouchIdError(const QString& message);
+
     // Error state + shake, e.g. after a failed VaultFile::open. An
     // empty message shows the default "Invalid password" line.
     void rejectPassword(const QString& message = {});
@@ -52,6 +58,7 @@ signals:
     // Unlock mode's "Forgot a password?" link; the owner forgets the
     // vault and restarts the first-run flow.
     void forgotPasswordRequested();
+    void touchIdRequested();
 
 private:
     void submit();
@@ -69,6 +76,8 @@ private:
     QWidget* locationHolder_;  // Create mode only
     QLabel* locationLabel_;
     QLabel* error_;
+    QPushButton* touchId_;
     QLabel* forgotPassword_;  // Unlock mode only
     QLabel* openExisting_;    // Create mode only
+    bool touchIdAvailable_ = false;
 };

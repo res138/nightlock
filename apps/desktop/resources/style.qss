@@ -421,6 +421,18 @@ QLabel#lockError {
     font-size: 12px;
     color: #D2605E;
 }
+
+QPushButton#lockTouchId {
+    background: transparent;
+    border: 1px solid @border-soft;
+    border-radius: 8px;
+    color: @text;
+    font-size: 13px;
+    padding: 0 14px;
+}
+QPushButton#lockTouchId:hover { background: @bg-input-focus; }
+QPushButton#lockTouchId:pressed { background: @bg-input; }
+QPushButton#lockTouchId:disabled { color: @text-muted; }
 QLabel#lockLink {
     font-size: 12px;
 }

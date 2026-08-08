@@ -9,6 +9,7 @@ class QHBoxLayout;
 class QLabel;
 class QListView;
 class QMenu;
+class QMenuBar;
 class QShortcut;
 class QSplitter;
 class QToolButton;
@@ -130,6 +131,7 @@ private:
 
     QWidget* buildTreeHeader();
     QWidget* buildListHeader();
+    void buildGlobalMenu();
     nightlock::Group* currentGroup() const;
     NlMenu* showSortMenu();
     void applySortMode(EntryListModel::SortMode mode);
@@ -167,6 +169,10 @@ private:
     SearchWindow* openSearch();
     PasswordGeneratorWindow* openPasswordGenerator();
     SettingsWindow* openSettings();
+    void openVaultDialog();
+    void createVaultDialog();
+    void saveVaultAs();
+    void closeDatabase();
     void lockVault();
     // Closes every vault-showing surface and wipes the session.
     void closeVaultSession();
@@ -180,6 +186,13 @@ private:
     void setVaultRoot(nightlock::Group* root);
     // Verifies a lock-screen submission against the vault service.
     void handlePassword(const QString& password);
+    // Retrieves the per-vault password from Keychain after macOS has
+    // accepted the enrolled fingerprint.
+    void handleTouchId();
+    void moveCurrentEntry(int offset);
+    void setAlwaysOnTop(bool enabled);
+    void fillWindow();
+    void centerWindow();
     // Hides the lock screen and shows `root`.
     void finishUnlock(nightlock::Group* root);
     void revealInVault(nightlock::Group* group, nightlock::Entry* entry);
@@ -207,10 +220,12 @@ private:
     PasswordGeneratorWindow* passwordGenerator_ = nullptr;
     SearchWindow* search_ = nullptr;   // the one search window, if open
     SettingsWindow* settings_ = nullptr;  // the one settings window, if open
+    QMenuBar* globalMenuBar_ = nullptr;   // parentless default menu bar on macOS
     LockScreen* lockScreen_ = nullptr; // covers the window while locked
     QSplitter* splitter_;
     QList<int> detailSplitterSizes_;  // pane widths to restore on re-dock
     QList<int> treeSplitterSizes_;    // pane widths to restore on reopen
+    bool alwaysOnTop_ = false;
 
 protected:
     void resizeEvent(QResizeEvent* event) override;

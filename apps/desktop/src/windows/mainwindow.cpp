@@ -1,5 +1,7 @@
 #include "mainwindow.hpp"
 
+#include <QAction>
+#include <QActionGroup>
 #include <QClipboard>
 #include <QCursor>
 #include <QDebug>
@@ -15,10 +17,13 @@
 #include <QLabel>
 #include <QListView>
 #include <QMessageBox>
+#include <QMenu>
+#include <QMenuBar>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QScrollBar>
+#include <QScreen>
 #include <QShortcut>
 #include <QStyle>
 #include <QTimer>
@@ -42,6 +47,7 @@
 #include "qsecure.hpp"
 #include "respaths.hpp"
 #include "standardicons.hpp"
+#include "touchid.hpp"
 #include "vaultservice.hpp"
 #include "widgets/entrydetailview.hpp"
 #include "widgets/entrylistdelegate.hpp"
@@ -247,6 +253,8 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     lockScreen_->hide();
     connect(lockScreen_, &LockScreen::passwordSubmitted, this,
             &MainWindow::handlePassword);
+    connect(lockScreen_, &LockScreen::touchIdRequested, this,
+            &MainWindow::handleTouchId);
     connect(lockScreen_, &LockScreen::openExistingRequested, this, [this] {
         const QString path = QFileDialog::getOpenFileName(
             this, tr("Open Vault"),
@@ -324,7 +332,279 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
         });
     });
 
+    buildGlobalMenu();
     detail_->setEntry(nullptr);
+}
+
+void MainWindow::buildGlobalMenu() {
+#ifdef Q_OS_MACOS
+    // A parentless menu bar is Qt's application-wide default, so the
+    // same native menu remains available while Settings, NetGraph or
+    // the password generator is the active top-level window.
+    globalMenuBar_ = new QMenuBar;
+    connect(this, &QObject::destroyed, globalMenuBar_, &QObject::deleteLater);
+#else
+    globalMenuBar_ = menuBar();
+#endif
+    globalMenuBar_->setNativeMenuBar(true);
+
+#ifndef Q_OS_MACOS
+    // AppKit supplies the application-name menu itself. Other
+    // platforms need the visible top-level menu explicitly.
+    auto* nightlockMenu = globalMenuBar_->addMenu(QStringLiteral("Nightlock"));
+#endif
+    auto* databaseMenu = globalMenuBar_->addMenu(QStringLiteral("Database"));
+    auto* settingsAction = new QAction(QStringLiteral("Settings…"), globalMenuBar_);
+    settingsAction->setMenuRole(QAction::PreferencesRole);
+    connect(settingsAction, &QAction::triggered, this,
+            [this] { openSettings(); });
+#ifdef Q_OS_MACOS
+    // Qt moves PreferencesRole into the system-provided Nightlock
+    // application menu, leaving Database's visible order untouched.
+    databaseMenu->addAction(settingsAction);
+#else
+    nightlockMenu->addAction(settingsAction);
+#endif
+
+    QAction* createDatabaseAction = databaseMenu->addAction(
+        QStringLiteral("Create Database…"), this, &MainWindow::createVaultDialog);
+    QAction* openDatabaseAction = databaseMenu->addAction(
+        QStringLiteral("Open Database…"), this, &MainWindow::openVaultDialog);
+    QAction* saveAsAction = databaseMenu->addAction(
+        QStringLiteral("Save Database As…"), this, &MainWindow::saveVaultAs);
+    databaseMenu->addSeparator();
+    QAction* closeDatabaseAction = databaseMenu->addAction(
+        QStringLiteral("Close Database"), this, &MainWindow::closeDatabase);
+    QAction* lockDatabaseAction = databaseMenu->addAction(
+        QStringLiteral("Lock Database"), this, &MainWindow::lockVault);
+    connect(databaseMenu, &QMenu::aboutToShow, this,
+            [this, createDatabaseAction, openDatabaseAction, saveAsAction,
+             closeDatabaseAction, lockDatabaseAction] {
+                auto* service = VaultService::instance();
+                const bool realVault = !service->demoMode();
+                const bool unlocked = realVault && service->isUnlocked() &&
+                                      !lockScreen_->isVisible();
+                createDatabaseAction->setEnabled(realVault);
+                openDatabaseAction->setEnabled(realVault);
+                saveAsAction->setEnabled(unlocked);
+                closeDatabaseAction->setEnabled(
+                    realVault && service->vaultExists() &&
+                    lockScreen_->mode() == LockScreen::Mode::Unlock);
+                lockDatabaseAction->setEnabled(unlocked);
+            });
+
+    auto* entryMenu = globalMenuBar_->addMenu(QStringLiteral("Entry"));
+    connect(entryMenu, &QMenu::aboutToShow, this, [this, entryMenu] {
+        entryMenu->clear();
+        const bool unlocked = !lockScreen_->isVisible() &&
+                              treeModel_->rootGroup();
+        nightlock::Entry* entry =
+            unlocked ? entryModel_->entry(list_->currentIndex()) : nullptr;
+
+        QAction* create = entryMenu->addAction(
+            QStringLiteral("Create"), this, [this] { addEntryTo(currentGroup()); });
+        create->setEnabled(unlocked);
+        QAction* edit = entryMenu->addAction(
+            QStringLiteral("Edit"), this, [this, entry] { editEntry(entry); });
+        QAction* remove = entryMenu->addAction(
+            QStringLiteral("Delete"), this, [this, entry] { deleteEntry(entry); });
+        edit->setEnabled(entry);
+        remove->setEnabled(entry);
+
+        entryMenu->addSeparator();
+        const QModelIndex index = entryModel_->indexOf(entry);
+        const bool customOrder =
+            entryModel_->sortMode() == EntryListModel::SortMode::Custom;
+        QAction* moveUp = entryMenu->addAction(
+            QStringLiteral("Move Up"), this, [this] { moveCurrentEntry(-1); });
+        QAction* moveDown = entryMenu->addAction(
+            QStringLiteral("Move Down"), this, [this] { moveCurrentEntry(1); });
+        moveUp->setEnabled(entry && customOrder && index.row() > 0);
+        moveDown->setEnabled(entry && customOrder && index.isValid() &&
+                             index.row() + 1 < entryModel_->rowCount());
+
+        entryMenu->addSeparator();
+        QAction* copyLogin = entryMenu->addAction(
+            QStringLiteral("Copy Login"), this, [entry] {
+                QGuiApplication::clipboard()->setText(
+                    QString::fromStdString(entry->login));
+            });
+        QAction* copyPassword = entryMenu->addAction(
+            QStringLiteral("Copy Password"), this, [entry] {
+                QGuiApplication::clipboard()->setText(toQString(entry->password));
+            });
+        QAction* copyUrl = entryMenu->addAction(
+            QStringLiteral("Copy URL"), this, [entry] {
+                QGuiApplication::clipboard()->setText(
+                    QString::fromStdString(entry->url));
+            });
+        copyLogin->setEnabled(entry && !entry->login.empty());
+        copyPassword->setEnabled(entry && !entry->password.empty());
+        copyUrl->setEnabled(entry && !entry->url.empty());
+
+        QMenu* attributes = entryMenu->addMenu(QStringLiteral("Copy Attribute"));
+        attributes->setEnabled(entry);
+        int attributeCount = 0;
+        const auto addAttribute = [this, attributes, &attributeCount](
+                                      const QString& label, const QString& value) {
+            if (value.isEmpty())
+                return;
+            ++attributeCount;
+            attributes->addAction(label, this, [value] {
+                QGuiApplication::clipboard()->setText(value);
+            });
+        };
+        if (entry) {
+            addAttribute(QStringLiteral("2FA Code"), toQString(entry->code));
+            addAttribute(QStringLiteral("Note"), QString::fromStdString(entry->note));
+            for (const nightlock::EntryField& field : entry->fields) {
+                addAttribute(QString::fromStdString(field.label),
+                             toQString(field.value));
+            }
+        }
+        if (attributeCount == 0) {
+            QAction* empty = attributes->addAction(QStringLiteral("No Attributes"));
+            empty->setEnabled(false);
+        }
+    });
+
+    auto* directoryMenu = globalMenuBar_->addMenu(QStringLiteral("Directory"));
+    connect(directoryMenu, &QMenu::aboutToShow, this,
+            [this, directoryMenu] {
+                directoryMenu->clear();
+                const bool unlocked = !lockScreen_->isVisible() &&
+                                      treeModel_->rootGroup();
+                nightlock::Group* group = unlocked ? currentGroup() : nullptr;
+                const bool mutableGroup = group && group != treeModel_->rootGroup();
+                QAction* create = directoryMenu->addAction(
+                    QStringLiteral("Create"), this,
+                    [this] { addFolderTo(currentGroup()); });
+                QAction* rename = directoryMenu->addAction(
+                    QStringLiteral("Rename"), this,
+                    [this, group] { renameFolder(group); });
+                QAction* remove = directoryMenu->addAction(
+                    QStringLiteral("Delete"), this,
+                    [this, group] { deleteFolder(group); });
+                create->setEnabled(unlocked);
+                rename->setEnabled(mutableGroup);
+                remove->setEnabled(mutableGroup);
+            });
+
+    auto* applicationsMenu = globalMenuBar_->addMenu(QStringLiteral("Applications"));
+    QAction* graphAction = applicationsMenu->addAction(
+        QStringLiteral("NetGraph"), this, &MainWindow::openGraph);
+    applicationsMenu->addAction(
+        QStringLiteral("Password Generator"), this,
+        [this] { openPasswordGenerator(); });
+    connect(applicationsMenu, &QMenu::aboutToShow, this,
+            [this, graphAction] {
+                graphAction->setEnabled(!lockScreen_->isVisible() &&
+                                        !graphsettings::disabled());
+            });
+
+    auto* viewMenu = globalMenuBar_->addMenu(QStringLiteral("View"));
+    QMenu* appearanceMenu = viewMenu->addMenu(QStringLiteral("Appearance"));
+    auto* themeGroup = new QActionGroup(appearanceMenu);
+    themeGroup->setExclusive(true);
+    const auto addTheme = [this, appearanceMenu, themeGroup](
+                              const QString& title, const char* id) {
+        QAction* action = appearanceMenu->addAction(title);
+        action->setCheckable(true);
+        action->setData(QLatin1String(id));
+        themeGroup->addAction(action);
+        connect(action, &QAction::triggered, this, [id] {
+            appearancesettings::setTheme(QLatin1String(id));
+        });
+        return action;
+    };
+    addTheme(QStringLiteral("Light"), appearancesettings::kThemes[0]);
+    addTheme(QStringLiteral("Dark"), appearancesettings::kThemes[1]);
+    addTheme(QStringLiteral("System"), appearancesettings::kThemes[2]);
+    connect(appearanceMenu, &QMenu::aboutToShow, this,
+            [themeGroup] {
+                const QString current = appearancesettings::theme();
+                for (QAction* action : themeGroup->actions())
+                    action->setChecked(action->data().toString() == current);
+            });
+
+    QMenu* accentMenu = viewMenu->addMenu(QStringLiteral("Accent Color"));
+    auto* accentGroup = new QActionGroup(accentMenu);
+    accentGroup->setExclusive(true);
+    const auto addAccent = [this, accentMenu, accentGroup](
+                               const QString& title, const char* id) {
+        QAction* action = accentMenu->addAction(title);
+        action->setCheckable(true);
+        action->setData(QLatin1String(id));
+        accentGroup->addAction(action);
+        connect(action, &QAction::triggered, this, [id] {
+            appearancesettings::setAccent(QLatin1String(id));
+        });
+        return action;
+    };
+    addAccent(QStringLiteral("Black"), appearancesettings::kAccents[0]);
+    addAccent(QStringLiteral("Blue"), appearancesettings::kAccents[1]);
+    addAccent(QStringLiteral("Green"), appearancesettings::kAccents[2]);
+    connect(accentMenu, &QMenu::aboutToShow, this,
+            [accentGroup] {
+                const QString current = appearancesettings::accent();
+                for (QAction* action : accentGroup->actions())
+                    action->setChecked(action->data().toString() == current);
+            });
+
+    viewMenu->addSeparator();
+    QAction* alwaysOnTop = viewMenu->addAction(QStringLiteral("Always on Top"));
+    alwaysOnTop->setCheckable(true);
+    connect(alwaysOnTop, &QAction::toggled, this,
+            &MainWindow::setAlwaysOnTop);
+    QAction* folderPanel = viewMenu->addAction(QStringLiteral("Show Directory Panel"));
+    folderPanel->setCheckable(true);
+    connect(folderPanel, &QAction::triggered, this,
+            [this](bool shown) { setTreePaneVisible(shown); });
+    QAction* fullScreen = viewMenu->addAction(QStringLiteral("Enter Full Screen"));
+    fullScreen->setCheckable(true);
+    fullScreen->setShortcut(QKeySequence(QKeySequence::FullScreen));
+    connect(fullScreen, &QAction::triggered, this, [this](bool enabled) {
+        enabled ? showFullScreen() : showNormal();
+    });
+    connect(viewMenu, &QMenu::aboutToShow, this,
+            [this, alwaysOnTop, folderPanel, fullScreen] {
+                alwaysOnTop->setChecked(alwaysOnTop_);
+                folderPanel->setChecked(treePane_->isVisible());
+                fullScreen->setChecked(isFullScreen());
+                fullScreen->setText(isFullScreen()
+                                        ? QStringLiteral("Exit Full Screen")
+                                        : QStringLiteral("Enter Full Screen"));
+            });
+
+    auto* windowMenu = globalMenuBar_->addMenu(QStringLiteral("Window"));
+    windowMenu->addAction(QStringLiteral("Minimize"),
+                          QKeySequence(QStringLiteral("Ctrl+M")), this,
+                          &QWidget::showMinimized);
+    windowMenu->addAction(QStringLiteral("Zoom"), this, [this] {
+#ifdef Q_OS_MACOS
+        macwindow::performZoom(this);
+#else
+        isMaximized() ? showNormal() : showMaximized();
+#endif
+    });
+    windowMenu->addAction(QStringLiteral("Fill"), this, &MainWindow::fillWindow);
+    windowMenu->addAction(QStringLiteral("Center"), this, &MainWindow::centerWindow);
+
+    auto* helpMenu = globalMenuBar_->addMenu(QStringLiteral("Help"));
+    helpMenu->addAction(QStringLiteral("Documentation"), this, [] {
+        QDesktopServices::openUrl(
+            QUrl(QStringLiteral("https://github.com/res138/nightlock")));
+    });
+
+#ifdef Q_OS_MACOS
+    // AppKit decorates its registered Window menu with the exact
+    // system Move & Resize and Full Screen Tile commands supported by
+    // the running macOS version.
+    const QString windowTitle = windowMenu->title();
+    QTimer::singleShot(0, this, [this, windowTitle] {
+        macwindow::configureWindowMenu(globalMenuBar_, windowTitle);
+    });
+#endif
 }
 
 // Toolbar over the directory pane: the traffic lights keep their
@@ -685,6 +965,84 @@ SettingsWindow* MainWindow::openSettings() {
     return settings_;
 }
 
+void MainWindow::openVaultDialog() {
+    auto* service = VaultService::instance();
+    if (service->demoMode())
+        return;
+    const QString path = QFileDialog::getOpenFileName(
+        this, tr("Open Database"),
+        QFileInfo(service->vaultPath()).absolutePath(),
+        tr("Nightlock Vault (*.nlck)"));
+    if (!path.isEmpty())
+        switchToVault(path);
+}
+
+void MainWindow::createVaultDialog() {
+    auto* service = VaultService::instance();
+    if (service->demoMode())
+        return;
+    QString path = QFileDialog::getSaveFileName(
+        this, tr("Create Database"),
+        QFileInfo(service->vaultPath()).dir().filePath(
+            QStringLiteral("Vault.nlck")),
+        tr("Nightlock Vault (*.nlck)"), nullptr,
+        QFileDialog::DontConfirmOverwrite);
+    if (path.isEmpty())
+        return;
+    if (!path.endsWith(QLatin1String(".nlck"), Qt::CaseInsensitive))
+        path += QLatin1String(".nlck");
+    if (QFileInfo::exists(path)) {
+        QMessageBox::warning(
+            this, tr("Create Database"),
+            tr("A vault already exists there. Pick another name."));
+        return;
+    }
+    createVaultAt(path);
+}
+
+void MainWindow::saveVaultAs() {
+    auto* service = VaultService::instance();
+    if (service->demoMode() || !service->isUnlocked())
+        return;
+    QString path = QFileDialog::getSaveFileName(
+        this, tr("Save Database As"), service->vaultPath(),
+        tr("Nightlock Vault (*.nlck)"), nullptr,
+        QFileDialog::DontConfirmOverwrite);
+    if (path.isEmpty())
+        return;
+    if (!path.endsWith(QLatin1String(".nlck"), Qt::CaseInsensitive))
+        path += QLatin1String(".nlck");
+    if (QFileInfo::exists(path) && path != service->vaultPath()) {
+        const auto answer = QMessageBox::question(
+            this, tr("Replace Database"),
+            tr("A database already exists there. Replace it?"));
+        if (answer != QMessageBox::Yes)
+            return;
+    }
+    const nightlock::VaultError error = service->saveAs(path);
+    if (error != nightlock::VaultError::None) {
+        QMessageBox::warning(
+            this, tr("Save Database As"),
+            tr("The database could not be saved: %1")
+                .arg(QString::fromUtf8(nightlock::errorMessage(error))));
+        return;
+    }
+    updateVaultTitle();
+}
+
+void MainWindow::closeDatabase() {
+    auto* service = VaultService::instance();
+    if (service->demoMode())
+        return;
+    closeVaultSession();
+    service->clearRememberedVaultPath();
+    service->setVaultPath(VaultService::defaultVaultPath());
+    updateVaultTitle();
+    showLockScreen(true);
+    raise();
+    activateWindow();
+}
+
 QWidget* MainWindow::openSettingsForScreenshot(int category) {
     SettingsWindow* window = openSettings();
     window->selectCategory(category);
@@ -713,6 +1071,42 @@ void MainWindow::lockVault() {
     showLockScreen(false);
 }
 
+void MainWindow::moveCurrentEntry(int offset) {
+    nightlock::Entry* entry = entryModel_->entry(list_->currentIndex());
+    if (!entry || !entryModel_->moveEntryBy(entry, offset))
+        return;
+    list_->setCurrentIndex(entryModel_->indexOf(entry));
+    refreshGraph();
+}
+
+void MainWindow::setAlwaysOnTop(bool enabled) {
+    if (alwaysOnTop_ == enabled)
+        return;
+    alwaysOnTop_ = enabled;
+#ifdef Q_OS_MACOS
+    macwindow::setAlwaysOnTop(this, enabled);
+#else
+    setWindowFlag(Qt::WindowStaysOnTopHint, enabled);
+    show();
+#endif
+}
+
+void MainWindow::fillWindow() {
+    if (isFullScreen())
+        showNormal();
+    if (QScreen* target = screen())
+        setGeometry(target->availableGeometry());
+}
+
+void MainWindow::centerWindow() {
+    if (isFullScreen())
+        showNormal();
+    if (QScreen* target = screen()) {
+        const QRect available = target->availableGeometry();
+        move(available.center() - rect().center());
+    }
+}
+
 void MainWindow::closeVaultSession() {
     if (graph_)
         graph_->close();
@@ -736,9 +1130,16 @@ void MainWindow::closeVaultSession() {
 }
 
 void MainWindow::showLockScreen(bool create) {
+    touchid::cancelAuthentication();
     lockScreen_->setMode(create ? LockScreen::Mode::Create
                                 : LockScreen::Mode::Unlock);
     lockScreen_->setVaultTarget(VaultService::instance()->vaultPath());
+    QString touchIdError;
+    const bool offerTouchId =
+        !create &&
+        touchid::isEnabledForVault(VaultService::instance()->vaultPath()) &&
+        touchid::isAvailable(&touchIdError);
+    lockScreen_->setTouchIdAvailable(offerTouchId);
     lockScreen_->setGeometry(rect());
     lockScreen_->reset();
     lockScreen_->show();
@@ -746,6 +1147,10 @@ void MainWindow::showLockScreen(bool create) {
     // Keynote-style: the Dock icon wears a padlock while locked.
     QGuiApplication::setWindowIcon(
         QIcon(respaths::icon(QStringLiteral("appicon-locked.png"))));
+    // The opt-in is explicit, so begin authentication immediately;
+    // cancelling simply leaves the password field and button ready.
+    if (offerTouchId)
+        QTimer::singleShot(0, this, &MainWindow::handleTouchId);
 }
 
 void MainWindow::updateVaultTitle() {
@@ -794,6 +1199,15 @@ void MainWindow::signOutVault() {
     auto* service = VaultService::instance();
     if (service->demoMode())
         return;
+    if (touchid::isEnabledForVault(service->vaultPath())) {
+        QString error;
+        if (!touchid::disableForVault(service->vaultPath(), &error)) {
+            QMessageBox::warning(
+                this, tr("Sign Out"),
+                tr("The Touch ID credential could not be removed: %1").arg(error));
+            return;
+        }
+    }
     closeVaultSession();
     service->clearRememberedVaultPath();
     service->setVaultPath(VaultService::defaultVaultPath());
@@ -856,7 +1270,59 @@ void MainWindow::handlePassword(const QString& password) {
     }
 }
 
+void MainWindow::handleTouchId() {
+    auto* service = VaultService::instance();
+    if (!lockScreen_->isVisible() ||
+        lockScreen_->mode() != LockScreen::Mode::Unlock ||
+        !touchid::isEnabledForVault(service->vaultPath()))
+        return;
+
+    const QString requestedPath = service->vaultPath();
+    lockScreen_->setTouchIdBusy(true);
+    touchid::authenticate(
+        requestedPath, this,
+        [this, requestedPath](touchid::AuthenticationResult result) {
+            auto* currentService = VaultService::instance();
+            if (!lockScreen_->isVisible() ||
+                lockScreen_->mode() != LockScreen::Mode::Unlock ||
+                currentService->vaultPath() != requestedPath)
+                return;
+
+            lockScreen_->setTouchIdBusy(false);
+            if (result.cancelled)
+                return;
+            if (!result.error.isEmpty()) {
+                if (!touchid::isEnabledForVault(requestedPath))
+                    lockScreen_->setTouchIdAvailable(false);
+                lockScreen_->showTouchIdError(
+                    tr("Touch ID failed: %1").arg(result.error));
+                return;
+            }
+
+            const nightlock::VaultError error =
+                currentService->unlock(result.password);
+            result.password.clear();
+            if (error == nightlock::VaultError::None) {
+                finishUnlock(currentService->root());
+                return;
+            }
+            if (error == nightlock::VaultError::WrongPassword) {
+                // The database password changed outside this app; do
+                // not keep offering a credential that cannot work.
+                touchid::disableForVault(requestedPath);
+                lockScreen_->setTouchIdAvailable(false);
+                lockScreen_->showTouchIdError(
+                    tr("The saved Touch ID credential is outdated. Enter the password "
+                       "and enable Touch ID again in Settings."));
+                return;
+            }
+            lockScreen_->showTouchIdError(
+                QString::fromUtf8(nightlock::errorMessage(error)));
+        });
+}
+
 void MainWindow::finishUnlock(nightlock::Group* root) {
+    touchid::cancelAuthentication();
     setVaultRoot(root);
     lockScreen_->hide();
     // The Dock loses its lock badge together with the screen.

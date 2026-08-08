@@ -41,6 +41,11 @@ public:
     // previous image stays behind as "<path>.bak".
     VaultError save();
 
+    // Writes the live vault to a new path and adopts it as the active
+    // file. The original remains untouched; on failure the session
+    // keeps its original path.
+    VaultError saveAs(std::filesystem::path path);
+
     // True when `password` derives this open vault's key (same salt
     // and params, constant-time compare). False on a locked vault —
     // there is no key to compare against.

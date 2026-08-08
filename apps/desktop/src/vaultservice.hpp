@@ -55,6 +55,11 @@ public:
 
     nightlock::VaultError createNew(const QString& password);
     nightlock::VaultError unlock(const QString& password);
+    // Saves the open vault under a new name and retargets the session.
+    nightlock::VaultError saveAs(const QString& path);
+    // Checks a candidate against the currently open vault without
+    // changing or retaining it. Used before enabling Touch ID.
+    bool verifyPassword(const QString& password) const;
     // Verifies `current` against the open vault, then re-encrypts and
     // saves under `next`. NotOpen while locked or in demo mode,
     // WrongPassword when `current` does not match.

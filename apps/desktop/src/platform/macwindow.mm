@@ -2,6 +2,8 @@
 
 #import <AppKit/AppKit.h>
 
+#include <QMenuBar>
+#include <QString>
 #include <QWidget>
 
 namespace macwindow {
@@ -44,6 +46,31 @@ void layoutTrafficLights(QWidget* window, int leftMargin, int centerY) {
         [button setFrameOrigin:[button.superview convertPoint:inFrame fromView:frameView]];
         x += kPitch;
     }
+}
+
+void configureWindowMenu(QMenuBar* menuBar, const QString& title) {
+    if (!menuBar)
+        return;
+    NSMenu* nativeBar = menuBar->toNSMenu();
+    NSString* expected = title.toNSString();
+    for (NSMenuItem* item in nativeBar.itemArray) {
+        if ([item.title isEqualToString:expected] && item.submenu) {
+            NSApp.windowsMenu = item.submenu;
+            return;
+        }
+    }
+}
+
+void performZoom(QWidget* window) {
+    NSView* view = reinterpret_cast<NSView*>(window->winId());
+    [view.window performZoom:nil];
+}
+
+void setAlwaysOnTop(QWidget* window, bool enabled) {
+    NSView* view = reinterpret_cast<NSView*>(window->winId());
+    NSWindow* nswindow = view.window;
+    if (nswindow)
+        nswindow.level = enabled ? NSFloatingWindowLevel : NSNormalWindowLevel;
 }
 
 }  // namespace macwindow

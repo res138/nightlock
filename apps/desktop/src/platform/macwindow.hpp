@@ -1,6 +1,8 @@
 #pragma once
 
 class QWidget;
+class QMenuBar;
+class QString;
 
 namespace macwindow {
 
@@ -15,5 +17,15 @@ void hideTitleBar(QWidget* window);
 // from the window's top-left corner). AppKit re-lays the buttons out
 // on its own occasions, so call this again after window resizes.
 void layoutTrafficLights(QWidget* window, int leftMargin, int centerY);
+
+// Marks the named native menu as AppKit's Window menu. macOS then
+// supplies its current system Move & Resize and Full Screen Tile
+// submenus in addition to the app-provided actions.
+void configureWindowMenu(QMenuBar* menuBar, const QString& title);
+
+// Native window operations whose macOS semantics differ from Qt's
+// cross-platform maximize/stay-on-top flags.
+void performZoom(QWidget* window);
+void setAlwaysOnTop(QWidget* window, bool enabled);
 
 }  // namespace macwindow
