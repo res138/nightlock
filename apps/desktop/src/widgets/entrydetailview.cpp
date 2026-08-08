@@ -549,7 +549,8 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
         }
     };
     for (const nightlock::EntryField& field : entry->fields) {
-        if (field.custom && nightlock::expiration::isLabel(field.label)) {
+        if (field.custom && !field.secret &&
+            nightlock::expiration::isLabel(field.label)) {
             if (!expirationField && !field.value.empty())
                 expirationField = &field;
             continue;

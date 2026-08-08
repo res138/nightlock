@@ -822,6 +822,7 @@ void EntryEditDialog::removeExtraField(QWidget* row) {
         extraLayoutRows_.end());
     extraFields_.erase(it);
     extraFieldsContainer_->setVisible(!extraFields_.empty());
+    refreshSaveAvailability();
 }
 
 QWidget* EntryEditDialog::makeField(const QString& label, QWidget* editor, bool required,
