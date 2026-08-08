@@ -15,6 +15,7 @@
 
 #include "appearancesettings.hpp"
 #include "entrycolors.hpp"
+#include "expirationui.hpp"
 #include "generalsettings.hpp"
 #include "graphsettings.hpp"
 
@@ -303,6 +304,7 @@ EntryDetailView::EntryDetailView(QWidget* parent)
     metaLayout->setContentsMargins(16, 2, 16, 2);
     metaLayout->setSpacing(0);
     createdRow_ = makeRow(metaLayout, tr("Created"));
+    expirationRow_ = makeRow(metaLayout, tr("Expiration"));
     modifiedRow_ = makeRow(metaLayout, tr("Modified"), true);
     layout->addWidget(metaCard);
     layout->addSpacing(kSectionGap);
@@ -535,6 +537,7 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     clearAdditionalFields();
     QString cryptoAsset;
     QStringList seedWords;
+    const nightlock::EntryField* expirationField = nullptr;
     const auto populateRow = [](FieldRow& row, const nightlock::EntryField& field) {
         if (field.secret) {
             row.value->hide();
@@ -546,6 +549,12 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
         }
     };
     for (const nightlock::EntryField& field : entry->fields) {
+        if (field.custom && !field.secret &&
+            nightlock::expiration::isLabel(field.label)) {
+            if (!expirationField && !field.value.empty())
+                expirationField = &field;
+            continue;
+        }
         if (field.value.empty())
             continue;
         if (entry->preset == nightlock::EntryPreset::CryptoWallet && !field.custom &&
@@ -610,6 +619,19 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
                             !additionalRows_.isEmpty());
 
     createdRow_.value->setText(formatDate(entry->created));
+    expirationRow_.frame->setVisible(expirationField != nullptr);
+    if (expirationField) {
+        const QDate date = expirationui::date(*expirationField);
+        expirationRow_.value->setText(
+            date.isValid() ? expirationui::displayText(date)
+                           : toQString(expirationField->value));
+    } else {
+        expirationRow_.value->clear();
+    }
+    expirationRow_.value->setStyleSheet(
+        expirationui::isExpired(*entry)
+            ? QStringLiteral("color:#FF2D2D; font-weight:600;")
+            : QString{});
     modifiedRow_.value->setText(formatDate(entry->modified));
 
     refreshLastVisibleRow();

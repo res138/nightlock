@@ -4,6 +4,7 @@
 #include <QCheckBox>
 #include <QCursor>
 #include <QEasingCurve>
+#include <QFocusEvent>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -22,6 +23,7 @@
 #include <tuple>
 
 #include "appearancesettings.hpp"
+#include "expirationui.hpp"
 #include "generalsettings.hpp"
 #include "qsecure.hpp"
 #include "widgets/icongallerypopup.hpp"
@@ -34,6 +36,132 @@
 namespace {
 
 using nightlock::EntryPreset;
+
+bool isExpirationLabel(const QString& label) {
+    const QByteArray utf8 = label.trimmed().toUtf8();
+    return nightlock::expiration::isLabel(
+        std::string_view(utf8.constData(), static_cast<std::size_t>(utf8.size())));
+}
+
+// An expiration custom field is edited as clean DD / MM / YYYY segments
+// with separators inserted as the user types. Unlike QLineEdit's native
+// input mask, this leaves no technical underscore placeholders behind.
+// It switches to a localized long date as soon as focus leaves it.
+// The vault always receives DD/MM/YYYY, independently of the UI locale.
+class ExpirationLineEdit : public QLineEdit {
+public:
+    explicit ExpirationLineEdit(QWidget* parent = nullptr) : QLineEdit(parent) {
+        connect(this, &QLineEdit::textEdited, this, [this](const QString& value) {
+            if (!expirationMode_)
+                return;
+            const QString formatted = numericText(value);
+            if (formatted != value) {
+                setText(formatted);
+                setCursorPosition(formatted.size());
+            }
+        });
+    }
+
+    void setExpirationMode(bool enabled) {
+        if (expirationMode_ == enabled)
+            return;
+        expirationMode_ = enabled;
+        if (!enabled) {
+            setPlaceholderText(ordinaryPlaceholder_);
+            setMaxLength(32767);
+            return;
+        }
+
+        ordinaryPlaceholder_ = placeholderText();
+        setPlaceholderText(tr("DD / MM / YYYY"));
+        const QDate parsed = parsedDate();
+        if (parsed.isValid()) {
+            setText(expirationui::displayText(parsed));
+        } else {
+            beginNumericEditing();
+        }
+    }
+
+    QString valueForStorage() const {
+        if (!expirationMode_)
+            return text();
+        if (blank())
+            return {};
+        const QDate parsed = parsedDate();
+        return parsed.isValid() ? expirationui::storedText(parsed) : text().trimmed();
+    }
+
+    bool validOrEmpty() const {
+        if (!expirationMode_)
+            return true;
+        return blank() || parsedDate().isValid();
+    }
+
+protected:
+    void focusInEvent(QFocusEvent* event) override {
+        if (expirationMode_)
+            beginNumericEditing();
+        QLineEdit::focusInEvent(event);
+    }
+
+    void focusOutEvent(QFocusEvent* event) override {
+        QLineEdit::focusOutEvent(event);
+        if (!expirationMode_)
+            return;
+        const QDate parsed = parsedDate();
+        if (!parsed.isValid())
+            return;
+        setMaxLength(32767);
+        setText(expirationui::displayText(parsed));
+    }
+
+private:
+    bool blank() const {
+        return digits(text()).isEmpty();
+    }
+
+    static QString digits(const QString& value) {
+        QString result;
+        result.reserve(8);
+        for (const QChar character : value) {
+            if (character.isDigit() && result.size() < 8)
+                result.append(character);
+        }
+        return result;
+    }
+
+    static QString numericText(const QString& value) {
+        const QString raw = digits(value);
+        if (raw.size() <= 2)
+            return raw;
+        QString result = raw.left(2) + QStringLiteral(" / ") + raw.mid(2, 2);
+        if (raw.size() > 4)
+            result += QStringLiteral(" / ") + raw.mid(4, 4);
+        return result;
+    }
+
+    QDate parsedDate() const {
+        if (const QDate displayed = expirationui::parseText(text()); displayed.isValid())
+            return displayed;
+        const QString raw = digits(text());
+        return raw.size() == 8
+                   ? expirationui::parseText(raw.left(2) + QLatin1Char('/') +
+                                             raw.mid(2, 2) + QLatin1Char('/') +
+                                             raw.mid(4, 4))
+                   : QDate{};
+    }
+
+    void beginNumericEditing() {
+        const QDate parsed = parsedDate();
+        setMaxLength(14);
+        setText(parsed.isValid()
+                    ? parsed.toString(QStringLiteral("dd / MM / yyyy"))
+                    : numericText(text()));
+    }
+
+    bool expirationMode_ = false;
+    QString ordinaryPlaceholder_;
+};
 
 QString presetTitle(EntryPreset preset) {
     switch (preset) {
@@ -432,7 +560,12 @@ void EntryEditDialog::applyTo(nightlock::Entry& entry) const {
             continue;
         nightlock::EntryField field;
         field.label = label.toStdString();
-        assignSecret(field.value, editor.valueEdit->text());
+        QString value = editor.valueEdit->text();
+        if (const auto* expirationEdit =
+                dynamic_cast<const ExpirationLineEdit*>(editor.valueEdit)) {
+            value = expirationEdit->valueForStorage();
+        }
+        assignSecret(field.value, value);
         field.secret = editor.secretToggle ? editor.secretToggle->isChecked()
                                            : editor.fixedSecret;
         field.custom = editor.custom;
@@ -517,7 +650,13 @@ void EntryEditDialog::refreshSaveAvailability() {
     const bool nameReady = !nameEdit_->text().trimmed().isEmpty();
     const bool loginReady = !loginField_->isVisible() ||
                             !loginEdit_->text().trimmed().isEmpty();
-    saveButton_->setEnabled(nameReady && loginReady);
+    const bool expirationReady = std::all_of(
+        extraFields_.begin(), extraFields_.end(), [](const ExtraFieldEditor& editor) {
+            const auto* expirationEdit =
+                dynamic_cast<const ExpirationLineEdit*>(editor.valueEdit);
+            return !expirationEdit || expirationEdit->validOrEmpty();
+        });
+    saveButton_->setEnabled(nameReady && loginReady && expirationReady);
 }
 
 void EntryEditDialog::addPresetFields(EntryPreset preset) {
@@ -592,7 +731,8 @@ void EntryEditDialog::addExtraField(const QString& label, bool secret, bool cust
     editor.custom = custom;
     editor.fixedLabel = label;
     editor.fixedSecret = secret;
-    editor.valueEdit = new QLineEdit;
+    editor.valueEdit = custom ? static_cast<QLineEdit*>(new ExpirationLineEdit)
+                              : new QLineEdit;
     editor.valueEdit->setText(value);
 
     if (!custom) {
@@ -620,6 +760,19 @@ void EntryEditDialog::addExtraField(const QString& label, bool secret, bool cust
         rowLayout->addWidget(editor.valueEdit, 1);
         rowLayout->addWidget(editor.secretToggle);
         rowLayout->addWidget(editor.removeButton);
+
+        auto* expirationEdit = static_cast<ExpirationLineEdit*>(editor.valueEdit);
+        const auto syncExpirationMode = [expirationEdit](const QString& fieldLabel) {
+            expirationEdit->setExpirationMode(isExpirationLabel(fieldLabel));
+        };
+        connect(editor.labelEdit, &QLineEdit::textChanged, this,
+                [this, syncExpirationMode](const QString& fieldLabel) {
+                    syncExpirationMode(fieldLabel);
+                    refreshSaveAvailability();
+                });
+        connect(editor.valueEdit, &QLineEdit::textChanged, this,
+                [this] { refreshSaveAvailability(); });
+        syncExpirationMode(editor.labelEdit->text());
     }
 
     QWidget* row = editor.row;
@@ -669,6 +822,7 @@ void EntryEditDialog::removeExtraField(QWidget* row) {
         extraLayoutRows_.end());
     extraFields_.erase(it);
     extraFieldsContainer_->setVisible(!extraFields_.empty());
+    refreshSaveAvailability();
 }
 
 QWidget* EntryEditDialog::makeField(const QString& label, QWidget* editor, bool required,

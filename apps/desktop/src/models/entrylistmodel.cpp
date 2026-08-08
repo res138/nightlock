@@ -9,6 +9,7 @@
 #include <nightlock/group.hpp>
 
 #include "vaultservice.hpp"
+#include "expirationui.hpp"
 
 namespace {
 
@@ -234,6 +235,8 @@ QVariant EntryListModel::data(const QModelIndex& index, int role) const {
         return e->preset != nightlock::EntryPreset::Classic;
     case ColorRole:
         return static_cast<int>(e->color);
+    case ExpiredRole:
+        return expirationui::isExpired(*e);
     case Qt::DecorationRole:
         if (!e->icon.empty())
             return QIcon(QString::fromStdString(e->icon));

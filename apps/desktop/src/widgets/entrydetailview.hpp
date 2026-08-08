@@ -115,6 +115,7 @@ private:
     QList<SpoilerLabel*> seedSpoilers_;
     QList<FieldRow> customRows_;
     FieldRow createdRow_;
+    FieldRow expirationRow_;
     FieldRow modifiedRow_;
     QPushButton* graphButton_;
 };

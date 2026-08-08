@@ -5,6 +5,7 @@ add_library(nightlock-core STATIC
     src/format/serialize.cpp
     src/format/tlv.cpp
     src/generator/generator.cpp
+    src/model/expiration.cpp
     src/model/group.cpp
     src/secure/secure.cpp
     src/vault/atomic_write.cpp
