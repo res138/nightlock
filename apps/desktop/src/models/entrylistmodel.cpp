@@ -119,6 +119,26 @@ bool EntryListModel::removeEntry(nightlock::Entry* entry) {
     return removed;
 }
 
+bool EntryListModel::moveEntryBy(nightlock::Entry* entry, int offset) {
+    if (sortMode_ != SortMode::Custom || (offset != -1 && offset != 1))
+        return false;
+    const QModelIndex source = indexOf(entry);
+    if (!source.isValid())
+        return false;
+    const int from = source.row();
+    const int target = from + offset;
+    if (target < 0 || target >= rowCount())
+        return false;
+    const int destination = offset < 0 ? target : target + 1;
+    if (!beginMoveRows({}, from, from, {}, destination))
+        return false;
+    group_->moveEntry(from, destination);
+    rebuildView();
+    endMoveRows();
+    VaultService::instance()->markDirty();
+    return true;
+}
+
 Qt::ItemFlags EntryListModel::flags(const QModelIndex& index) const {
     if (!index.isValid())
         return Qt::ItemIsDropEnabled;  // drops land between rows

@@ -49,6 +49,8 @@ public:
     void notifyEntryChanged(nightlock::Entry* entry);
     // Deletes the entry from its group.
     bool removeEntry(nightlock::Entry* entry);
+    // Moves one entry by a single row in Custom order.
+    bool moveEntryBy(nightlock::Entry* entry, int offset);
 
     int rowCount(const QModelIndex& parent = {}) const override;
     QVariant data(const QModelIndex& index, int role) const override;

@@ -122,6 +122,14 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     error_->setAlignment(Qt::AlignHCenter);
     error_->setFixedHeight(18);  // reserved, so nothing jumps on error
 
+    touchId_ = new QPushButton(tr("Unlock with Touch ID"));
+    touchId_->setObjectName(QStringLiteral("lockTouchId"));
+    touchId_->setCursor(Qt::PointingHandCursor);
+    touchId_->setFixedSize(180, 34);
+    connect(touchId_, &QPushButton::clicked, this,
+            &LockScreen::touchIdRequested);
+    touchId_->hide();
+
     // Unlock mode's escape hatch: no password means this vault is a
     // dead end — forget it and start over on the first-run screen (the
     // file itself stays on disk). Shares the bottom slot with Create
@@ -164,6 +172,7 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     layout->addWidget(locationHolder_, 0, Qt::AlignHCenter);
     layout->addSpacing(10);
     layout->addWidget(error_);
+    layout->addWidget(touchId_, 0, Qt::AlignHCenter);
     layout->addStretch(6);
     layout->addWidget(openExisting_);
     layout->addWidget(forgotPassword_);
@@ -182,6 +191,7 @@ void LockScreen::setMode(Mode mode) {
     locationHolder_->setVisible(create);
     openExisting_->setVisible(create);
     forgotPassword_->setVisible(!create);
+    touchId_->setVisible(!create && touchIdAvailable_);
 }
 
 void LockScreen::setVaultTarget(const QString& path) {
@@ -207,6 +217,24 @@ void LockScreen::reset() {
     field_->clear();
     confirm_->clear();
     setError(false);
+    setTouchIdBusy(false);
+    field_->setFocus();
+}
+
+void LockScreen::setTouchIdAvailable(bool available) {
+    touchIdAvailable_ = available;
+    touchId_->setVisible(available && mode_ == Mode::Unlock);
+}
+
+void LockScreen::setTouchIdBusy(bool busy) {
+    touchId_->setEnabled(!busy);
+    touchId_->setText(busy ? tr("Waiting for Touch ID…")
+                           : tr("Unlock with Touch ID"));
+}
+
+void LockScreen::showTouchIdError(const QString& message) {
+    setTouchIdBusy(false);
+    error_->setText(message);
     field_->setFocus();
 }
 

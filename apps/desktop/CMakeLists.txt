@@ -14,6 +14,7 @@ qt_add_executable(nightlock-desktop
     src/hotkeys.cpp
     src/respaths.cpp
     src/standardicons.cpp
+    src/touchid.hpp
     src/vaultservice.cpp
     src/models/grouptreemodel.cpp
     src/models/entrylistmodel.cpp
@@ -55,8 +56,17 @@ target_compile_definitions(nightlock-desktop PRIVATE
     NIGHTLOCK_FONTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/fonts")
 
 if(APPLE)
-    target_sources(nightlock-desktop PRIVATE src/platform/macwindow.mm)
-    target_link_libraries(nightlock-desktop PRIVATE "-framework AppKit")
+    target_sources(nightlock-desktop PRIVATE
+        src/platform/macwindow.mm
+        src/platform/touchid_mac.mm)
+    set_source_files_properties(src/platform/touchid_mac.mm PROPERTIES
+        COMPILE_OPTIONS "-fobjc-arc")
+    target_link_libraries(nightlock-desktop PRIVATE
+        "-framework AppKit"
+        "-framework LocalAuthentication"
+        "-framework Security")
+else()
+    target_sources(nightlock-desktop PRIVATE src/touchid.cpp)
 endif()
 target_link_libraries(nightlock-desktop PRIVATE Qt6::Widgets Qt6::Svg nightlock-core)
 
@@ -68,6 +78,8 @@ if(APPLE)
     set_target_properties(nightlock-desktop PROPERTIES
         OUTPUT_NAME Nightlock
         MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_INFO_PLIST
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources/Info.plist.in"
         MACOSX_BUNDLE_BUNDLE_NAME Nightlock
         MACOSX_BUNDLE_GUI_IDENTIFIER com.nightlock.Nightlock
         MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}

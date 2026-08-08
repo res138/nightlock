@@ -196,6 +196,20 @@ VaultError VaultFile::save() {
     return VaultError::None;
 }
 
+VaultError VaultFile::saveAs(std::filesystem::path path) {
+    if (!root_)
+        return VaultError::NotOpen;
+    if (path == path_)
+        return save();
+
+    const std::filesystem::path previous = path_;
+    path_ = std::move(path);
+    const VaultError error = save();
+    if (error != VaultError::None)
+        path_ = previous;
+    return error;
+}
+
 bool VaultFile::verifyPassword(std::string_view password) const {
     if (!root_ || key_.empty())
         return false;

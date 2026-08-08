@@ -187,6 +187,24 @@ TEST_CASE("save keeps the previous image as .bak") {
     CHECK(VaultFile::open(bak, "pw"));
 }
 
+TEST_CASE("saveAs writes a new vault and adopts its path") {
+    const fs::path dir = freshDir("save-as");
+    const fs::path original = dir / "original.nlck";
+    const fs::path copy = dir / "copy.nlck";
+    auto vault = VaultFile::create(original, "pw", weakParams());
+    REQUIRE(vault);
+    populate(*vault.value().root());
+
+    REQUIRE(vault.value().saveAs(copy) == VaultError::None);
+    CHECK(vault.value().path() == copy);
+    CHECK(fs::exists(original));
+    CHECK(fs::exists(copy));
+
+    auto reopened = VaultFile::open(copy, "pw");
+    REQUIRE(reopened);
+    CHECK(reopened.value().root()->groups()[0]->entries()[0]->name == "GitHub");
+}
+
 TEST_CASE("changePassword rotates the salt and invalidates the old password") {
     const fs::path file = freshDir("passwd") / "v.nlck";
     auto vault = VaultFile::create(file, "old-pw", weakParams());

@@ -126,6 +126,29 @@ nightlock::VaultError VaultService::unlock(const QString& password) {
     return nightlock::VaultError::None;
 }
 
+nightlock::VaultError VaultService::saveAs(const QString& path) {
+    if (demoMode() || !vault_ || !vault_->isOpen())
+        return nightlock::VaultError::NotOpen;
+    const nightlock::VaultError error = vault_->saveAs(toFsPath(path));
+    if (error != nightlock::VaultError::None)
+        return error;
+
+    debounce_.stop();
+    dirty_ = false;
+    activePath_ = path;
+    emit vaultPathChanged(vaultPath());
+    rememberOpenedVault();
+    return nightlock::VaultError::None;
+}
+
+bool VaultService::verifyPassword(const QString& password) const {
+    if (demoMode() || !vault_ || !vault_->isOpen())
+        return false;
+    nightlock::secure::String candidate;
+    assignSecret(candidate, password);
+    return vault_->verifyPassword(nightlock::secure::view(candidate));
+}
+
 nightlock::VaultError VaultService::changePassword(const QString& current,
                                                    const QString& next) {
     if (demoMode() || !vault_ || !vault_->isOpen())

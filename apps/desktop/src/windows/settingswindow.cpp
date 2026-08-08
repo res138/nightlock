@@ -7,6 +7,7 @@
 #include <QFileInfo>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QKeyEvent>
 #include <QKeySequence>
 #include <QLabel>
@@ -16,6 +17,7 @@
 #include <QPainter>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSignalBlocker>
 #include <QStackedWidget>
 #include <QStyle>
 #include <QVBoxLayout>
@@ -29,6 +31,7 @@
 #include "generalsettings.hpp"
 #include "graphsettings.hpp"
 #include "hotkeys.hpp"
+#include "touchid.hpp"
 #include "vaultservice.hpp"
 #include "widgets/nlmenu.hpp"
 
@@ -485,6 +488,75 @@ QWidget* SettingsWindow::buildDatabasePage() {
                 pathLabel->setText(QDir::toNativeSeparators(path));
             });
 
+    QString touchIdAvailability;
+    const bool touchIdAvailable = touchid::isAvailable(&touchIdAvailability);
+    auto* touchIdToggle =
+        new ToggleSwitch(touchid::isEnabledForVault(service->vaultPath()));
+    // An existing opt-in can always be turned off, even when Touch ID
+    // has since become unavailable or the vault is currently locked.
+    touchIdToggle->setEnabled(
+        touchIdToggle->isChecked() ||
+        (touchIdAvailable && service->isUnlocked() && !service->demoMode()));
+    addRow(rows, tr("Unlock with Touch ID"),
+           touchIdAvailable
+               ? tr("Store this database's master password in the macOS Keychain, "
+                    "then require Touch ID before it can be used.")
+               : tr("Unavailable: %1").arg(touchIdAvailability),
+           touchIdToggle);
+    connect(touchIdToggle, &QAbstractButton::toggled, this,
+            [this, service, touchIdToggle](bool enabled) {
+                const auto restore = [touchIdToggle](bool checked) {
+                    const QSignalBlocker blocker(touchIdToggle);
+                    touchIdToggle->setChecked(checked);
+                };
+
+                const QString path = service->vaultPath();
+                QString error;
+                if (!enabled) {
+                    if (!touchid::disableForVault(path, &error)) {
+                        restore(true);
+                        QMessageBox::warning(
+                            this, tr("Touch ID"),
+                            tr("Touch ID could not be disabled: %1").arg(error));
+                    }
+                    return;
+                }
+
+                if (service->demoMode() || !service->isUnlocked()) {
+                    restore(false);
+                    QMessageBox::warning(this, tr("Touch ID"),
+                                         tr("Unlock the database before enabling Touch ID."));
+                    return;
+                }
+                if (!touchid::isAvailable(&error)) {
+                    restore(false);
+                    QMessageBox::warning(this, tr("Touch ID"), error);
+                    return;
+                }
+
+                bool accepted = false;
+                const QString password = QInputDialog::getText(
+                    this, tr("Enable Touch ID"),
+                    tr("Enter the current master password:"), QLineEdit::Password,
+                    {}, &accepted);
+                if (!accepted) {
+                    restore(false);
+                    return;
+                }
+                if (!service->verifyPassword(password)) {
+                    restore(false);
+                    QMessageBox::warning(this, tr("Touch ID"),
+                                         tr("The master password is incorrect."));
+                    return;
+                }
+                if (!touchid::enableForVault(path, password, &error)) {
+                    restore(false);
+                    QMessageBox::warning(
+                        this, tr("Touch ID"),
+                        tr("Touch ID could not be enabled: %1").arg(error));
+                }
+            });
+
     auto* switchButton = inlineButton(tr("Choose File…"));
     connect(switchButton, &QPushButton::clicked, this, [this, service] {
         const QString path = QFileDialog::getOpenFileName(
@@ -555,7 +627,8 @@ QWidget* SettingsWindow::buildDatabasePage() {
         passwordStatus->setText(message);
     };
     connect(applyPassword, &QPushButton::clicked, this,
-            [service, currentPassword, newPassword, repeatPassword, passwordVerdict] {
+            [service, currentPassword, newPassword, repeatPassword, passwordVerdict,
+             touchIdToggle] {
                 if (service->demoMode()) {
                     passwordVerdict(tr("Demo mode has no real vault."), true);
                     return;
@@ -575,6 +648,8 @@ QWidget* SettingsWindow::buildDatabasePage() {
                     repeatPassword->setFocus();
                     return;
                 }
+                const bool refreshTouchId = touchid::isEnabledForVault(
+                    service->vaultPath());
                 const nightlock::VaultError error = service->changePassword(
                     currentPassword->text(), newPassword->text());
                 if (error == nightlock::VaultError::WrongPassword) {
@@ -586,6 +661,25 @@ QWidget* SettingsWindow::buildDatabasePage() {
                 if (error != nightlock::VaultError::None) {
                     passwordVerdict(
                         QString::fromUtf8(nightlock::errorMessage(error)), true);
+                    return;
+                }
+                QString touchIdError;
+                if (refreshTouchId && !touchid::enableForVault(
+                                          service->vaultPath(), newPassword->text(),
+                                          &touchIdError)) {
+                    QString disableError;
+                    if (!touchid::disableForVault(service->vaultPath(), &disableError) &&
+                        !disableError.isEmpty())
+                        touchIdError += tr("; cleanup failed: %1").arg(disableError);
+                    const QSignalBlocker blocker(touchIdToggle);
+                    touchIdToggle->setChecked(false);
+                    currentPassword->clear();
+                    newPassword->clear();
+                    repeatPassword->clear();
+                    passwordVerdict(
+                        tr("Password changed, but Touch ID was disabled: %1")
+                            .arg(touchIdError),
+                        true);
                     return;
                 }
                 currentPassword->clear();
