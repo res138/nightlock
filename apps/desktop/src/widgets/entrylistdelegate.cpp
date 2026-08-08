@@ -52,8 +52,33 @@ void EntryListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
     painter->setPen(selected ? appearancesettings::accentTextColor()
                              : appearancesettings::palette().ink);
     const QRect nameRect(textLeft, content.top() + 10, textWidth, 20);
-    painter->drawText(nameRect, Qt::AlignLeft | Qt::AlignVCenter,
-                      index.data(EntryListModel::NameRole).toString());
+    const QString name = index.data(EntryListModel::NameRole).toString();
+    const bool expired = index.data(EntryListModel::ExpiredRole).toBool();
+    if (!expired) {
+        painter->drawText(nameRect, Qt::AlignLeft | Qt::AlignVCenter,
+                          QFontMetrics(nameFont).elidedText(name, Qt::ElideRight,
+                                                          nameRect.width()));
+    } else {
+        QFont expiredFont(fonts::resolvedFamily(fonts::Role::Primary), 11);
+        expiredFont.setItalic(true);
+        const QString suffix = tr("(expired)");
+        const int suffixWidth = QFontMetrics(expiredFont).horizontalAdvance(suffix);
+        constexpr int kSuffixGap = 5;
+        const int nameWidth = qMax(0, nameRect.width() - suffixWidth - kSuffixGap);
+        const QString visibleName =
+            QFontMetrics(nameFont).elidedText(name, Qt::ElideRight, nameWidth);
+        painter->drawText(QRect(nameRect.left(), nameRect.top(), nameWidth,
+                                nameRect.height()),
+                          Qt::AlignLeft | Qt::AlignVCenter, visibleName);
+        const int suffixLeft = nameRect.left() +
+                               QFontMetrics(nameFont).horizontalAdvance(visibleName) +
+                               kSuffixGap;
+        painter->setFont(expiredFont);
+        painter->setPen(QColor(QStringLiteral("#FF2D2D")));
+        painter->drawText(QRect(suffixLeft, nameRect.top(), suffixWidth,
+                                nameRect.height()),
+                          Qt::AlignLeft | Qt::AlignVCenter, suffix);
+    }
 
     QFont loginFont = option.font;
     loginFont.setPointSize(11);

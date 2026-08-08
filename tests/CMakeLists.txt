@@ -1,6 +1,7 @@
 add_executable(nightlock-tests
     test_main.cpp
     test_crypto.cpp
+    test_expiration.cpp
     test_generator.cpp
     test_group.cpp
     test_secure.cpp
