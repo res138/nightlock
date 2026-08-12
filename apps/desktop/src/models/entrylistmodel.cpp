@@ -1,6 +1,7 @@
 #include "entrylistmodel.hpp"
 
 #include <QIODevice>
+#include <QDateTime>
 #include <QMimeData>
 
 #include <algorithm>
@@ -10,6 +11,7 @@
 
 #include "vaultservice.hpp"
 #include "expirationui.hpp"
+#include "qsecure.hpp"
 
 namespace {
 
@@ -237,6 +239,17 @@ QVariant EntryListModel::data(const QModelIndex& index, int role) const {
         return static_cast<int>(e->color);
     case ExpiredRole:
         return expirationui::isExpired(*e);
+    case PasswordRole:
+        return toQString(e->password);
+    case UrlRole:
+        return QString::fromStdString(e->url);
+    case NoteRole:
+        return QString::fromStdString(e->note);
+    case ModifiedRole: {
+        const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(
+            e->modified.time_since_epoch()).count();
+        return QDateTime::fromSecsSinceEpoch(seconds);
+    }
     case Qt::DecorationRole:
         if (!e->icon.empty())
             return QIcon(QString::fromStdString(e->icon));

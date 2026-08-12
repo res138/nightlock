@@ -55,6 +55,18 @@ int main(int argc, char* argv[]) {
     // leaving a 28px white strip the pane borders never reach into.
     window.setAttribute(Qt::WA_ContentsMarginsRespectsSafeArea, false);
     window.resize(843, 617);
+    // Isolated responsive-layout QA hook: "widthxheight". It does not
+    // touch persisted window or appearance settings.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_WINDOW_SIZE")) {
+        const QStringList parts =
+            qEnvironmentVariable("NIGHTLOCK_TEST_WINDOW_SIZE").split(QLatin1Char('x'));
+        bool widthOk = false;
+        bool heightOk = false;
+        const int width = parts.value(0).toInt(&widthOk);
+        const int height = parts.value(1).toInt(&heightOk);
+        if (widthOk && heightOk && width > 0 && height > 0)
+            window.resize(width, height);
+    }
     window.show();
 #ifdef Q_OS_MACOS
     macwindow::hideTitleBar(&window);
@@ -267,6 +279,23 @@ int main(int argc, char* argv[]) {
             QWidget* detached = window.debugDetachDetail();
             QTimer::singleShot(400, detached, [detached] {
                 detached->grab().save(qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_DETACHED"));
+                QApplication::quit();
+            });
+        });
+    }
+
+    // Debug hook: opens a fresh, permanently independent Entry View
+    // through the same path as the context-menu command.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_SCREENSHOT_STANDALONE")) {
+        QTimer::singleShot(800, &window, [&window] {
+            QWidget* standalone = window.openSelectedEntryStandaloneForScreenshot();
+            if (!standalone) {
+                QApplication::quit();
+                return;
+            }
+            QTimer::singleShot(400, standalone, [standalone] {
+                standalone->grab().save(
+                    qEnvironmentVariable("NIGHTLOCK_SCREENSHOT_STANDALONE"));
                 QApplication::quit();
             });
         });

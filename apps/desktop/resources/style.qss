@@ -43,6 +43,19 @@ QListView#entryList {
     outline: none;
 }
 
+QTableView#compactEntryTable {
+    background: @bg;
+    border: none;
+    outline: none;
+    gridline-color: transparent;
+    selection-background-color: transparent;
+    selection-color: @text;
+}
+QTableView#compactEntryTable::item {
+    border: none;
+    padding: 0;
+}
+
 QFrame#listHeader,
 QFrame#treeHeader {
     background: @bg;

@@ -21,6 +21,8 @@ public:
     // Reads the pattern kind, icon and seed off the entry. Safe to call
     // with nullptr (the layer just goes blank).
     void setEntry(const nightlock::Entry* entry);
+    // Drops the resolved icon path, seed and rendered pixmap cache.
+    void clear();
 
     // Vertical center of the entry icon in this widget's coordinates;
     // the ripple variant radiates from it.

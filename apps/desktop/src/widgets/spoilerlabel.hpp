@@ -17,12 +17,19 @@ public:
 
     // Sets the hidden text and resets to the spoilered state.
     void setSecret(const QString& secret);
+    // Stops all secret-related animation and drops the retained QString.
+    // This is a best-effort logical clear; QString itself is not secure
+    // storage and cannot guarantee zeroization of shared buffers.
+    void clear();
 
     // State drivers (also used by the NIGHTLOCK_TEST_SPOILER hook).
     void reveal();
     void copyAndFlash();
     void conceal();
     void setCoordinatedReveal(bool enabled);
+    // Optional clipping policy for constrained table cells. The detail
+    // view keeps the default (no elision).
+    void setTextElideMode(Qt::TextElideMode mode);
 
     QSize sizeHint() const override;
 
@@ -59,6 +66,7 @@ private:
     QVariantAnimation* revealAnimation_ = nullptr;
     QVariantAnimation* copiedAnimation_ = nullptr;
     bool coordinatedReveal_ = false;
+    Qt::TextElideMode elideMode_ = Qt::ElideNone;
     qreal reveal_ = 0;  // 0 = particle cloud, 1 = secret shown
     qreal copied_ = 0;  // 0..1 crossfade to the "Copied" flash
 };

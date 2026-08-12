@@ -5,6 +5,7 @@
 
 class CopyLabel;
 class PatternBackdrop;
+class QCloseEvent;
 class QFrame;
 class QHBoxLayout;
 class QLabel;
@@ -27,6 +28,18 @@ public:
     explicit EntryDetailView(QWidget* parent = nullptr);
 
     void setEntry(const nightlock::Entry* entry);
+    // Synchronously removes every entry-derived value retained by the
+    // view.  setEntry(nullptr) delegates here; owners should call either
+    // before destroying/wiping the backing vault tree.
+    void clearEntry();
+
+    // One-way transition for a newly-created detail view that must stay
+    // an independent top-level window.  It becomes parentless,
+    // self-deleting on close and uses the floating visual treatment, but
+    // never emits detach/dropped/dock requests.  Its red fake traffic
+    // light emits closeRequested and closes the window instead.
+    void makePermanentStandalone();
+    bool isPermanentStandalone() const { return permanentStandalone_; }
 
     // Called by the owner right after reparenting the view into a
     // floating window mid-drag, so the drag continues seamlessly.
@@ -58,9 +71,13 @@ signals:
     void dropped(const QPoint& globalPos);
     // The red traffic-light button of the floating window was clicked.
     void dockRequested();
+    // The red traffic-light button of a permanent standalone window was
+    // clicked.  The view also closes itself after emitting this signal.
+    void closeRequested();
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
+    void closeEvent(QCloseEvent* event) override;
 
 private:
     struct FieldRow {
@@ -86,6 +103,7 @@ private:
     QToolButton* editButton_;
     QWidget* floatingControls_;
     QWidget* floatingBackdrop_;
+    bool permanentStandalone_ = false;
     QPoint pressGlobal_;
     QPoint grabOffset_;
     QLabel* iconLabel_;

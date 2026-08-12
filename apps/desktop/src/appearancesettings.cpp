@@ -12,6 +12,61 @@
 namespace appearancesettings {
 namespace {
 
+constexpr auto kCompactModeKey = "compact-mode";
+constexpr auto kCompactColumnsKey = "compact-columns";
+
+struct CompactColumnSpec {
+    CompactColumn column;
+    const char* id;
+};
+
+// This is both the persisted-id registry and the table's canonical
+// display order. Keep it aligned with CompactColumn in the public API.
+constexpr CompactColumnSpec kCompactColumnSpecs[] = {
+    {CompactColumn::Name, "name"},
+    {CompactColumn::Login, "login"},
+    {CompactColumn::Password, "password"},
+    {CompactColumn::Url, "url"},
+    {CompactColumn::Note, "note"},
+    {CompactColumn::Date, "date"},
+};
+
+bool compactColumnRequired(CompactColumn column) {
+    return column == CompactColumn::Login || column == CompactColumn::Password;
+}
+
+bool compactColumnKnown(CompactColumn column) {
+    for (const CompactColumnSpec& spec : kCompactColumnSpecs)
+        if (spec.column == column)
+            return true;
+    return false;
+}
+
+QStringList defaultCompactColumnIds() {
+    QStringList ids;
+    for (const CompactColumnSpec& spec : kCompactColumnSpecs)
+        ids.append(QLatin1String(spec.id));
+    return ids;
+}
+
+QList<CompactColumn> canonicalCompactColumns(const QStringList& ids) {
+    QList<CompactColumn> columns;
+    for (const CompactColumnSpec& spec : kCompactColumnSpecs) {
+        if (compactColumnRequired(spec.column) || ids.contains(QLatin1String(spec.id)))
+            columns.append(spec.column);
+    }
+    return columns;
+}
+
+QStringList compactColumnIds(const QList<CompactColumn>& columns) {
+    QStringList ids;
+    for (const CompactColumnSpec& spec : kCompactColumnSpecs) {
+        if (compactColumnRequired(spec.column) || columns.contains(spec.column))
+            ids.append(QLatin1String(spec.id));
+    }
+    return ids;
+}
+
 QString read(const char* key, const char* fallback) {
     return QSettings()
         .value(QStringLiteral("appearance/") + QLatin1String(key), QLatin1String(fallback))
@@ -160,7 +215,52 @@ bool folderIcons() {
 }
 
 void setFolderIcons(bool shown) {
+    if (folderIcons() == shown)
+        return;
     write("folder-icons", shown);
+    notifier()->notify();
+}
+
+bool compactMode() {
+    return QSettings()
+        .value(QStringLiteral("appearance/") + QLatin1String(kCompactModeKey), false)
+        .toBool();
+}
+
+void setCompactMode(bool enabled) {
+    if (compactMode() == enabled)
+        return;
+    write(kCompactModeKey, enabled);
+    notifier()->notify();
+}
+
+QList<CompactColumn> compactColumns() {
+    const QStringList stored =
+        QSettings()
+            .value(QStringLiteral("appearance/") + QLatin1String(kCompactColumnsKey),
+                   defaultCompactColumnIds())
+            .toStringList();
+    return canonicalCompactColumns(stored);
+}
+
+bool compactColumnEnabled(CompactColumn column) {
+    return compactColumns().contains(column);
+}
+
+void setCompactColumnEnabled(CompactColumn column, bool enabled) {
+    if (!compactColumnKnown(column) || (compactColumnRequired(column) && !enabled))
+        return;
+
+    QList<CompactColumn> columns = compactColumns();
+    const bool currentlyEnabled = columns.contains(column);
+    if (currentlyEnabled == enabled)
+        return;
+
+    if (enabled)
+        columns.append(column);
+    else
+        columns.removeAll(column);
+    write(kCompactColumnsKey, compactColumnIds(columns));
     notifier()->notify();
 }
 

@@ -2,6 +2,7 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QApplication>
 #include <QClipboard>
 #include <QCursor>
 #include <QDebug>
@@ -31,7 +32,6 @@
 #include <QVariantAnimation>
 #include <QWindow>
 #include <QSplitter>
-#include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
 
@@ -49,6 +49,7 @@
 #include "standardicons.hpp"
 #include "touchid.hpp"
 #include "vaultservice.hpp"
+#include "widgets/compactentryview.hpp"
 #include "widgets/entrydetailview.hpp"
 #include "widgets/entrylistdelegate.hpp"
 #include "widgets/grouptreeview.hpp"
@@ -205,6 +206,11 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     middleLayout->addWidget(buildListHeader());
     middleLayout->addWidget(list_, 1);
 
+    compactView_ = new CompactEntryView;
+    compactView_->setSourceModel(entryModel_);
+    compactView_->hide();
+    middleLayout->addWidget(compactView_, 1);
+
     detail_ = new EntryDetailView;
 
     splitter_ = new QSplitter;
@@ -239,8 +245,12 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     hotkeys::bind(QStringLiteral("password-generator"), tr("Password generator"),
                   QKeySequence(QStringLiteral("Ctrl+Shift+G")), this,
                   [this] { openPasswordGenerator(); });
-    hotkeys::bind(QStringLiteral("lock"), tr("Lock vault"),
-                  QKeySequence(QStringLiteral("Ctrl+L")), this, [this] { lockVault(); });
+    QShortcut* lockShortcut = hotkeys::bind(
+        QStringLiteral("lock"), tr("Lock vault"),
+        QKeySequence(QStringLiteral("Ctrl+L")), this, [this] { lockVault(); });
+    // A standalone Entry View is a separate top-level window. Locking
+    // must remain available while it owns keyboard focus.
+    lockShortcut->setContext(Qt::ApplicationShortcut);
     hotkeys::bind(QStringLiteral("toggle-folder-panel"), tr("Toggle folder panel"),
                   QKeySequence(QStringLiteral("Ctrl+D")), this, [this] {
                       if (!lockScreen_->isVisible())
@@ -301,6 +311,8 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     connect(generalsettings::notifier(), &generalsettings::Notifier::changed, this,
             &MainWindow::syncGeneralToolbarVisibility);
     syncGeneralToolbarVisibility();
+    connect(appearancesettings::notifier(), &appearancesettings::Notifier::changed, this,
+            &MainWindow::syncCompactMode);
 
     new OverlayScrollBar(tree_);
     new OverlayScrollBar(list_);
@@ -308,12 +320,23 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     connect(tree_->selectionModel(), &QItemSelectionModel::currentChanged, this,
             [this](const QModelIndex& current, const QModelIndex&) { onGroupChanged(current); });
     connect(list_->selectionModel(), &QItemSelectionModel::currentChanged, this,
-            [this](const QModelIndex& current, const QModelIndex&) { onEntryChanged(current); });
+            [this](const QModelIndex& current, const QModelIndex&) {
+                onEntryChanged(current);
+                if (compactView_->currentSourceIndex() != current)
+                    compactView_->setCurrentSourceIndex(current);
+            });
+    connect(compactView_, &CompactEntryView::currentSourceChanged, this,
+            [this](const QModelIndex& current, const QModelIndex&) {
+                if (list_->currentIndex() != current)
+                    list_->setCurrentIndex(current);
+            });
 
     tree_->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(tree_, &QWidget::customContextMenuRequested, this, &MainWindow::showGroupMenu);
     list_->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(list_, &QWidget::customContextMenuRequested, this, &MainWindow::showEntryMenu);
+    connect(compactView_, &CompactEntryView::contextMenuRequested, this,
+            &MainWindow::showCompactEntryMenu);
 
     connect(treeModel_, &QAbstractItemModel::dataChanged, this, [this] {
         // A folder rename may change the path shown under the counter.
@@ -334,6 +357,10 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
 
     buildGlobalMenu();
     detail_->setEntry(nullptr);
+    // Startup geometry is assigned by main() after construction. Apply
+    // the saved mode on the first event-loop turn so hiding the detail
+    // pane gives its width to the table, not to the directory pane.
+    QTimer::singleShot(0, this, &MainWindow::syncCompactMode);
 }
 
 void MainWindow::buildGlobalMenu() {
@@ -393,47 +420,48 @@ void MainWindow::buildGlobalMenu() {
                 lockDatabaseAction->setEnabled(unlocked);
             });
 
-    auto* entryMenu = globalMenuBar_->addMenu(QStringLiteral("Entry"));
-    connect(entryMenu, &QMenu::aboutToShow, this, [this, entryMenu] {
-        entryMenu->clear();
+    entryMenu_ = globalMenuBar_->addMenu(QStringLiteral("Entry"));
+    connect(entryMenu_, &QMenu::aboutToShow, this, [this] {
+        entryMenu_->setEnabled(true);
+        entryMenu_->clear();
         const bool unlocked = !lockScreen_->isVisible() &&
                               treeModel_->rootGroup();
         nightlock::Entry* entry =
             unlocked ? entryModel_->entry(list_->currentIndex()) : nullptr;
 
-        QAction* create = entryMenu->addAction(
+        QAction* create = entryMenu_->addAction(
             QStringLiteral("Create"), this, [this] { addEntryTo(currentGroup()); });
         create->setEnabled(unlocked);
-        QAction* edit = entryMenu->addAction(
+        QAction* edit = entryMenu_->addAction(
             QStringLiteral("Edit"), this, [this, entry] { editEntry(entry); });
-        QAction* remove = entryMenu->addAction(
+        QAction* remove = entryMenu_->addAction(
             QStringLiteral("Delete"), this, [this, entry] { deleteEntry(entry); });
         edit->setEnabled(entry);
         remove->setEnabled(entry);
 
-        entryMenu->addSeparator();
+        entryMenu_->addSeparator();
         const QModelIndex index = entryModel_->indexOf(entry);
         const bool customOrder =
             entryModel_->sortMode() == EntryListModel::SortMode::Custom;
-        QAction* moveUp = entryMenu->addAction(
+        QAction* moveUp = entryMenu_->addAction(
             QStringLiteral("Move Up"), this, [this] { moveCurrentEntry(-1); });
-        QAction* moveDown = entryMenu->addAction(
+        QAction* moveDown = entryMenu_->addAction(
             QStringLiteral("Move Down"), this, [this] { moveCurrentEntry(1); });
         moveUp->setEnabled(entry && customOrder && index.row() > 0);
         moveDown->setEnabled(entry && customOrder && index.isValid() &&
                              index.row() + 1 < entryModel_->rowCount());
 
-        entryMenu->addSeparator();
-        QAction* copyLogin = entryMenu->addAction(
+        entryMenu_->addSeparator();
+        QAction* copyLogin = entryMenu_->addAction(
             QStringLiteral("Copy Login"), this, [entry] {
                 QGuiApplication::clipboard()->setText(
                     QString::fromStdString(entry->login));
             });
-        QAction* copyPassword = entryMenu->addAction(
+        QAction* copyPassword = entryMenu_->addAction(
             QStringLiteral("Copy Password"), this, [entry] {
                 QGuiApplication::clipboard()->setText(toQString(entry->password));
             });
-        QAction* copyUrl = entryMenu->addAction(
+        QAction* copyUrl = entryMenu_->addAction(
             QStringLiteral("Copy URL"), this, [entry] {
                 QGuiApplication::clipboard()->setText(
                     QString::fromStdString(entry->url));
@@ -442,47 +470,27 @@ void MainWindow::buildGlobalMenu() {
         copyPassword->setEnabled(entry && !entry->password.empty());
         copyUrl->setEnabled(entry && !entry->url.empty());
 
-        QMenu* attributes = entryMenu->addMenu(QStringLiteral("Copy Attribute"));
+        QMenu* attributes = entryMenu_->addMenu(QStringLiteral("Copy Attribute"));
         attributes->setEnabled(entry);
-        int attributeCount = 0;
-        const auto addAttribute = [this, attributes, &attributeCount](
-                                      const QString& label, const QString& value) {
-            if (value.isEmpty())
-                return;
-            ++attributeCount;
-            attributes->addAction(label, this, [value] {
-                QGuiApplication::clipboard()->setText(value);
-            });
-        };
-        if (entry) {
-            addAttribute(QStringLiteral("2FA Code"), toQString(entry->code));
-            addAttribute(QStringLiteral("Note"), QString::fromStdString(entry->note));
-            for (const nightlock::EntryField& field : entry->fields) {
-                addAttribute(QString::fromStdString(field.label),
-                             toQString(field.value));
-            }
-        }
-        if (attributeCount == 0) {
-            QAction* empty = attributes->addAction(QStringLiteral("No Attributes"));
-            empty->setEnabled(false);
-        }
+        populateCopyAttributeMenu(attributes, entry, false);
     });
 
-    auto* directoryMenu = globalMenuBar_->addMenu(QStringLiteral("Directory"));
-    connect(directoryMenu, &QMenu::aboutToShow, this,
-            [this, directoryMenu] {
-                directoryMenu->clear();
+    directoryMenu_ = globalMenuBar_->addMenu(QStringLiteral("Directory"));
+    connect(directoryMenu_, &QMenu::aboutToShow, this,
+            [this] {
+                directoryMenu_->setEnabled(true);
+                directoryMenu_->clear();
                 const bool unlocked = !lockScreen_->isVisible() &&
                                       treeModel_->rootGroup();
                 nightlock::Group* group = unlocked ? currentGroup() : nullptr;
                 const bool mutableGroup = group && group != treeModel_->rootGroup();
-                QAction* create = directoryMenu->addAction(
+                QAction* create = directoryMenu_->addAction(
                     QStringLiteral("Create"), this,
                     [this] { addFolderTo(currentGroup()); });
-                QAction* rename = directoryMenu->addAction(
+                QAction* rename = directoryMenu_->addAction(
                     QStringLiteral("Rename"), this,
                     [this, group] { renameFolder(group); });
-                QAction* remove = directoryMenu->addAction(
+                QAction* remove = directoryMenu_->addAction(
                     QStringLiteral("Delete"), this,
                     [this, group] { deleteFolder(group); });
                 create->setEnabled(unlocked);
@@ -867,6 +875,93 @@ void MainWindow::syncGeneralToolbarVisibility() {
         lockButton_->setVisible(!generalsettings::hideLockButton());
     if (list_)
         list_->viewport()->update();
+    if (compactView_)
+        compactView_->viewport()->update();
+}
+
+void MainWindow::syncCompactMode() {
+    // The environment override keeps screenshot/smoke tests isolated
+    // from a developer's real QSettings profile.
+    const bool compact = appearancesettings::compactMode() ||
+                         qEnvironmentVariableIsSet("NIGHTLOCK_TEST_COMPACT_MODE");
+    if (compact == compactModeActive_)
+        return;
+    compactModeActive_ = compact;
+
+    if (compact) {
+        const QModelIndex current = list_->currentIndex();
+        const QModelIndexList selected = list_->selectionModel()->selectedRows();
+        // Compact mode is a true two-pane layout. If the normal detail
+        // view was floating, put that singleton back first so it can be
+        // hidden rather than survive as a third, dockable surface.
+        if (detail_->isWindow())
+            dockDetail();
+        // A hidden tree keeps its last expanded widths separately. Use
+        // that full three-pane snapshot rather than splitter sizes whose
+        // first slot is currently zero.
+        QList<int> savedNormalSizes = treeSplitterSizes_;
+        if (!treePane_->isVisible() && savedNormalSizes.size() == 2 &&
+            detailSplitterSizes_.size() == splitter_->count()) {
+            // The tree was hidden while the detail pane was detached,
+            // so its snapshot has only {tree, middle}. Merge that tree
+            // width with the last full docked layout.
+            savedNormalSizes = detailSplitterSizes_;
+            savedNormalSizes[0] = treeSplitterSizes_.first();
+        }
+        compactSplitterSizes_ =
+            !treePane_->isVisible() &&
+                    savedNormalSizes.size() == splitter_->count()
+                ? savedNormalSizes
+                : splitter_->sizes();
+        detail_->clearEntry();
+        detail_->hide();
+        list_->hide();
+        compactView_->show();
+        if (compactSplitterSizes_.size() == splitter_->count()) {
+            const QList<int> compactSizes = {
+                compactSplitterSizes_[0],
+                compactSplitterSizes_[1] + compactSplitterSizes_[2], 0};
+            // If Directory Pane is currently hidden, its later reopen
+            // must restore the compact two-pane shape, not resurrect a
+            // width for the hidden detail pane.
+            if (!treePane_->isVisible())
+                treeSplitterSizes_ = compactSizes;
+            splitter_->setSizes(compactSizes);
+        }
+        compactView_->setSelectedSourceIndexes(selected, current);
+    } else {
+        const QModelIndex current = compactView_->currentSourceIndex();
+        const QModelIndexList selected = compactView_->selectedSourceIndexes();
+        // Conversely, a tree hidden while compact was active must
+        // reopen into the saved normal three-pane layout after exit.
+        if (!treePane_->isVisible() &&
+            compactSplitterSizes_.size() == splitter_->count())
+            treeSplitterSizes_ = compactSplitterSizes_;
+        compactView_->hide();
+        list_->show();
+        detail_->show();
+        if (compactSplitterSizes_.size() == splitter_->count())
+            splitter_->setSizes(compactSplitterSizes_);
+
+        QItemSelection restored;
+        for (const QModelIndex& index : selected) {
+            if (index.isValid() && index.model() == entryModel_)
+                restored.select(index, index);
+        }
+        if (restored.isEmpty())
+            list_->selectionModel()->clearSelection();
+        else
+            list_->selectionModel()->select(
+                restored, QItemSelectionModel::ClearAndSelect |
+                              QItemSelectionModel::Rows);
+        list_->selectionModel()->setCurrentIndex(
+            current.isValid() && current.model() == entryModel_ ? current
+                                                                : QModelIndex{},
+            QItemSelectionModel::NoUpdate);
+        if (current.isValid())
+            list_->scrollTo(current);
+        detail_->setEntry(entryModel_->entry(current));
+    }
 }
 
 // Jump to a spot in the vault — from a graph-node click or a search
@@ -1108,6 +1203,45 @@ void MainWindow::centerWindow() {
 }
 
 void MainWindow::closeVaultSession() {
+    // Context menus contain actions whose callbacks reference the
+    // current Entry/Group objects. Close them and destroy those
+    // callbacks before the backing vault tree is released.
+    const auto transientMenus = findChildren<NlMenu*>();
+    for (NlMenu* menu : transientMenus) {
+        menu->setEnabled(false);
+        menu->close();
+        menu->deleteLater();
+    }
+    if (entryMenu_) {
+        entryMenu_->setEnabled(false);
+        entryMenu_->close();
+    }
+    if (directoryMenu_) {
+        directoryMenu_->setEnabled(false);
+        directoryMenu_->close();
+    }
+    if (QWidget* popup = QApplication::activePopupWidget())
+        popup->close();
+
+    // clear() deletes owned actions. Queue it so a lock shortcut fired
+    // from inside an Edit/Delete action cannot delete that QAction while
+    // its triggered() delivery is still on the stack.
+    QTimer::singleShot(0, this, [this] {
+        if (entryMenu_) {
+            entryMenu_->clear();
+            entryMenu_->setEnabled(!lockScreen_->isVisible() &&
+                                   treeModel_->rootGroup());
+        }
+        if (directoryMenu_) {
+            directoryMenu_->clear();
+            directoryMenu_->setEnabled(!lockScreen_->isVisible() &&
+                                       treeModel_->rootGroup());
+        }
+    });
+
+    // Standalone detail windows contain rendered copies of secrets;
+    // clear and close them before the backing vault is wiped.
+    closeAllStandaloneEntryWindows();
     if (graph_)
         graph_->close();
     if (search_)
@@ -1325,6 +1459,10 @@ void MainWindow::finishUnlock(nightlock::Group* root) {
     touchid::cancelAuthentication();
     setVaultRoot(root);
     lockScreen_->hide();
+    if (entryMenu_)
+        entryMenu_->setEnabled(true);
+    if (directoryMenu_)
+        directoryMenu_->setEnabled(true);
     // The Dock loses its lock badge together with the screen.
     QGuiApplication::setWindowIcon(
         QIcon(respaths::icon(QStringLiteral("appicon.png"))));
@@ -1360,7 +1498,10 @@ void MainWindow::onGroupChanged(const QModelIndex& current) {
 }
 
 void MainWindow::onEntryChanged(const QModelIndex& current) {
-    detail_->setEntry(entryModel_->entry(current));
+    if (compactModeActive_)
+        detail_->clearEntry();
+    else
+        detail_->setEntry(entryModel_->entry(current));
 }
 
 void MainWindow::showGroupMenu(const QPoint& pos) {
@@ -1412,6 +1553,37 @@ void MainWindow::showGroupMenu(const QPoint& pos) {
 void MainWindow::showEntryMenu(const QPoint& pos) {
     const QModelIndex idx = list_->indexAt(pos);
     auto* entry = entryModel_->entry(idx);
+    QList<nightlock::Entry*> selected;
+    for (const QModelIndex& i : list_->selectionModel()->selectedIndexes())
+        if (auto* e = entryModel_->entry(i); e && !selected.contains(e))
+            selected << e;
+    if (entry && idx != list_->currentIndex())
+        list_->setCurrentIndex(idx);  // keeps the detail panel in sync
+    popupEntryMenu(entry, selected, list_->viewport()->mapToGlobal(pos));
+}
+
+void MainWindow::showCompactEntryMenu(const QPoint& pos) {
+    const QModelIndex index = compactView_->sourceIndexAt(pos);
+    nightlock::Entry* entry = entryModel_->entry(index);
+
+    QList<nightlock::Entry*> selected;
+    for (const QModelIndex& source : compactView_->selectedSourceIndexes()) {
+        if (auto* candidate = entryModel_->entry(source);
+            candidate && !selected.contains(candidate))
+            selected << candidate;
+    }
+    // A click outside the current multi-selection starts a new single
+    // selection, matching the regular list. Preserve a selected batch.
+    if (entry && !selected.contains(entry)) {
+        compactView_->setCurrentSourceIndex(index);
+        selected = {entry};
+    }
+    popupEntryMenu(entry, selected, compactView_->viewportGlobal(pos));
+}
+
+void MainWindow::popupEntryMenu(nightlock::Entry* entry,
+                                const QList<nightlock::Entry*>& selected,
+                                const QPoint& globalPos) {
     if (!entry) {
         // Empty area: offer creating an entry in the current folder.
         auto* group = treeModel_->group(tree_->currentIndex());
@@ -1421,14 +1593,11 @@ void MainWindow::showEntryMenu(const QPoint& pos) {
         connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
         menu->addAction(menuIcon(QStringLiteral("key")), tr("New entry"), this,
                         [this, group] { addEntryTo(group); });
-        menu->popupAt(list_->viewport()->mapToGlobal(pos));
+        menu->popupAt(globalPos);
         return;
     }
+
     // A multi-selection gets a reduced menu: move or delete them all.
-    QList<nightlock::Entry*> selected;
-    for (const QModelIndex& i : list_->selectionModel()->selectedIndexes())
-        if (auto* e = entryModel_->entry(i))
-            selected << e;
     if (selected.size() > 1 && selected.contains(entry)) {
         auto* menu = new NlMenu(this);
         connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
@@ -1442,15 +1611,12 @@ void MainWindow::showEntryMenu(const QPoint& pos) {
         auto* del = menu->addAction(menuIcon(QStringLiteral("trash")), tr("Delete"), this,
                                     [this, selected] { deleteEntries(selected); });
         del->setProperty("danger", true);
-        menu->popupAt(list_->viewport()->mapToGlobal(pos));
+        menu->popupAt(globalPos);
         return;
     }
 
-    if (idx != list_->currentIndex())
-        list_->setCurrentIndex(idx);  // keeps the detail panel in sync
-
     auto* menu = buildEntryMenu(entry);
-    menu->popupAt(list_->viewport()->mapToGlobal(pos));
+    menu->popupAt(globalPos);
 }
 
 NlMenu* MainWindow::buildEntryMenu(nightlock::Entry* entry) {
@@ -1474,6 +1640,16 @@ NlMenu* MainWindow::buildEntryMenu(nightlock::Entry* entry) {
         });
     }
 
+    auto* attributes = new NlMenu(menu);
+    attributes->setTitle(tr("Copy Attribute"));
+    attributes->setIcon(menuIcon(QStringLiteral("copy")));
+    populateCopyAttributeMenu(attributes, entry);
+    menu->addMenu(attributes);
+
+    menu->addAction(menuIcon(QStringLiteral("external-link")),
+                    tr("Open in Separate Window"), this,
+                    [this, entry] { openEntryInSeparateWindow(entry); });
+
     menu->addSeparator();
     menu->addAction(menuIcon(QStringLiteral("edit")), tr("Edit"), this,
                     [this, entry] { editEntry(entry); });
@@ -1490,6 +1666,44 @@ NlMenu* MainWindow::buildEntryMenu(nightlock::Entry* entry) {
                                 [this, entry] { deleteEntry(entry); });
     del->setProperty("danger", true);
     return menu;
+}
+
+void MainWindow::populateCopyAttributeMenu(QMenu* menu, nightlock::Entry* entry,
+                                           bool includeUrl) {
+    if (!entry) {
+        QAction* empty = menu->addAction(tr("No Attributes"));
+        empty->setEnabled(false);
+        return;
+    }
+
+    int count = 0;
+    const auto add = [this, menu, &count](const QString& label, auto copyValue) {
+        ++count;
+        menu->addAction(label, this, [copyValue = std::move(copyValue)] {
+            QGuiApplication::clipboard()->setText(copyValue());
+        });
+    };
+
+    if (includeUrl && !entry->url.empty())
+        add(tr("URL"), [entry] { return QString::fromStdString(entry->url); });
+    if (!entry->code.empty())
+        add(tr("2FA Code"), [entry] { return toQString(entry->code); });
+    if (!entry->note.empty())
+        add(tr("Note"), [entry] { return QString::fromStdString(entry->note); });
+    for (std::size_t i = 0; i < entry->fields.size(); ++i) {
+        const nightlock::EntryField& field = entry->fields[i];
+        if (field.value.empty())
+            continue;
+        const QString label = QString::fromStdString(field.label);
+        add(label, [entry, i] {
+            return i < entry->fields.size() ? toQString(entry->fields[i].value) : QString{};
+        });
+    }
+
+    if (count == 0) {
+        QAction* empty = menu->addAction(tr("No Attributes"));
+        empty->setEnabled(false);
+    }
 }
 
 // Every folder of the vault is a destination: leaves are plain items,
@@ -1592,10 +1806,20 @@ void MainWindow::editEntry(nightlock::Entry* entry) {
         VaultService::instance()->markDirty();
     }
     standardicons::addRecentIconPath(QString::fromStdString(entry->icon));
-    entryModel_->notifyEntryChanged(entry);
-    // A sorted view may have moved the row under the edit; follow it.
-    list_->setCurrentIndex(entryModel_->indexOf(entry));
-    detail_->setEntry(entry);
+    // A permanent standalone window may outlive navigation to another
+    // directory. Only touch the main list/detail when this entry still
+    // belongs to the model currently displayed there.
+    if (entryModel_->indexOf(entry).isValid()) {
+        entryModel_->notifyEntryChanged(entry);
+        // A sorted view may have moved the row under the edit; follow it.
+        list_->setCurrentIndex(entryModel_->indexOf(entry));
+        if (!compactModeActive_)
+            detail_->setEntry(entry);
+    }
+    if (EntryDetailView* standalone = standaloneDetails_.value(entry)) {
+        standalone->setWindowTitle(QString::fromStdString(entry->name));
+        standalone->setEntry(entry);
+    }
     refreshGraph();
 }
 
@@ -1631,6 +1855,7 @@ void MainWindow::deleteFolder(nightlock::Group* group) {
     if (box.clickedButton() != deleteButton)
         return;
 
+    closeStandaloneWindowsInGroup(group);
     nightlock::Group* parent = group->parent();
     if (treeModel_->removeGroup(treeModel_->indexOf(group)))
         tree_->setCurrentIndex(treeModel_->indexOf(parent));
@@ -1670,8 +1895,10 @@ void MainWindow::deleteFolders(const QList<nightlock::Group*>& groups) {
     if (box.clickedButton() != deleteButton)
         return;
 
-    for (nightlock::Group* group : tops)
+    for (nightlock::Group* group : tops) {
+        closeStandaloneWindowsInGroup(group);
         treeModel_->removeGroup(treeModel_->indexOf(group));
+    }
     tree_->setCurrentIndex(treeModel_->indexOf(treeModel_->rootGroup()));
 }
 
@@ -1736,6 +1963,14 @@ QWidget* MainWindow::debugDetachDetail() {
     return detail_;
 }
 
+QWidget* MainWindow::openSelectedEntryStandaloneForScreenshot() {
+    nightlock::Entry* entry = entryModel_->entry(list_->currentIndex());
+    if (!entry)
+        return nullptr;
+    openEntryInSeparateWindow(entry);
+    return standaloneDetails_.value(entry);
+}
+
 void MainWindow::debugReattachDetail() {
     maybeReattachDetail(frameGeometry().center());
 }
@@ -1775,6 +2010,68 @@ void MainWindow::dockDetail() {
     detail_->show();
 }
 
+void MainWindow::openEntryInSeparateWindow(nightlock::Entry* entry) {
+    if (!entry)
+        return;
+    if (EntryDetailView* existing = standaloneDetails_.value(entry)) {
+        existing->raise();
+        existing->activateWindow();
+        return;
+    }
+
+    auto* view = new EntryDetailView;
+    view->makePermanentStandalone();
+    view->setWindowTitle(QString::fromStdString(entry->name));
+    view->resize(qMax(420, detail_->width()), qMax(560, detail_->height()));
+    view->setEntry(entry);
+    standaloneDetails_.insert(entry, view);
+
+    connect(view, &QObject::destroyed, this, [this, entry, view] {
+        if (standaloneDetails_.value(entry) == view)
+            standaloneDetails_.remove(entry);
+    });
+    connect(view, &EntryDetailView::editRequested, this,
+            [this, entry] { editEntry(entry); });
+    connect(view, &EntryDetailView::passwordGeneratorRequested, this,
+            [this] { openPasswordGenerator(); });
+    connect(view, &EntryDetailView::graphRequested, this, [this, entry] {
+        openGraph();
+        if (graph_)
+            graph_->focusEntry(entry);
+    });
+
+    view->move(geometry().center() - QPoint(view->width() / 2, view->height() / 2));
+    view->show();
+}
+
+void MainWindow::closeStandaloneEntryWindow(const nightlock::Entry* entry) {
+    EntryDetailView* view = standaloneDetails_.take(entry);
+    if (!view)
+        return;
+    view->clearEntry();
+    view->close();
+}
+
+void MainWindow::closeStandaloneWindowsInGroup(const nightlock::Group* group) {
+    if (!group)
+        return;
+    for (const auto& entry : group->entries())
+        closeStandaloneEntryWindow(entry.get());
+    for (const auto& child : group->groups())
+        closeStandaloneWindowsInGroup(child.get());
+}
+
+void MainWindow::closeAllStandaloneEntryWindows() {
+    const auto windows = standaloneDetails_.values();
+    standaloneDetails_.clear();
+    for (EntryDetailView* view : windows) {
+        if (!view)
+            continue;
+        view->clearEntry();
+        view->close();
+    }
+}
+
 void MainWindow::resizeEvent(QResizeEvent* event) {
     QMainWindow::resizeEvent(event);
     if (lockScreen_ && lockScreen_->isVisible())
@@ -1804,6 +2101,7 @@ void MainWindow::deleteEntry(nightlock::Entry* entry) {
     if (box.clickedButton() != deleteButton)
         return;
 
+    closeStandaloneEntryWindow(entry);
     if (detail_->isWindow())
         detail_->setEntry(nullptr);
     entryModel_->removeEntry(entry);
@@ -1824,8 +2122,10 @@ void MainWindow::deleteEntries(const QList<nightlock::Entry*>& entries) {
 
     if (detail_->isWindow())
         detail_->setEntry(nullptr);
-    for (nightlock::Entry* entry : entries)
+    for (nightlock::Entry* entry : entries) {
+        closeStandaloneEntryWindow(entry);
         entryModel_->removeEntry(entry);
+    }
     onGroupChanged(tree_->currentIndex());  // refreshes the counter
     refreshGraph();
 }
@@ -1861,7 +2161,8 @@ void MainWindow::debugSetEntryIcon(const QString& path) {
     entry->icon = path.toStdString();
     VaultService::instance()->markDirty();
     entryModel_->notifyEntryChanged(entry);
-    detail_->setEntry(entry);
+    if (!compactModeActive_)
+        detail_->setEntry(entry);
 }
 
 void MainWindow::debugSetEntryPattern(const QString& spec) {
@@ -1905,7 +2206,8 @@ void MainWindow::debugSetEntryPattern(const QString& spec) {
             VaultService::instance()->markDirty();
         }
     }
-    detail_->setEntry(entryModel_->entry(list_->currentIndex()));
+    if (!compactModeActive_)
+        detail_->setEntry(entryModel_->entry(list_->currentIndex()));
 }
 
 void MainWindow::debugRenameFolder(const QString& name) {

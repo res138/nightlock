@@ -1,5 +1,6 @@
 #include "entrydetailview.hpp"
 
+#include <QCloseEvent>
 #include <QDateTime>
 #include <QFrame>
 #include <QIcon>
@@ -8,6 +9,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPushButton>
+#include <QScrollBar>
 #include <QStyle>
 #include <QTimer>
 #include <QToolButton>
@@ -42,6 +44,20 @@ QString formatDate(std::chrono::system_clock::time_point tp) {
     const auto secs =
         std::chrono::duration_cast<std::chrono::seconds>(tp.time_since_epoch()).count();
     return QDateTime::fromSecsSinceEpoch(secs).toString(QStringLiteral("dd.MM.yyyy"));
+}
+
+// QLabel does not expose mutable access to its backing QString.  Take a
+// shared reference first, make the label release it, then overwrite the
+// now locally-owned buffer before releasing it.  Qt can still retain
+// internal/layout copies, so this remains best-effort rather than a
+// secure-memory guarantee.
+void discardLabelText(QLabel* label) {
+    QString text = label->text();
+    label->clear();
+    if (!text.isEmpty())
+        text.fill(QChar(u'\0'));
+    text.clear();
+    text.squeeze();
 }
 
 // The six-dot grip (two rows of three) that tears the panel off.
@@ -136,8 +152,9 @@ protected:
     }
 };
 
-// Traffic lights of the floating window: red docks the panel back into
-// the main window, yellow and green are decorative for now.
+// Traffic lights of the floating window: red docks the regular detached
+// panel, or closes a permanent standalone view. Yellow and green are
+// decorative for now.
 class FloatingControls : public QWidget {
 public:
     explicit FloatingControls(EntryDetailView* view) : QWidget(view), view_(view) {
@@ -160,8 +177,16 @@ protected:
     void mousePressEvent(QMouseEvent* event) override {
         if (event->button() != Qt::LeftButton)
             return;
-        if (event->position().x() < kDot)  // the red one
-            emit view_->dockRequested();
+        if (event->position().x() < kDot) {  // the red one
+            if (view_->isPermanentStandalone()) {
+                emit view_->closeRequested();
+                // Emit first so an external owner can update its window
+                // registry while the object is certainly still alive.
+                view_->close();
+            } else {
+                emit view_->dockRequested();
+            }
+        }
     }
 
 private:
@@ -411,6 +436,20 @@ void EntryDetailView::resizeEvent(QResizeEvent* event) {
     updatePatternGeometry();
 }
 
+void EntryDetailView::closeEvent(QCloseEvent* event) {
+    // close() delivers this synchronously even though WA_DeleteOnClose
+    // may defer object destruction.  Drop entry-derived Qt strings now,
+    // before a caller proceeds to wipe the core vault tree.
+    clearEntry();
+    QString title = windowTitle();
+    setWindowTitle({});
+    if (!title.isEmpty())
+        title.fill(QChar(u'\0'));
+    title.clear();
+    title.squeeze();
+    QScrollArea::closeEvent(event);
+}
+
 // The pattern zone runs from the very top of the panel (the grip strip)
 // down to the fields card; the card position depends on the optional
 // note, so this is re-run after every setEntry as well as on resize.
@@ -431,6 +470,10 @@ void EntryDetailView::updatePatternGeometry() {
 }
 
 void EntryDetailView::setFloatingMode(bool floating) {
+    // A permanent standalone view is intentionally a one-way state: it
+    // must keep its top-level controls and can never become a dock pane.
+    if (permanentStandalone_ && !floating)
+        return;
     setAttribute(Qt::WA_TranslucentBackground, floating);
     setProperty("floatingWindow", floating);
     floatingControls_->setVisible(floating);
@@ -444,6 +487,20 @@ void EntryDetailView::setFloatingMode(bool floating) {
     content_->style()->polish(content_);
 }
 
+void EntryDetailView::makePermanentStandalone() {
+    if (permanentStandalone_)
+        return;
+
+    // setParent(nullptr) is explicit even for the usual parentless
+    // construction: entering the mode always starts as a genuinely
+    // independent top-level rather than a transient child window.
+    setParent(nullptr);
+    setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
+    setAttribute(Qt::WA_DeleteOnClose);
+    permanentStandalone_ = true;
+    setFloatingMode(true);
+}
+
 void EntryDetailView::gripPressed(const QPoint& globalPos) {
     pressGlobal_ = globalPos;
     if (isWindow())
@@ -451,6 +508,11 @@ void EntryDetailView::gripPressed(const QPoint& globalPos) {
 }
 
 void EntryDetailView::gripDragged(const QPoint& globalPos) {
+    if (permanentStandalone_) {
+        if (isWindow())
+            move(globalPos - grabOffset_);
+        return;
+    }
     if (isWindow()) {
         move(globalPos - grabOffset_);
         return;
@@ -460,7 +522,7 @@ void EntryDetailView::gripDragged(const QPoint& globalPos) {
 }
 
 void EntryDetailView::gripReleased(const QPoint& globalPos) {
-    if (isWindow())
+    if (isWindow() && !permanentStandalone_)
         emit dropped(globalPos);
 }
 
@@ -492,14 +554,13 @@ void EntryDetailView::refreshUrlText() {
 }
 
 void EntryDetailView::setEntry(const nightlock::Entry* entry) {
-    content_->setVisible(entry != nullptr);
-    editButton_->setVisible(entry != nullptr);
-    syncGeneratorVisibility();
-    if (!entry) {
-        entryColor_ = nightlock::EntryColor::None;
-        refreshCardColors();
+    clearEntry();
+    if (!entry)
         return;
-    }
+
+    content_->show();
+    editButton_->show();
+    syncGeneratorVisibility();
 
     entryColor_ = entry->color;
     refreshCardColors();
@@ -534,7 +595,6 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     codeRow_.frame->setVisible(!entry->code.empty());
     codeRow_.value->setText(toQString(entry->code));
 
-    clearAdditionalFields();
     QString cryptoAsset;
     QStringList seedWords;
     const nightlock::EntryField* expirationField = nullptr;
@@ -640,6 +700,48 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     updatePatternGeometry();
 }
 
+void EntryDetailView::clearEntry() {
+    // Hide first so every nested SpoilerLabel stops ticking before its
+    // retained value is cleared or its dynamic row is destroyed.
+    content_->hide();
+    editButton_->hide();
+    syncGeneratorVisibility();
+
+    iconLabel_->clear();
+    discardLabelText(titleLabel_);
+    discardLabelText(noteLabel_);
+    noteLabel_->hide();
+
+    loginRow_.frame->hide();
+    loginCopy_->clear();
+    passwordRow_.frame->hide();
+    passwordSpoiler_->clear();
+    urlRow_.frame->hide();
+    if (!url_.isEmpty())
+        url_.fill(QChar(u'\0'));
+    url_.clear();
+    url_.squeeze();
+    discardLabelText(urlRow_.value);
+    codeRow_.frame->hide();
+    discardLabelText(codeRow_.value);
+    fieldsCard_->hide();
+
+    seedCopy_->clear();
+    clearAdditionalFields();
+
+    discardLabelText(createdRow_.value);
+    expirationRow_.frame->hide();
+    discardLabelText(expirationRow_.value);
+    expirationRow_.value->setStyleSheet({});
+    discardLabelText(modifiedRow_.value);
+
+    refreshLastVisibleRow();
+    patternBackdrop_->clear();
+    entryColor_ = nightlock::EntryColor::None;
+    refreshCardColors();
+    verticalScrollBar()->setValue(0);
+}
+
 void EntryDetailView::syncGeneratorVisibility() {
     generatorButton_->setVisible(content_->isVisible() &&
                                  !generalsettings::hideGeneratorIcon());
@@ -727,12 +829,18 @@ void EntryDetailView::applyPresetLabels(int presetValue) {
 }
 
 void EntryDetailView::clearAdditionalFields() {
-    for (const FieldRow& row : additionalRows_)
-        delete row.frame;
-    for (const FieldRow& row : seedRows_)
-        delete row.frame;
-    for (const FieldRow& row : customRows_)
-        delete row.frame;
+    const auto clearRows = [](const QList<FieldRow>& rows) {
+        for (const FieldRow& row : rows) {
+            discardLabelText(row.name);
+            discardLabelText(row.value);
+            for (SpoilerLabel* spoiler : row.frame->findChildren<SpoilerLabel*>())
+                spoiler->clear();
+            delete row.frame;
+        }
+    };
+    clearRows(additionalRows_);
+    clearRows(seedRows_);
+    clearRows(customRows_);
     additionalRows_.clear();
     seedRows_.clear();
     seedSpoilers_.clear();

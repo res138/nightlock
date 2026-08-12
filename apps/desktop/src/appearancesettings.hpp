@@ -2,13 +2,14 @@
 
 #include <QColor>
 #include <QIcon>
+#include <QList>
 #include <QObject>
 #include <QString>
 
 // User-facing appearance switches (Settings → Appearance): the color
-// scheme, the accent color and folder-icon visibility. Everything
-// persists via QSettings; setters reinstall the app stylesheet where
-// needed and ping notifier() so open views refresh live.
+// scheme, accent, folder-icon visibility and compact entry layout.
+// Everything persists via QSettings; setters reinstall the app
+// stylesheet where needed and ping notifier() so open views refresh.
 namespace appearancesettings {
 
 // Stored option ids, index-aligned with the Settings dropdowns.
@@ -32,6 +33,28 @@ void setAccent(const QString& accent);
 
 bool folderIcons();
 void setFolderIcons(bool shown);
+
+// Compact Mode replaces the entry list/detail split with one table.
+// Column preferences describe the user's desired table; responsive
+// layouts may temporarily show fewer columns without changing them.
+enum class CompactColumn {
+    Name,
+    Login,
+    Password,
+    Url,
+    Note,
+    Date,
+};
+
+bool compactMode();
+void setCompactMode(bool enabled);
+
+// Returned in the canonical display order above. Login and Password
+// are mandatory and therefore remain enabled even if stored settings
+// are incomplete or a caller tries to turn them off.
+QList<CompactColumn> compactColumns();
+bool compactColumnEnabled(CompactColumn column);
+void setCompactColumnEnabled(CompactColumn column, bool enabled);
 
 // Semantic colors for hand-painted widgets, resolved for the active
 // scheme. Read at paint time — a theme switch repolishes every

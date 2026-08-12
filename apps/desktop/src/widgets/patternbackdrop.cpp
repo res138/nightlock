@@ -292,10 +292,14 @@ PatternBackdrop::PatternBackdrop(QWidget* parent) : QWidget(parent) {
 }
 
 void PatternBackdrop::setEntry(const nightlock::Entry* entry) {
-    const auto kind = entry ? entry->pattern : nightlock::Pattern::None;
+    if (!entry) {
+        clear();
+        return;
+    }
+    const auto kind = entry->pattern;
     QString iconPath;
     quint64 seed = 0;
-    if (entry && kind != nightlock::Pattern::None) {
+    if (kind != nightlock::Pattern::None) {
         iconPath = entry->icon.empty() ? QStringLiteral(":/icons/entry.png")
                                        : QString::fromStdString(entry->icon);
         seed = std::hash<long long>{}(
@@ -306,6 +310,17 @@ void PatternBackdrop::setEntry(const nightlock::Entry* entry) {
     kind_ = kind;
     iconPath_ = iconPath;
     seed_ = seed;
+    update();
+}
+
+void PatternBackdrop::clear() {
+    kind_ = nightlock::Pattern::None;
+    if (!iconPath_.isEmpty())
+        iconPath_.fill(QChar(u'\0'));
+    iconPath_.clear();
+    iconPath_.squeeze();
+    seed_ = 0;
+    cache_.clear();
     update();
 }
 

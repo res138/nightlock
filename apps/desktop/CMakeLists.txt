@@ -19,6 +19,7 @@ qt_add_executable(nightlock-desktop
     src/models/grouptreemodel.cpp
     src/models/entrylistmodel.cpp
     src/widgets/copylabel.cpp
+    src/widgets/compactentryview.cpp
     src/widgets/entrydetailview.cpp
     src/widgets/entrycolorpicker.cpp
     src/widgets/entrylistdelegate.cpp

@@ -22,6 +22,10 @@ public:
         SubtitleStrongRole,
         ColorRole,
         ExpiredRole,
+        PasswordRole,
+        UrlRole,
+        NoteRole,
+        ModifiedRole,
     };
 
     // Display order of the list. Custom is the group's own order (the

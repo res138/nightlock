@@ -19,6 +19,16 @@ constexpr int kHeight = 16;
 
 QColor textColor() { return appearancesettings::palette().value; }
 
+// Best effort for the common uniquely-owned case.  QString may detach
+// when another Qt object still shares the buffer, so this does not turn
+// ordinary Qt text storage into secure memory.
+void discardText(QString& text) {
+    if (!text.isEmpty())
+        text.fill(QChar(u'\0'));
+    text.clear();
+    text.squeeze();
+}
+
 }  // namespace
 
 CopyLabel::CopyLabel(QWidget* parent) : QWidget(parent) {
@@ -46,6 +56,8 @@ CopyLabel::CopyLabel(QWidget* parent) : QWidget(parent) {
 }
 
 void CopyLabel::setText(const QString& text) {
+    discardText(text_);
+    discardText(clipboardText_);
     text_ = text;
     clipboardText_ = text;
     hold_->stop();
@@ -56,7 +68,18 @@ void CopyLabel::setText(const QString& text) {
 }
 
 void CopyLabel::setClipboardText(const QString& text) {
+    discardText(clipboardText_);
     clipboardText_ = text;
+}
+
+void CopyLabel::clear() {
+    hold_->stop();
+    flash_->stop();
+    copied_ = 0;
+    discardText(text_);
+    discardText(clipboardText_);
+    updateGeometry();
+    update();
 }
 
 void CopyLabel::setLeadingIconVisible(bool visible) {
@@ -69,6 +92,13 @@ void CopyLabel::setLeadingIconVisible(bool visible) {
 
 void CopyLabel::setContentAlignment(Qt::Alignment alignment) {
     contentAlignment_ = alignment;
+    update();
+}
+
+void CopyLabel::setTextElideMode(Qt::TextElideMode mode) {
+    if (elideMode_ == mode)
+        return;
+    elideMode_ = mode;
     update();
 }
 
@@ -107,19 +137,22 @@ void CopyLabel::paintEvent(QPaintEvent*) {
     if (copied_ < 1.0) {
         painter.setOpacity(1.0 - copied_);
         painter.setPen(textColor());
+        const QFontMetrics metrics(font());
         if (leadingIconVisible_) {
-            const QFontMetrics metrics(font());
-            const int textWidth = metrics.horizontalAdvance(text_);
+            const int available = qMax(0, width() - kIconSize - kGap);
+            const QString visible = metrics.elidedText(text_, elideMode_, available);
+            const int textWidth = metrics.horizontalAdvance(visible);
             const int x = alignedX(textWidth + kGap + kIconSize);
             copyIcon.paint(&painter,
                            QRect(x, (height() - kIconSize) / 2, kIconSize, kIconSize));
             painter.drawText(QRect(x + kIconSize + kGap, 0, textWidth, height()),
                              Qt::AlignLeft | Qt::AlignVCenter | Qt::TextSingleLine,
-                             text_);
+                             visible);
         } else {
+            const QString visible = metrics.elidedText(text_, elideMode_, width());
             painter.drawText(rect(), contentAlignment_ | Qt::AlignVCenter |
                                          Qt::TextSingleLine,
-                             text_);
+                             visible);
         }
     }
 

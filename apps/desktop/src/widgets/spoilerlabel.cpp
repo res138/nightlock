@@ -39,6 +39,13 @@ QColor particleColor() {
                                             : QColor(0x2A, 0x2A, 0x2A);
 }
 
+void discardText(QString& text) {
+    if (!text.isEmpty())
+        text.fill(QChar(u'\0'));
+    text.clear();
+    text.squeeze();
+}
+
 qreal randomIn(qreal from, qreal to) {
     return from + QRandomGenerator::global()->generateDouble() * (to - from);
 }
@@ -96,16 +103,26 @@ SpoilerLabel::SpoilerLabel(QWidget* parent) : QWidget(parent) {
 }
 
 void SpoilerLabel::setSecret(const QString& secret) {
+    clear();
     secret_ = secret;
-    // Hard reset, no animation when switching entries.
+    if (secret_.isEmpty())
+        return;
+    rebuildParticles();
+    ensureTicking();
+    update();
+}
+
+void SpoilerLabel::clear() {
+    // Hard reset, no animation when switching entries or locking.
+    timer_->stop();
     copiedHold_->stop();
     copiedAnimation_->stop();
     revealAnimation_->stop();
     copied_ = 0;
     reveal_ = 0;
+    discardText(secret_);
+    particles_.clear();
     updateGeometry();
-    rebuildParticles();
-    ensureTicking();
     update();
 }
 
@@ -136,6 +153,13 @@ void SpoilerLabel::conceal() {
 
 void SpoilerLabel::setCoordinatedReveal(bool enabled) {
     coordinatedReveal_ = enabled;
+}
+
+void SpoilerLabel::setTextElideMode(Qt::TextElideMode mode) {
+    if (elideMode_ == mode)
+        return;
+    elideMode_ = mode;
+    update();
 }
 
 void SpoilerLabel::animateReveal(qreal target) {
@@ -217,8 +241,10 @@ void SpoilerLabel::paintEvent(QPaintEvent*) {
     if (reveal_ > 0.0 && copied_ < 1.0) {
         painter.setOpacity(reveal_ * (1.0 - copied_));
         painter.setPen(textColor());
+        const QString visible = QFontMetrics(font()).elidedText(
+            secret_, elideMode_, width());
         painter.drawText(rect(), Qt::AlignRight | Qt::AlignVCenter | Qt::TextSingleLine,
-                         secret_);
+                         visible);
     }
 
     if (copied_ > 0.0) {

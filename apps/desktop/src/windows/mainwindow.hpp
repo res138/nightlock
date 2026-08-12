@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QHash>
 #include <QMainWindow>
 
 #include "models/entrylistmodel.hpp"
@@ -15,6 +16,7 @@ class QSplitter;
 class QToolButton;
 class QVariantAnimation;
 class EntryDetailView;
+class CompactEntryView;
 class GraphWindow;
 class GroupTreeModel;
 class GroupTreeView;
@@ -100,6 +102,9 @@ public:
     // Debug hook for NIGHTLOCK_SCREENSHOT_DETACHED: floats the detail
     // view as it would after a grip drag; returns it for grabbing.
     QWidget* debugDetachDetail();
+    // Debug hook for NIGHTLOCK_SCREENSHOT_STANDALONE: opens the
+    // selected entry through the permanent context-menu window path.
+    QWidget* openSelectedEntryStandaloneForScreenshot();
     // Debug hook for NIGHTLOCK_SCREENSHOT_GRAPH: opens the graph
     // window and returns it for grabbing.
     QWidget* openGraphForScreenshot();
@@ -140,7 +145,13 @@ private:
 
     void showGroupMenu(const QPoint& pos);
     void showEntryMenu(const QPoint& pos);
+    void showCompactEntryMenu(const QPoint& pos);
+    void popupEntryMenu(nightlock::Entry* entry,
+                        const QList<nightlock::Entry*>& selected,
+                        const QPoint& globalPos);
     NlMenu* buildEntryMenu(nightlock::Entry* entry);
+    void populateCopyAttributeMenu(QMenu* menu, nightlock::Entry* entry,
+                                   bool includeUrl = true);
     NlMenu* buildMoveMenu(nightlock::Group* group, const QList<nightlock::Entry*>& entries,
                           QWidget* parent);
     void prependMoveTarget(NlMenu* menu, nightlock::Group* target,
@@ -160,12 +171,17 @@ private:
     void detachDetail(const QPoint& globalPos);
     void maybeReattachDetail(const QPoint& globalPos);
     void dockDetail();
+    void openEntryInSeparateWindow(nightlock::Entry* entry);
+    void closeStandaloneEntryWindow(const nightlock::Entry* entry);
+    void closeStandaloneWindowsInGroup(const nightlock::Group* group);
+    void closeAllStandaloneEntryWindows();
     void deleteEntry(nightlock::Entry* entry);
 
     void openGraph();
     void refreshGraph();
     void syncNetGraphAvailability();
     void syncGeneralToolbarVisibility();
+    void syncCompactMode();
     SearchWindow* openSearch();
     PasswordGeneratorWindow* openPasswordGenerator();
     SettingsWindow* openSettings();
@@ -204,6 +220,7 @@ private:
     QWidget* treeInner_;              // header + tree; slides inside treePane_
     QVariantAnimation* paneAnimation_ = nullptr;
     QListView* list_;
+    CompactEntryView* compactView_ = nullptr;
     QLabel* countLabel_;
     QLabel* pathLabel_;
     QHBoxLayout* listHeaderLayout_;
@@ -215,7 +232,10 @@ private:
     QToolButton* reopenTreeButton_;   // lives in the list header, shown
                                       // only while the tree pane is hidden
     QShortcut* graphShortcut_ = nullptr;
+    QMenu* entryMenu_ = nullptr;       // rebuilt on show; cleared before vault wipe
+    QMenu* directoryMenu_ = nullptr;   // likewise may hold Group* callbacks
     EntryDetailView* detail_;
+    QHash<const nightlock::Entry*, EntryDetailView*> standaloneDetails_;
     GraphWindow* graph_ = nullptr;     // the one graph window, if open
     PasswordGeneratorWindow* passwordGenerator_ = nullptr;
     SearchWindow* search_ = nullptr;   // the one search window, if open
@@ -224,8 +244,10 @@ private:
     LockScreen* lockScreen_ = nullptr; // covers the window while locked
     QSplitter* splitter_;
     QList<int> detailSplitterSizes_;  // pane widths to restore on re-dock
+    QList<int> compactSplitterSizes_; // three-pane widths to restore after compact mode
     QList<int> treeSplitterSizes_;    // pane widths to restore on reopen
     bool alwaysOnTop_ = false;
+    bool compactModeActive_ = false;
 
 protected:
     void resizeEvent(QResizeEvent* event) override;

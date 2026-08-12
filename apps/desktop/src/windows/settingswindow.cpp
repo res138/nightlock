@@ -15,6 +15,7 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSignalBlocker>
@@ -95,6 +96,57 @@ protected:
 
 private:
     qreal pos_;  // knob position, 0 = off .. 1 = on
+};
+
+// Compact, circular checkbox for the Compact Mode column picker. Its
+// filled state follows the selected accent; with the blue accent this
+// is the blue disc and white tick from the reference design.
+class RoundCheckBox : public QAbstractButton {
+public:
+    explicit RoundCheckBox(bool checked, QWidget* parent = nullptr)
+        : QAbstractButton(parent) {
+        setCheckable(true);
+        setChecked(checked);
+        setCursor(Qt::PointingHandCursor);
+        setFixedSize(22, 22);
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        const auto& palette = appearancesettings::palette();
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        // Required checked columns stay visually selected like the
+        // reference; their disabled state is conveyed by cursor/input,
+        // not by washing out the blue disc.
+        painter.setOpacity(isEnabled() || isChecked() ? 1.0 : 0.5);
+
+        const QRectF circle = QRectF(rect()).adjusted(1, 1, -1, -1);
+        if (isChecked()) {
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(appearancesettings::accentColor());
+        } else {
+            painter.setPen(QPen(palette.borderStrong, 1));
+            painter.setBrush(underMouse() ? palette.inputHover : palette.input);
+        }
+        painter.drawEllipse(circle);
+
+        if (isChecked()) {
+            QPen tick(appearancesettings::accentTextColor(), 2.0);
+            tick.setCapStyle(Qt::RoundCap);
+            tick.setJoinStyle(Qt::RoundJoin);
+            painter.setPen(tick);
+            painter.setBrush(Qt::NoBrush);
+            QPainterPath path;
+            path.moveTo(5.8, 11.4);
+            path.lineTo(9.3, 14.8);
+            path.lineTo(16.2, 7.4);
+            painter.drawPath(path);
+        }
+    }
+
+    void enterEvent(QEnterEvent*) override { update(); }
+    void leaveEvent(QEvent*) override { update(); }
 };
 
 // Round color swatch for the accent picker's menu entries.
@@ -791,9 +843,50 @@ QWidget* SettingsWindow::buildAppearancePage() {
             [](bool shown) { appearancesettings::setFolderIcons(shown); });
     addRow(rows, tr("Folder icons"),
            tr("Show custom icons next to folders in the tree."), folderIcons);
+
+    auto* compactMode = new ToggleSwitch(appearancesettings::compactMode());
+    connect(compactMode, &QAbstractButton::toggled, compactMode,
+            [](bool enabled) { appearancesettings::setCompactMode(enabled); });
+    addRow(rows, tr("Enable Compact Mode"),
+           tr("Show entries in a responsive table with no detail pane."), compactMode);
     finishCard(rows);
 
     column->addWidget(card);
+
+    QVBoxLayout* compactColumnRows = nullptr;
+    QFrame* compactColumnsCard = makeCard(compactColumnRows);
+    struct ColumnOption {
+        appearancesettings::CompactColumn column;
+        QString title;
+        bool required;
+    };
+    const QList<ColumnOption> compactColumnOptions = {
+        {appearancesettings::CompactColumn::Name, tr("Name"), false},
+        {appearancesettings::CompactColumn::Login, tr("Login"), true},
+        {appearancesettings::CompactColumn::Password, tr("Password"), true},
+        {appearancesettings::CompactColumn::Url, tr("URL"), false},
+        {appearancesettings::CompactColumn::Note, tr("Note"), false},
+        {appearancesettings::CompactColumn::Date, tr("Date"), false},
+    };
+    for (const ColumnOption& option : compactColumnOptions) {
+        auto* checkbox =
+            new RoundCheckBox(appearancesettings::compactColumnEnabled(option.column));
+        checkbox->setAccessibleName(option.title);
+        if (option.required) {
+            checkbox->setChecked(true);
+            checkbox->setEnabled(false);
+            checkbox->setCursor(Qt::ArrowCursor);
+            checkbox->setToolTip(tr("Required in Compact Mode"));
+        } else {
+            connect(checkbox, &QAbstractButton::toggled, checkbox,
+                    [column = option.column](bool enabled) {
+                        appearancesettings::setCompactColumnEnabled(column, enabled);
+                    });
+        }
+        addRow(compactColumnRows, option.title, {}, checkbox);
+    }
+    finishCard(compactColumnRows);
+    column->addWidget(compactColumnsCard);
     column->addStretch(1);
     return page;
 }

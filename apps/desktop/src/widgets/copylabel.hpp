@@ -17,8 +17,15 @@ public:
     void setText(const QString& text);
     QString text() const { return text_; }
     void setClipboardText(const QString& text);
+    // Drops both the displayed and copy-only values immediately.  Qt's
+    // QString storage cannot promise cryptographic zeroization, but the
+    // widget must not retain a logical copy after the vault is locked.
+    void clear();
     void setLeadingIconVisible(bool visible);
     void setContentAlignment(Qt::Alignment alignment);
+    // Optional clipping policy for constrained table cells. The detail
+    // view keeps the default (no elision).
+    void setTextElideMode(Qt::TextElideMode mode);
 
     // Also used by the NIGHTLOCK_TEST_SPOILER hook.
     void copyAndFlash();
@@ -36,5 +43,6 @@ private:
     QVariantAnimation* flash_;
     bool leadingIconVisible_ = false;
     Qt::Alignment contentAlignment_ = Qt::AlignRight;
+    Qt::TextElideMode elideMode_ = Qt::ElideNone;
     qreal copied_ = 0;  // 0..1 crossfade to the "Copied" flash
 };
