@@ -86,6 +86,12 @@ Start at the [documentation hub](docs/README.md).
 | Understand support boundaries | [SUPPORT.md](SUPPORT.md) |
 | Review the documentation roadmap | [Documentation plan](docs/DOCUMENTATION_PLAN.md) |
 
+## Reports
+
+| Date | Report | Description |
+|---|---|---|
+| 12 August 2026 | [Comprehensive Security Assessment](docs/reports/Nightlock_Security_Assessment_2026-08-12.docx) | A detailed assessment of Nightlock 1.2.2 covering cryptography, secret lifecycle, storage, platform hardening, software supply chain, and comparisons with KeePassXC/KDBX and other password managers. It includes prioritized findings, remediation requirements, a radical secure-by-default target architecture, and a release roadmap. |
+
 ## Contributing and security
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Architectural changes require an ADR or RFC when they alter durable contracts.
