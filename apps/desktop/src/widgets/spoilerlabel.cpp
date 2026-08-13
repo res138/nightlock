@@ -33,8 +33,13 @@ constexpr int kCopiedFlashMs = 160;
 constexpr int kCopiedHoldMs = 900;
 constexpr int kHeight = 16;
 
-QColor textColor() { return appearancesettings::palette().value; }
-QColor particleColor() {
+QColor textColor(bool primary) {
+    return primary ? appearancesettings::palette().ink
+                   : appearancesettings::palette().value;
+}
+QColor particleColor(bool primary) {
+    if (primary)
+        return appearancesettings::palette().ink;
     return appearancesettings::darkActive() ? QColor(0xC8, 0xC6, 0xCD)
                                             : QColor(0x2A, 0x2A, 0x2A);
 }
@@ -155,6 +160,20 @@ void SpoilerLabel::setCoordinatedReveal(bool enabled) {
     coordinatedReveal_ = enabled;
 }
 
+void SpoilerLabel::setContentAlignment(Qt::Alignment alignment) {
+    if (contentAlignment_ == alignment)
+        return;
+    contentAlignment_ = alignment;
+    update();
+}
+
+void SpoilerLabel::setPrimaryTextColor(bool enabled) {
+    if (primaryTextColor_ == enabled)
+        return;
+    primaryTextColor_ = enabled;
+    update();
+}
+
 void SpoilerLabel::setTextElideMode(Qt::TextElideMode mode) {
     if (elideMode_ == mode)
         return;
@@ -231,7 +250,7 @@ void SpoilerLabel::paintEvent(QPaintEvent*) {
                 fadeEnvelope(particle.age / particle.lifetime) * (1.0 - reveal_);
             if (alpha <= 0.01)
                 continue;
-            QColor color = particleColor();
+            QColor color = particleColor(primaryTextColor_);
             color.setAlphaF(alpha * 0.85);
             painter.setBrush(color);
             painter.drawEllipse(particle.pos, particle.radius, particle.radius);
@@ -240,10 +259,11 @@ void SpoilerLabel::paintEvent(QPaintEvent*) {
 
     if (reveal_ > 0.0 && copied_ < 1.0) {
         painter.setOpacity(reveal_ * (1.0 - copied_));
-        painter.setPen(textColor());
+        painter.setPen(textColor(primaryTextColor_));
         const QString visible = QFontMetrics(font()).elidedText(
             secret_, elideMode_, width());
-        painter.drawText(rect(), Qt::AlignRight | Qt::AlignVCenter | Qt::TextSingleLine,
+        painter.drawText(rect(), contentAlignment_ | Qt::AlignVCenter |
+                                     Qt::TextSingleLine,
                          visible);
     }
 
@@ -255,11 +275,16 @@ void SpoilerLabel::paintEvent(QPaintEvent*) {
         constexpr int kGap = 5;
         const int textWidth = metrics.horizontalAdvance(label);
         const qreal slide = (1.0 - copied_) * 4.0;  // gentle rise-in
-        int x = width() - textWidth - kGap - kIconSize;
+        const int flashWidth = textWidth + kGap + kIconSize;
+        const int x = contentAlignment_.testFlag(Qt::AlignLeft)
+                          ? 0
+                          : contentAlignment_.testFlag(Qt::AlignHCenter)
+                                ? (width() - flashWidth) / 2
+                                : width() - flashWidth;
         const QRectF iconRect(x, (height() - kIconSize) / 2.0 + slide, kIconSize, kIconSize);
         static const QIcon copyIcon = appearancesettings::themedMenuIcon(QStringLiteral("copy"));
         copyIcon.paint(&painter, iconRect.toRect());
-        painter.setPen(textColor());
+        painter.setPen(textColor(primaryTextColor_));
         painter.drawText(QRectF(x + kIconSize + kGap, slide, textWidth, height()),
                          Qt::AlignLeft | Qt::AlignVCenter, label);
     }

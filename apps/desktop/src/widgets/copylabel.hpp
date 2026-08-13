@@ -23,6 +23,9 @@ public:
     void clear();
     void setLeadingIconVisible(bool visible);
     void setContentAlignment(Qt::Alignment alignment);
+    // Uses the primary interface text color instead of the softer field
+    // value color. Compact tables opt in so every column has one tone.
+    void setPrimaryTextColor(bool enabled);
     // Optional clipping policy for constrained table cells. The detail
     // view keeps the default (no elision).
     void setTextElideMode(Qt::TextElideMode mode);
@@ -42,6 +45,7 @@ private:
     QTimer* hold_;
     QVariantAnimation* flash_;
     bool leadingIconVisible_ = false;
+    bool primaryTextColor_ = false;
     Qt::Alignment contentAlignment_ = Qt::AlignRight;
     Qt::TextElideMode elideMode_ = Qt::ElideNone;
     qreal copied_ = 0;  // 0..1 crossfade to the "Copied" flash

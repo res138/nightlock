@@ -40,8 +40,13 @@ enum Column {
     ColumnCount,
 };
 
-constexpr int kRowHeight = 42;
-constexpr int kHeaderHeight = 32;
+constexpr int kRowHeight = 30;
+constexpr int kHeaderHeight = 26;
+constexpr int kCellPadding = 4;
+constexpr int kNameIconSize = 15;
+constexpr int kNameIconGap = 4;
+constexpr int kUrlIconSize = 12;
+constexpr int kUrlIconGap = 4;
 constexpr char kInteractiveRowProperty[] = "compactEntryRow";
 
 struct ColumnMetrics {
@@ -51,12 +56,12 @@ struct ColumnMetrics {
 };
 
 constexpr std::array<ColumnMetrics, ColumnCount> kColumnMetrics = {{
-    {104, 200, 2},  // Name
-    {112, 190, 2},  // Login
-    {116, 190, 2},  // Password
-    {112, 205, 2},  // URL
-    {120, 235, 3},  // Note
-    {90, 100, 1},   // Date
+    {100, 160, 2},  // Name
+    {102, 160, 2},  // Login
+    {106, 160, 2},  // Password
+    {96, 175, 2},   // URL
+    {100, 190, 3},  // Note
+    {78, 88, 1},    // Date
 }};
 
 appearancesettings::CompactColumn settingColumn(int column) {
@@ -84,25 +89,37 @@ public:
         : QWidget(parent), kind_(kind) {
         setAttribute(Qt::WA_StyledBackground, false);
         auto* layout = new QHBoxLayout(this);
-        layout->setContentsMargins(10, 0, 10, 0);
+        layout->setContentsMargins(kCellPadding, 0, kCellPadding, 0);
         layout->setSpacing(0);
         if (kind == Kind::Login) {
             login_ = new CopyLabel;
             login_->setContentAlignment(Qt::AlignLeft);
+            login_->setPrimaryTextColor(true);
             login_->setTextElideMode(Qt::ElideRight);
             login_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
             layout->addWidget(login_);
         } else {
             password_ = new SpoilerLabel;
+            password_->setContentAlignment(Qt::AlignLeft);
+            password_->setPrimaryTextColor(true);
             password_->setTextElideMode(Qt::ElideRight);
             password_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
             layout->addWidget(password_);
         }
+        refreshFont();
     }
 
     Kind kind() const { return kind_; }
     CopyLabel* login() const { return login_; }
     SpoilerLabel* password() const { return password_; }
+    void refreshFont() {
+        QFont valueFont(fonts::resolvedFamily(fonts::Role::Secondary));
+        valueFont.setPixelSize(12);
+        if (login_)
+            login_->setFont(valueFont);
+        if (password_)
+            password_->setFont(valueFont);
+    }
 
 private:
     Kind kind_;
@@ -133,14 +150,14 @@ protected:
         painter->drawLine(rect.bottomLeft(), rect.bottomRight());
         painter->drawLine(rect.topRight(), rect.bottomRight());
 
-        QFont headerFont(fonts::resolvedFamily(fonts::Role::Primary));
+        QFont headerFont(fonts::resolvedFamily(fonts::Role::Secondary));
         headerFont.setPixelSize(12);
         headerFont.setWeight(QFont::DemiBold);
         painter->setFont(headerFont);
-        painter->setPen(appearancesettings::palette().muted);
+        painter->setPen(appearancesettings::palette().ink);
         const QString title = model()->headerData(logicalIndex, orientation(),
                                                    Qt::DisplayRole).toString();
-        const QRect textRect = rect.adjusted(10, 0, -10, 0);
+        const QRect textRect = rect.adjusted(kCellPadding, 0, -kCellPadding, 0);
         painter->drawText(textRect, Qt::AlignLeft | Qt::AlignVCenter,
                           QFontMetrics(headerFont).elidedText(
                               title, Qt::ElideRight, textRect.width()));
@@ -154,8 +171,6 @@ QColor rowBackground(const QStyleOptionViewItem& option, const QModelIndex& inde
         selected.setAlpha(appearancesettings::darkActive() ? 54 : 25);
         return selected;
     }
-    if (option.state.testFlag(QStyle::State_MouseOver))
-        return appearancesettings::palette().inputHover;
     if (generalsettings::entryColorsEnabled()) {
         const auto color = static_cast<nightlock::EntryColor>(
             index.data(EntryListModel::ColorRole).toInt());
@@ -189,19 +204,17 @@ public:
             return;
         }
 
-        QRect content = option.rect.adjusted(10, 0, -10, 0);
-        QFont textFont(fonts::resolvedFamily(fonts::Role::Primary));
+        QRect content = option.rect.adjusted(kCellPadding, 0, -kCellPadding, 0);
+        QFont textFont(fonts::resolvedFamily(fonts::Role::Secondary));
         textFont.setPixelSize(12);
-        QColor textColor = appearancesettings::palette().value;
+        QColor textColor = appearancesettings::palette().ink;
 
         if (column_ == NameColumn) {
             const QIcon icon = index.data(Qt::DecorationRole).value<QIcon>();
-            constexpr int kIconSize = 18;
             icon.paint(painter, QRect(content.left(),
-                                      content.center().y() - kIconSize / 2,
-                                      kIconSize, kIconSize));
-            content.setLeft(content.left() + kIconSize + 7);
-            textFont.setFamily(fonts::resolvedFamily(fonts::Role::Secondary));
+                                      content.center().y() - kNameIconSize / 2,
+                                      kNameIconSize, kNameIconSize));
+            content.setLeft(content.left() + kNameIconSize + kNameIconGap);
             textFont.setWeight(QFont::DemiBold);
             textColor = appearancesettings::palette().ink;
         }
@@ -211,10 +224,9 @@ public:
         const QString text = index.data(Qt::DisplayRole).toString();
         const QString visible = QFontMetrics(textFont).elidedText(
             text, Qt::ElideRight, qMax(0, content.width()));
-        const Qt::Alignment alignment = column_ == DateColumn
-                                            ? Qt::AlignCenter
-                                            : Qt::AlignLeft | Qt::AlignVCenter;
-        painter->drawText(content, alignment | Qt::TextSingleLine, visible);
+        painter->drawText(content, Qt::AlignLeft | Qt::AlignVCenter |
+                                       Qt::TextSingleLine,
+                          visible);
         painter->restore();
     }
 
@@ -236,15 +248,15 @@ public:
 
         const QString url = index.data(Qt::DisplayRole).toString();
         if (!url.isEmpty()) {
-            QFont textFont(fonts::resolvedFamily(fonts::Role::Primary));
+            QFont textFont(fonts::resolvedFamily(fonts::Role::Secondary));
             textFont.setPixelSize(12);
             painter->setFont(textFont);
-            painter->setPen(appearancesettings::palette().value);
+            painter->setPen(appearancesettings::palette().ink);
 
-            constexpr int kIconSize = 13;
-            constexpr int kGap = 6;
-            QRect content = option.rect.adjusted(10, 0, -10, 0);
-            const int textWidth = qMax(0, content.width() - kIconSize - kGap);
+            QRect content = option.rect.adjusted(kCellPadding, 0,
+                                                 -kCellPadding, 0);
+            const int textWidth = qMax(
+                0, content.width() - kUrlIconSize - kUrlIconGap);
             const QString visible = QFontMetrics(textFont).elidedText(
                 url, Qt::ElideRight, textWidth);
             painter->drawText(QRect(content.left(), content.top(), textWidth,
@@ -253,9 +265,11 @@ public:
                               visible);
             static const QIcon externalLink =
                 appearancesettings::themedMenuIcon(QStringLiteral("external-link"));
-            externalLink.paint(painter, QRect(content.right() - kIconSize,
-                                               content.center().y() - kIconSize / 2,
-                                               kIconSize, kIconSize));
+            externalLink.paint(
+                painter,
+                QRect(content.right() - kUrlIconSize,
+                      content.center().y() - kUrlIconSize / 2,
+                      kUrlIconSize, kUrlIconSize));
         }
         painter->restore();
     }
@@ -522,8 +536,11 @@ CompactEntryView::CompactEntryView(QWidget* parent)
     setItemDelegateForColumn(DateColumn,
                              new CompactCellDelegate(DateColumn, this));
 
-    viewport()->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(viewport(), &QWidget::customContextMenuRequested, this,
+    // QAbstractScrollArea routes painted-cell context events through
+    // the view itself (coordinates are still viewport-relative).
+    // Index widgets keep their explicit event-filter path below.
+    setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(this, &QWidget::customContextMenuRequested, this,
             &CompactEntryView::contextMenuRequested);
     connect(selectionModel(), &QItemSelectionModel::currentChanged, this,
             [this](const QModelIndex& current, const QModelIndex& previous) {
@@ -559,6 +576,7 @@ CompactEntryView::CompactEntryView(QWidget* parent)
                 layoutColumns();
                 horizontalHeader()->viewport()->update();
                 viewport()->update();
+                scheduleInteractiveRefresh();
             });
     connect(generalsettings::notifier(), &generalsettings::Notifier::changed,
             viewport(), qOverload<>(&QWidget::update));
@@ -916,19 +934,18 @@ void CompactEntryView::layoutColumns() {
             if (!progressed)
                 break;
         }
-        // A very wide table has no blank tail: distribute the remainder
-        // with the same weights, keeping the header length exact.
-        while (extra > 0) {
-            for (int column = 0; column < ColumnCount && extra > 0; ++column) {
-                if (!visible[column])
-                    continue;
-                for (int unit = 0;
-                     unit < kColumnMetrics[column].grow && extra > 0;
-                     ++unit) {
-                    ++widths[column];
-                    --extra;
-                }
-            }
+        // Keep the short credential columns dense at wide sizes. The
+        // free space belongs to the first long-form visible column, so
+        // the grid fills the viewport without gaps between every value.
+        constexpr std::array<int, ColumnCount> kRemainderPriority = {
+            NoteColumn, UrlColumn, NameColumn, LoginColumn,
+            PasswordColumn, DateColumn};
+        for (const int column : kRemainderPriority) {
+            if (!visible[column])
+                continue;
+            widths[column] += extra;
+            extra = 0;
+            break;
         }
     }
 
@@ -1025,6 +1042,9 @@ void CompactEntryView::refreshInteractiveCells() {
                 cell->login()->setText(value);
             else
                 cell->password()->setSecret(value);
+            // Secondary font can change live from Appearance settings;
+            // reused index widgets must not retain the old family.
+            cell->refreshFont();
             if (kind == InteractiveCell::Kind::Login)
                 cell->login()->setVisible(!value.isEmpty());
             else

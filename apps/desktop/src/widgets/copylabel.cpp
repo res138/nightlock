@@ -17,7 +17,10 @@ constexpr int kFlashMs = 160;
 constexpr int kHoldMs = 900;
 constexpr int kHeight = 16;
 
-QColor textColor() { return appearancesettings::palette().value; }
+QColor textColor(bool primary) {
+    return primary ? appearancesettings::palette().ink
+                   : appearancesettings::palette().value;
+}
 
 // Best effort for the common uniquely-owned case.  QString may detach
 // when another Qt object still shares the buffer, so this does not turn
@@ -95,6 +98,13 @@ void CopyLabel::setContentAlignment(Qt::Alignment alignment) {
     update();
 }
 
+void CopyLabel::setPrimaryTextColor(bool enabled) {
+    if (primaryTextColor_ == enabled)
+        return;
+    primaryTextColor_ = enabled;
+    update();
+}
+
 void CopyLabel::setTextElideMode(Qt::TextElideMode mode) {
     if (elideMode_ == mode)
         return;
@@ -136,7 +146,7 @@ void CopyLabel::paintEvent(QPaintEvent*) {
 
     if (copied_ < 1.0) {
         painter.setOpacity(1.0 - copied_);
-        painter.setPen(textColor());
+        painter.setPen(textColor(primaryTextColor_));
         const QFontMetrics metrics(font());
         if (leadingIconVisible_) {
             const int available = qMax(0, width() - kIconSize - kGap);
@@ -165,7 +175,7 @@ void CopyLabel::paintEvent(QPaintEvent*) {
         const int x = alignedX(textWidth + kGap + kIconSize);
         const QRectF iconRect(x, (height() - kIconSize) / 2.0 + slide, kIconSize, kIconSize);
         copyIcon.paint(&painter, iconRect.toRect());
-        painter.setPen(textColor());
+        painter.setPen(textColor(primaryTextColor_));
         painter.drawText(QRectF(x + kIconSize + kGap, slide, textWidth, height()),
                          Qt::AlignLeft | Qt::AlignVCenter, label);
     }

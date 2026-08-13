@@ -27,6 +27,10 @@ public:
     void copyAndFlash();
     void conceal();
     void setCoordinatedReveal(bool enabled);
+    void setContentAlignment(Qt::Alignment alignment);
+    // Uses the primary interface color for both revealed text and the
+    // concealed particle cloud. Compact tables opt in for one tone.
+    void setPrimaryTextColor(bool enabled);
     // Optional clipping policy for constrained table cells. The detail
     // view keeps the default (no elision).
     void setTextElideMode(Qt::TextElideMode mode);
@@ -66,6 +70,8 @@ private:
     QVariantAnimation* revealAnimation_ = nullptr;
     QVariantAnimation* copiedAnimation_ = nullptr;
     bool coordinatedReveal_ = false;
+    bool primaryTextColor_ = false;
+    Qt::Alignment contentAlignment_ = Qt::AlignRight;
     Qt::TextElideMode elideMode_ = Qt::ElideNone;
     qreal reveal_ = 0;  // 0 = particle cloud, 1 = secret shown
     qreal copied_ = 0;  // 0..1 crossfade to the "Copied" flash
