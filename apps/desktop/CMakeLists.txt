@@ -146,6 +146,33 @@ if(APPLE OR WIN32)
     qt_generate_deploy_app_script(
         TARGET nightlock-desktop
         OUTPUT_SCRIPT nightlock_deploy_script
+        # Some Qt distributions install the PDF image-format plugin without
+        # the QtPdf framework it needs. Nightlock does not read PDF files.
+        # windeployqt honors this filter; macdeployqt does not expose plugin
+        # filtering, so make_dmg.sh removes the same unused plugin from its
+        # private staging copy before validating and signing the bundle.
+        EXCLUDE_PLUGINS qpdf
+        # Windows Setup installs the signed Microsoft redistributable as one
+        # prerequisite. Do not also copy an SDK-specific compiler runtime from
+        # the build machine, and keep unused Qt translations out of artifacts.
+        NO_COMPILER_RUNTIME
+        NO_TRANSLATIONS
         NO_UNSUPPORTED_PLATFORM_ERROR)
+
+    # qt_generate_deploy_app_script() defaults QT_DEPLOY_BIN_DIR to
+    # CMAKE_INSTALL_BINDIR (normally "bin").  Our Windows GUI deliberately
+    # lives at the install root while only the CLI lives in bin\, so accepting
+    # that default puts Qt6Core.dll and qt.conf where the Windows loader cannot
+    # find them.  These variables have to be set in the install-script scope,
+    # immediately before Qt's generated script is included.
+    if(WIN32)
+        install(CODE [[
+            set(QT_DEPLOY_BIN_DIR ".")
+            set(QT_DEPLOY_LIB_DIR ".")
+            set(QT_DEPLOY_PLUGINS_DIR "plugins")
+            set(QT_DEPLOY_QML_DIR "qml")
+            set(QT_DEPLOY_TRANSLATIONS_DIR "translations")
+        ]])
+    endif()
     install(SCRIPT ${nightlock_deploy_script})
 endif()

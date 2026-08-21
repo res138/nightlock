@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     strategy:
@@ -25,13 +28,19 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgl1-mesa-dev libxkbcommon-dev
+          sudo apt-get install -y \
+            dpkg-dev \
+            file \
+            libgl1-mesa-dev \
+            libxkbcommon-dev \
+            patchelf
 
       - name: Configure
         run: >
           cmake -B build
           -DCMAKE_BUILD_TYPE=Release
           -DNIGHTLOCK_FORCE_VENDORED_SODIUM=ON
+          ${{ runner.os == 'macOS' && '-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0' || '' }}
 
       - name: Build
         run: cmake --build build --config Release --parallel
@@ -52,3 +61,64 @@ jobs:
           ./packaging/windows/build_installer.ps1 `
             -StageDir "$PWD\stage" `
             -AppVersion $nightlockVersion
+
+      - name: Verify Windows installer and bundled runtime
+        if: runner.os == 'Windows'
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          $nightlockVersion = (Get-Content VERSION -Raw).Trim()
+          $installer = Get-ChildItem `
+            "packaging/windows/Output/Nightlock-$nightlockVersion-Windows-Setup.exe" |
+            Select-Object -First 1
+          if ($null -eq $installer) {
+            throw 'Generated Windows installer was not found.'
+          }
+          ./.github/workflows/scripts/verify-windows-package.ps1 `
+            -StageDir "$PWD\stage" `
+            -InstallerPath $installer.FullName `
+            -ExpectedVersion $nightlockVersion
+
+      - name: Build macOS disk image
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          NIGHTLOCK_PACKAGE_VERSION="$(tr -d '[:space:]' < VERSION)"
+          export NIGHTLOCK_ALLOW_SINGLE_ARCH=1
+          cmake --install build --config Release --prefix "$PWD/stage"
+          bash packaging/macos/make_dmg.sh \
+            "$PWD/stage" \
+            "Nightlock-$NIGHTLOCK_PACKAGE_VERSION-macOS.dmg"
+
+      - name: Verify macOS disk image and bundled runtime
+        if: runner.os == 'macOS'
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          NIGHTLOCK_PACKAGE_VERSION="$(tr -d '[:space:]' < VERSION)"
+          bash .github/workflows/scripts/verify-macos-package.sh \
+            "Nightlock-$NIGHTLOCK_PACKAGE_VERSION-macOS.dmg" \
+            "$NIGHTLOCK_PACKAGE_VERSION" \
+            "$(uname -m)"
+
+      - name: Build Linux Debian package
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          NIGHTLOCK_PACKAGE_VERSION="$(tr -d '[:space:]' < VERSION)"
+          cmake --install build --config Release --prefix "$PWD/stage/usr"
+          bash packaging/linux/make_deb.sh \
+            "$PWD/stage" \
+            "$QT_ROOT_DIR" \
+            "$NIGHTLOCK_PACKAGE_VERSION" \
+            "nightlock_${NIGHTLOCK_PACKAGE_VERSION}_amd64.deb"
+
+      - name: Verify Linux package on clean Ubuntu
+        if: runner.os == 'Linux'
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          NIGHTLOCK_PACKAGE_VERSION="$(tr -d '[:space:]' < VERSION)"
+          bash .github/workflows/scripts/verify-linux-package.sh \
+            "nightlock_${NIGHTLOCK_PACKAGE_VERSION}_amd64.deb" \
+            "$NIGHTLOCK_PACKAGE_VERSION"

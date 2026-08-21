@@ -4,6 +4,9 @@ on:
   push:
     tags: ['v*']
 
+permissions:
+  contents: read
+
 jobs:
   validate-version:
     runs-on: ubuntu-latest
@@ -39,6 +42,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release
           -DNIGHTLOCK_FORCE_VENDORED_SODIUM=ON
           -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
       - name: Build
         run: cmake --build build --parallel
       - name: Test
@@ -46,8 +50,19 @@ jobs:
       - name: Package DMG
         run: |
           NIGHTLOCK_PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
-          cmake --install build --prefix stage
-          bash packaging/macos/make_dmg.sh stage "Nightlock-$NIGHTLOCK_PACKAGE_VERSION-macOS.dmg"
+          cmake --install build --config Release --prefix "$PWD/stage"
+          bash packaging/macos/make_dmg.sh \
+            "$PWD/stage" \
+            "Nightlock-$NIGHTLOCK_PACKAGE_VERSION-macOS.dmg"
+      - name: Verify DMG and bundled runtime
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          NIGHTLOCK_PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
+          bash .github/workflows/scripts/verify-macos-package.sh \
+            "Nightlock-$NIGHTLOCK_PACKAGE_VERSION-macOS.dmg" \
+            "$NIGHTLOCK_PACKAGE_VERSION" \
+            "arm64 x86_64"
       - uses: actions/upload-artifact@v4
         with:
           name: macos
@@ -81,6 +96,17 @@ jobs:
           ./packaging/windows/build_installer.ps1 `
             -StageDir "$PWD\stage" `
             -AppVersion $nightlockVersion
+      - name: Verify installer and bundled runtime
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          $nightlockVersion = $env:GITHUB_REF_NAME.TrimStart('v')
+          $installer = Get-Item `
+            "packaging/windows/Output/Nightlock-$nightlockVersion-Windows-Setup.exe"
+          ./.github/workflows/scripts/verify-windows-package.ps1 `
+            -StageDir "$PWD\stage" `
+            -InstallerPath $installer.FullName `
+            -ExpectedVersion $nightlockVersion
       - uses: actions/upload-artifact@v4
         with:
           name: windows
@@ -99,7 +125,12 @@ jobs:
       - name: Build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgl1-mesa-dev libxkbcommon-dev patchelf
+          sudo apt-get install -y \
+            dpkg-dev \
+            file \
+            libgl1-mesa-dev \
+            libxkbcommon-dev \
+            patchelf
       - name: Configure
         run: >
           cmake -B build
@@ -112,9 +143,20 @@ jobs:
       - name: Package deb
         run: |
           NIGHTLOCK_PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
-          cmake --install build --prefix stage/usr
-          bash packaging/linux/make_deb.sh stage "$QT_ROOT_DIR" "$NIGHTLOCK_PACKAGE_VERSION" \
+          cmake --install build --config Release --prefix "$PWD/stage/usr"
+          bash packaging/linux/make_deb.sh \
+            "$PWD/stage" \
+            "$QT_ROOT_DIR" \
+            "$NIGHTLOCK_PACKAGE_VERSION" \
             "nightlock_${NIGHTLOCK_PACKAGE_VERSION}_amd64.deb"
+      - name: Verify deb on clean Ubuntu
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          NIGHTLOCK_PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
+          bash .github/workflows/scripts/verify-linux-package.sh \
+            "nightlock_${NIGHTLOCK_PACKAGE_VERSION}_amd64.deb" \
+            "$NIGHTLOCK_PACKAGE_VERSION"
       - uses: actions/upload-artifact@v4
         with:
           name: linux

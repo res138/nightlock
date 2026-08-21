@@ -33,9 +33,10 @@ Unknown. The packaging implementation predates the ADR process.
 ## Consequences
 
 - macOS places the CLI in `Contents/Helpers` to avoid a case-insensitive name collision.
-- Windows places the CLI in `bin` and optionally adds that directory to user PATH.
-- Linux places the GUI and bundled Qt runtime under `/usr/lib/nightlock` and the CLI under `/usr/bin`.
-- Package-specific smoke tests and license notices are required.
+- Windows places the GUI and Qt DLLs at the install root, plugins under `plugins`, the CLI in `bin`, and optionally adds that directory to machine PATH. Setup embeds and installs the official Visual C++ runtime before first launch.
+- Linux places the GUI and private Qt runtime under `/usr/lib/nightlock` and the CLI under `/usr/bin`; package dependencies are derived from every shipped ELF object.
+- macOS records a macOS 13 deployment target and ships universal Intel/Apple Silicon binaries.
+- Package-specific installed-artifact smoke tests and license notices are required.
 - Packages are currently unsigned; signing, notarization, SBOM, and provenance require a future prospective decision.
 
 ## Validation

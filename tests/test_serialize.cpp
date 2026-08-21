@@ -36,8 +36,10 @@ void checkEqual(const Group& a, const Group& b) {
         CHECK(x.name == y.name);
         CHECK(x.login == y.login);
         CHECK(x.password == y.password);
-        CHECK(x.created == y.created);
-        CHECK(x.modified == y.modified);
+        // Avoid decomposing chrono values: libc++'s diagnostic formatter for
+        // them raises the test binary's minimum OS requirement to macOS 13.3.
+        CHECK(bool(x.created == y.created));
+        CHECK(bool(x.modified == y.modified));
         CHECK(x.url == y.url);
         CHECK(x.icon == y.icon);
         CHECK(x.note == y.note);
