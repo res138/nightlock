@@ -106,12 +106,24 @@ macho_files() {
 }
 
 dependencies() {
-    otool -L "$1" | sed -n '2,$p' | \
-        sed -E 's/^[[:space:]]+//; s/[[:space:]]+\(compatibility version.*$//'
+    # Fat binaries add unindented per-architecture headers such as
+    #   /path/QtGui (architecture arm64):
+    # between their dependency groups.  Only actual load-command rows carry
+    # the "(compatibility version ...)" suffix, so select those explicitly
+    # instead of treating every line after the first as a dependency.
+    otool -L "$1" | sed -n -E \
+        's/^[[:space:]]*(.*)[[:space:]]+\(compatibility version.*$/\1/p' | \
+        awk '!seen[$0]++'
 }
 
 dylib_id() {
-    otool -D "$1" 2>/dev/null | sed -n '2p'
+    # Thin output starts with "file:", while fat output repeats
+    # "file (architecture ...):" before every slice.  Install names are the
+    # only non-empty rows that do not end in a header colon.
+    otool -D "$1" 2>/dev/null | awk '
+        /:$/ { next }
+        NF { sub(/^[[:space:]]+/, ""); print; exit }
+    '
 }
 
 # macdeployqt processes the GUI but not Contents/Helpers/nightlock.

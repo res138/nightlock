@@ -158,7 +158,12 @@ while IFS= read -r -d '' candidate; do
             '
     )
 
-    INSTALL_ID="$(otool -D "$candidate" 2>/dev/null | sed -n '2p' || true)"
+    INSTALL_ID="$(
+        otool -D "$candidate" 2>/dev/null | awk '
+            /:$/ { next }
+            NF { sub(/^[[:space:]]+/, ""); print; exit }
+        ' || true
+    )"
     while IFS= read -r dependency; do
         [ "$dependency" = "$INSTALL_ID" ] && continue
         case "$dependency" in
@@ -192,7 +197,8 @@ while IFS= read -r -d '' candidate; do
         esac
     done < <(
         otool -L "$candidate" |
-            sed -n '2,$s/^[[:space:]]*\([^[:space:]]*\).*/\1/p'
+            sed -n -E \
+                's/^[[:space:]]*(.*)[[:space:]]+\(compatibility version.*$/\1/p'
     )
 done < <(find "$APP_COPY" -type f -print0)
 

@@ -93,7 +93,10 @@ fi
 
 # Check every ELF object in the payload. In particular, all Qt and ICU
 # dependencies must resolve to the private package directory, never to the Qt
-# SDK installed on the GitHub runner.
+# SDK installed on the GitHub runner. ldd preserves the spelling of RUNPATH
+# expansions (for example plugins/platforms/../../lib), so compare canonical
+# paths instead of raw string prefixes.
+PRIVATE_LIB_ROOT="$(readlink -f -- "$APP_ROOT/lib")"
 while IFS= read -r -d '' object; do
     if ! file -b "$object" | grep -q '^ELF '; then
         continue
@@ -108,18 +111,24 @@ while IFS= read -r -d '' object; do
         echo "error: unresolved shared library in $object" >&2
         exit 1
     fi
-    if awk -v prefix="$APP_ROOT/lib/" '
-        /lib(Qt6|icu)[^[:space:]]*[[:space:]]+=>/ && index($3, prefix) != 1 {
-            print
-            bad = 1
+    while IFS=$'\t' read -r dependency resolved; do
+        [ -n "$dependency" ] || continue
+        resolved="$(readlink -f -- "$resolved")" || {
+            echo "error: cannot canonicalize $dependency from $object" >&2
+            exit 1
         }
-        END { exit bad ? 1 : 0 }
-    ' <<< "$LDD_OUTPUT"; then
-        :
-    else
-        echo "error: $object resolves a bundled Qt/ICU library outside the package" >&2
-        exit 1
-    fi
+        case "$resolved" in
+            "$PRIVATE_LIB_ROOT"/*)
+                ;;
+            *)
+                echo "error: $object resolves $dependency outside the private runtime: $resolved" >&2
+                exit 1
+                ;;
+        esac
+    done < <(
+        awk '/lib(Qt6|icu)[^[:space:]]*[[:space:]]+=>/ { print $1 "\t" $3 }' \
+            <<< "$LDD_OUTPUT"
+    )
 done < <(find "$EXTRACT_ROOT/usr" -type f -print0)
 
 CLI_OUTPUT="$(env -i HOME="$WORK_ROOT/home" PATH='/usr/bin:/bin' "$CLI" --version 2>&1)"
@@ -143,6 +152,7 @@ docker run --rm --platform linux/amd64 \
         test "$(dpkg-query -W -f="\${Version}" nightlock)" = "$NIGHTLOCK_EXPECTED_VERSION"
         test "$(nightlock --version)" = "nightlock $NIGHTLOCK_EXPECTED_VERSION"
 
+        private_lib_root="$(readlink -f -- /usr/lib/nightlock/lib)"
         while IFS= read -r -d "" object; do
             if ! file -b "$object" | grep -q "^ELF "; then
                 continue
@@ -153,17 +163,25 @@ docker run --rm --platform linux/amd64 \
                 echo "unresolved dependency in installed object: $object" >&2
                 exit 1
             fi
-            if ! awk '\''
-                /lib(Qt6|icu)[^[:space:]]*[[:space:]]+=>/ &&
-                    index($3, "/usr/lib/nightlock/lib/") != 1 {
-                    print
-                    bad = 1
+            while IFS="$(printf "\t")" read -r dependency resolved; do
+                test -n "$dependency" || continue
+                resolved="$(readlink -f -- "$resolved")" || {
+                    echo "cannot canonicalize $dependency from $object" >&2
+                    exit 1
                 }
-                END { exit bad ? 1 : 0 }
-            '\'' <<< "$output"; then
-                echo "Qt/ICU dependency escaped the private runtime: $object" >&2
-                exit 1
-            fi
+                case "$resolved" in
+                    "$private_lib_root"/*)
+                        ;;
+                    *)
+                        echo "$object resolves $dependency outside the private runtime: $resolved" >&2
+                        exit 1
+                        ;;
+                esac
+            done < <(
+                awk '\''/lib(Qt6|icu)[^[:space:]]*[[:space:]]+=>/ {
+                    print $1 "\t" $3
+                }'\'' <<< "$output"
+            )
         done < <(find /usr/lib/nightlock /usr/bin/nightlock -type f -print0)
 
         mkdir -p /tmp/nightlock-home

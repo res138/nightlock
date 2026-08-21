@@ -118,8 +118,7 @@ begin
           (ResultCode <> 1638) and
           (ResultCode <> VCRedistNewerVersionInstalled) then
     Result := Format(
-      'Microsoft Visual C++ Runtime installation failed (exit code %d).',
-      [ResultCode]);
+      'Microsoft Visual C++ Runtime installation failed (exit code %d).', [ResultCode]);
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
