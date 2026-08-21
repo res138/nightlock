@@ -11,19 +11,29 @@ Nightlock is under active development and does not yet offer a long-term-support
 | `main` | Active development | Best effort | Best effort |
 | Tagged historical versions | Historical | Not guaranteed | Not guaranteed |
 
-The current source version is `1.2.2`, with [VERSION](VERSION) as the authoritative source. Release tags must match it exactly with a leading `v`; see [CHANGELOG.md](CHANGELOG.md).
+The current source version is `1.2.3`, with [VERSION](VERSION) as the authoritative source. Release tags must match it exactly with a leading `v`; see [CHANGELOG.md](CHANGELOG.md).
 
 ## Platform baseline
 
-The following configurations are continuously compiled and tested:
+The release artifacts have these end-user baselines:
+
+| Artifact | Supported baseline | Bundled runtime |
+|---|---|---|
+| Windows Setup | 64-bit-compatible Windows 10 1809 (build 17763) or later | Qt, plugins, static libsodium, and the signed Microsoft Visual C++ x64 Redistributable |
+| macOS DMG | macOS 13 or later on Intel or Apple Silicon | Universal application, Qt frameworks/plugins, and static libsodium |
+| Debian package | Ubuntu 22.04 `amd64` baseline | Private Qt/ICU runtime; normal OS libraries are resolved automatically by APT |
+
+No separate Qt, libsodium, Visual Studio, or compiler-runtime installation is required for these artifacts. Debian system libraries remain package dependencies and are installed by the package manager, not by a manual prerequisite procedure.
+
+The following configurations are continuously compiled, tested, packaged, and smoke-tested:
 
 | CI target | Toolchain role | Guarantee |
 |---|---|---|
-| `macos-14` | Apple build and test baseline | Source build and tests only |
-| `windows-2022` | Visual Studio 2022 build and test baseline | Source build and tests only |
-| `ubuntu-22.04` | GCC/Linux build and test baseline | Source build and tests only |
+| `macos-14` | Apple build and test baseline | DMG mount, dependency/signature checks, CLI launch, and deterministic GUI launch |
+| `windows-2022` | Visual Studio 2022 build and test baseline | Silent Setup install, PE dependency checks, CLI launch, and deterministic GUI launch |
+| `ubuntu-22.04` | GCC/Linux build and test baseline | Debian install in a clean Ubuntu 22.04 container, complete ELF closure, CLI launch, and Xvfb GUI launch |
 
-CI success does not by itself guarantee that an installer works on every end-user OS version. Runtime support will become authoritative only after package smoke tests cover clean target systems.
+CI cannot prove compatibility with every hardware, driver, policy, or future OS update. The baselines above define the supported release scope; older OS versions and architectures not named there are not implied to be supported.
 
 ## Build requirements
 

@@ -31,8 +31,11 @@ TEST_CASE("expiration recognizes only the reserved labels") {
 }
 
 TEST_CASE("expiration parses a strict valid calendar date") {
-    CHECK(expiration::parseDate("12/12/2026") == date(2026, 12, 12));
-    CHECK(expiration::parseDate("29/02/2028") == date(2028, 2, 29));
+    // Keep doctest from instantiating libc++'s chrono ostream formatter. Its
+    // floating-point formatting helpers are only available from macOS 13.3,
+    // while Nightlock and Qt 6.10 support the full macOS 13 baseline.
+    CHECK(bool(expiration::parseDate("12/12/2026") == date(2026, 12, 12)));
+    CHECK(bool(expiration::parseDate("29/02/2028") == date(2028, 2, 29)));
     CHECK_FALSE(expiration::parseDate("29/02/2027"));
     CHECK_FALSE(expiration::parseDate("1/12/2026"));
     CHECK_FALSE(expiration::parseDate("12.12.2026"));
