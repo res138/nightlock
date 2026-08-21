@@ -169,16 +169,14 @@ if (($redistSignature.Status -ne 'Valid') -or
     throw 'The staged VC++ redistributable does not have a valid Microsoft signature.'
 }
 
-# Inno Setup embeds the redistributable as a temporary prerequisite rather
-# than leaving it in the installed application directory. Verify the final
-# artifact, not just the input stage.
-$sevenZip = Get-Command '7z.exe' -ErrorAction Stop
-$installerListing = & $sevenZip.Source l -slt $resolvedInstaller 2>&1
-if ($LASTEXITCODE -ne 0) {
-    throw "7-Zip could not inspect the generated installer:`n$installerListing"
-}
-if (($installerListing -join "`n") -notmatch '(?i)vc_redist\.x64\.exe') {
-    throw 'The generated Setup does not embed vc_redist.x64.exe.'
+# Inno 6.7 Setup executables are not a supported 7-Zip archive format. The
+# authoritative final-artifact check is the silent installation below:
+# PrepareToInstall must extract and execute the embedded prerequisite, and the
+# Setup log must record that exact file. Inno compilation itself also fails if
+# the non-external Source file named by the script is unavailable.
+$installer = Get-Item -LiteralPath $resolvedInstaller
+if ($installer.Length -lt 1MB) {
+    throw "Generated Setup is unexpectedly small: $($installer.Length) bytes"
 }
 
 $smokeRoot = Join-Path ([IO.Path]::GetTempPath()) (
