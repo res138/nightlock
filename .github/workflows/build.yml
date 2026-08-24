@@ -18,6 +18,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Enforce free-tier artifact policy
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          if grep -En 'actions/(upload|download)-artifact' \
+            .github/workflows/*.yml; then
+            echo 'Actions artifact storage is forbidden; publish release assets directly.'
+            exit 1
+          fi
+
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
