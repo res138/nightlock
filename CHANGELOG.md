@@ -36,6 +36,7 @@ GitHub-generated release notes are a publication aid, not a second authoritative
 - Fixed the Windows CLI PATH registration key and handling of systems that already have a newer compatible Visual C++ runtime.
 - Fixed Linux runtime closure and RUNPATH handling for bundled Qt libraries, plugins, ICU, and optional non-system libraries.
 - Fixed empty macOS minimum-version metadata and rejected unrelated Qt PDF plugins whose framework is absent from some Qt distributions.
+- Release jobs now publish verified installers directly to a draft GitHub Release, so one complete Windows/macOS/Linux release consumes no GitHub Actions artifact-storage quota.
 
 ### Security
 

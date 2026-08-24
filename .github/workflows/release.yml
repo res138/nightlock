@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   validate-version:
     runs-on: ubuntu-latest
@@ -25,10 +29,54 @@ jobs:
             echo "Tag $NIGHTLOCK_TAG_VERSION does not match VERSION $NIGHTLOCK_SOURCE_VERSION"
             exit 1
           fi
+      - name: Enforce free-tier artifact policy
+        shell: bash
+        run: |
+          if grep -En 'actions/(upload|download)-artifact' \
+            .github/workflows/*.yml; then
+            echo 'Actions artifact storage is forbidden; publish release assets directly.'
+            exit 1
+          fi
+
+  create-release:
+    needs: validate-version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            NIGHTLOCK_IS_DRAFT="$(
+              gh release view "$GITHUB_REF_NAME" \
+                --repo "$GITHUB_REPOSITORY" \
+                --json isDraft \
+                --jq '.isDraft'
+            )"
+            if [[ "$NIGHTLOCK_IS_DRAFT" != "true" ]]; then
+              echo "Refusing to overwrite published release $GITHUB_REF_NAME."
+              exit 1
+            fi
+            echo "Reusing draft release $GITHUB_REF_NAME."
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --draft \
+              --generate-notes
+          fi
 
   macos:
-    needs: validate-version
+    needs: create-release
     runs-on: macos-14
+    permissions:
+      contents: write
+    outputs:
+      sha256: ${{ steps.upload_release_asset.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v4
       - name: Install Qt
@@ -63,14 +111,28 @@ jobs:
             "Nightlock-$NIGHTLOCK_PACKAGE_VERSION-macOS.dmg" \
             "$NIGHTLOCK_PACKAGE_VERSION" \
             "arm64 x86_64"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos
-          path: Nightlock-*-macOS.dmg
+      - name: Upload DMG to draft release
+        id: upload_release_asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          NIGHTLOCK_PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
+          ASSET_PATH="Nightlock-$NIGHTLOCK_PACKAGE_VERSION-macOS.dmg"
+          ASSET_SHA256="$(shasum -a 256 "$ASSET_PATH" | awk '{print $1}')"
+          echo "sha256=$ASSET_SHA256" >> "$GITHUB_OUTPUT"
+          gh release upload "$GITHUB_REF_NAME" \
+            "$ASSET_PATH" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
 
   windows:
-    needs: validate-version
+    needs: create-release
     runs-on: windows-2022
+    permissions:
+      contents: write
+    outputs:
+      sha256: ${{ steps.upload_release_asset.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v4
       - name: Install Qt
@@ -107,14 +169,33 @@ jobs:
             -StageDir "$PWD\stage" `
             -InstallerPath $installer.FullName `
             -ExpectedVersion $nightlockVersion
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows
-          path: packaging/windows/Output/*.exe
+      - name: Upload installer to draft release
+        id: upload_release_asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $nightlockVersion = $env:GITHUB_REF_NAME.TrimStart('v')
+          $assetPath = `
+            "packaging/windows/Output/Nightlock-$nightlockVersion-Windows-Setup.exe"
+          $assetSha256 = `
+            (Get-FileHash -Algorithm SHA256 -Path $assetPath).Hash.ToLowerInvariant()
+          "sha256=$assetSha256" >> $env:GITHUB_OUTPUT
+          gh release upload $env:GITHUB_REF_NAME `
+            $assetPath `
+            --repo $env:GITHUB_REPOSITORY `
+            --clobber
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Failed to upload the Windows installer.'
+          }
 
   linux:
-    needs: validate-version
+    needs: create-release
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    outputs:
+      sha256: ${{ steps.upload_release_asset.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v4
       - name: Install Qt
@@ -157,10 +238,20 @@ jobs:
           bash .github/workflows/scripts/verify-linux-package.sh \
             "nightlock_${NIGHTLOCK_PACKAGE_VERSION}_amd64.deb" \
             "$NIGHTLOCK_PACKAGE_VERSION"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux
-          path: nightlock_*_amd64.deb
+      - name: Upload package to draft release
+        id: upload_release_asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          NIGHTLOCK_PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
+          ASSET_PATH="nightlock_${NIGHTLOCK_PACKAGE_VERSION}_amd64.deb"
+          ASSET_SHA256="$(sha256sum "$ASSET_PATH" | awk '{print $1}')"
+          echo "sha256=$ASSET_SHA256" >> "$GITHUB_OUTPUT"
+          gh release upload "$GITHUB_REF_NAME" \
+            "$ASSET_PATH" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
 
   publish:
     needs: [macos, windows, linux]
@@ -168,17 +259,107 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
-        with:
-          merge-multiple: true
-      - name: Checksums
-        run: sha256sum Nightlock-* nightlock_* > SHA256SUMS
-      - name: Create release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          files: |
-            Nightlock-*-macOS.dmg
-            Nightlock-*-Windows-Setup.exe
-            nightlock_*_amd64.deb
-            SHA256SUMS
+      - name: Verify release assets and upload checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MACOS_SHA256: ${{ needs.macos.outputs.sha256 }}
+          WINDOWS_SHA256: ${{ needs.windows.outputs.sha256 }}
+          LINUX_SHA256: ${{ needs.linux.outputs.sha256 }}
+        shell: bash
+        run: |
+          NIGHTLOCK_IS_DRAFT="$(
+            gh release view "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json isDraft \
+              --jq '.isDraft'
+          )"
+          if [[ "$NIGHTLOCK_IS_DRAFT" != "true" ]]; then
+            echo "Release $GITHUB_REF_NAME is not an unpublished draft."
+            exit 1
+          fi
+
+          NIGHTLOCK_PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
+          MACOS_ASSET="Nightlock-$NIGHTLOCK_PACKAGE_VERSION-macOS.dmg"
+          WINDOWS_ASSET="Nightlock-$NIGHTLOCK_PACKAGE_VERSION-Windows-Setup.exe"
+          LINUX_ASSET="nightlock_${NIGHTLOCK_PACKAGE_VERSION}_amd64.deb"
+
+          verify_remote_asset() {
+            local asset="$1"
+            local expected="$2"
+            local metadata
+            local remote_digest
+            local remote_state
+            if [[ ! "$expected" =~ ^[0-9a-f]{64}$ ]]; then
+              echo "Invalid verified digest for $asset: $expected"
+              exit 1
+            fi
+            metadata="$(
+              gh release view "$GITHUB_REF_NAME" \
+                --repo "$GITHUB_REPOSITORY" \
+                --json assets \
+                --jq ".assets[] | select(.name == \"$asset\") | [.digest, .state] | @tsv"
+            )"
+            IFS=$'\t' read -r remote_digest remote_state <<< "$metadata"
+            if [[ "$remote_state" != "uploaded" ]]; then
+              echo "Release asset is missing or incomplete: $asset"
+              exit 1
+            fi
+            if [[ "$remote_digest" != "sha256:$expected" ]]; then
+              echo "Release asset differs from the locally verified file: $asset"
+              echo "Expected: sha256:$expected"
+              echo "Remote:   $remote_digest"
+              exit 1
+            fi
+          }
+
+          verify_remote_asset "$MACOS_ASSET" "$MACOS_SHA256"
+          verify_remote_asset "$WINDOWS_ASSET" "$WINDOWS_SHA256"
+          verify_remote_asset "$LINUX_ASSET" "$LINUX_SHA256"
+
+          printf '%s  %s\n' \
+            "$MACOS_SHA256" "$MACOS_ASSET" \
+            "$WINDOWS_SHA256" "$WINDOWS_ASSET" \
+            "$LINUX_SHA256" "$LINUX_ASSET" > SHA256SUMS
+          SHA256SUMS_SHA256="$(sha256sum SHA256SUMS | awk '{print $1}')"
+          gh release upload "$GITHUB_REF_NAME" SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+          verify_remote_asset "SHA256SUMS" "$SHA256SUMS_SHA256"
+
+          mapfile -t NIGHTLOCK_EXPECTED_ASSETS < <(
+            printf '%s\n' \
+              "$MACOS_ASSET" \
+              "$WINDOWS_ASSET" \
+              "$LINUX_ASSET" \
+              "SHA256SUMS" | sort
+          )
+          mapfile -t NIGHTLOCK_ACTUAL_ASSETS < <(
+            gh release view "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json assets \
+              --jq '.assets[].name' | sort
+          )
+          if ! diff -u \
+            <(printf '%s\n' "${NIGHTLOCK_EXPECTED_ASSETS[@]}") \
+            <(printf '%s\n' "${NIGHTLOCK_ACTUAL_ASSETS[@]}"); then
+            echo "Draft release contains an unexpected asset set."
+            exit 1
+          fi
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          NIGHTLOCK_IS_DRAFT="$(
+            gh release view "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --json isDraft \
+              --jq '.isDraft'
+          )"
+          if [[ "$NIGHTLOCK_IS_DRAFT" != "true" ]]; then
+            echo "Release $GITHUB_REF_NAME is no longer a draft."
+            exit 1
+          fi
+          gh release edit "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false
