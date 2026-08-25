@@ -566,6 +566,14 @@ $guiProcess = Start-Process `
     -FilePath $guiPath `
     -WorkingDirectory $installDir `
     -PassThru
+# Start-Process/CreateProcess returns before the child has finished loading its
+# manifest and initialized the GUI thread. Querying SHCore in that narrow
+# window reports the temporary default (PROCESS_DPI_UNAWARE = 0), even though
+# the process switches to PMv2 during startup. Wait for its message loop first.
+if (-not $guiProcess.WaitForInputIdle(10000)) {
+    $guiProcess.Kill()
+    throw 'Installed GUI did not become input-idle before the DPI audit.'
+}
 $dpiAwareness = `
     [Nightlock.PackageAudit.NativeResourceReader]::ReadProcessDpiAwareness(
         $guiProcess.Handle)
