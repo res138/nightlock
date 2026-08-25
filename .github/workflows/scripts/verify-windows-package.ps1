@@ -201,6 +201,15 @@ Expected '$($expectedFields[$field])'.
     $manifestBytes = [Nightlock.PackageAudit.NativeResourceReader]::ReadResource(
         $LiteralPath, 24, 1)
     $manifestText = [Text.Encoding]::UTF8.GetString($manifestBytes)
+    # MSVC's manifest tool emits an UTF-8 BOM. Once the resource bytes are
+    # decoded to a .NET string that marker is an ordinary U+FEFF character;
+    # PowerShell's [xml] conversion then rejects the declaration because it is
+    # no longer the first character. Keep accepting both mt.exe output and the
+    # BOM-less MinGW resource generated from the same manifest.
+    if (($manifestText.Length -gt 0) -and
+        ($manifestText[0] -eq [char]0xFEFF)) {
+        $manifestText = $manifestText.Substring(1)
+    }
     try {
         [xml]$manifest = $manifestText
     }
