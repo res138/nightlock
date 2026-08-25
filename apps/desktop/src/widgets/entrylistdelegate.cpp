@@ -46,7 +46,11 @@ void EntryListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
     const int textLeft = iconRect.right() + 16;
     const int textWidth = content.right() - textLeft - 8;
 
-    QFont nameFont(fonts::resolvedFamily(fonts::Role::Secondary), 14);
+    // QFont's constructor takes points, while every surrounding metric
+    // in this delegate is expressed in logical pixels. At Windows' 96 DPI,
+    // 14pt becomes roughly 19px and crowds the fixed 20px title row.
+    QFont nameFont(fonts::resolvedFamily(fonts::Role::Secondary));
+    nameFont.setPixelSize(14);
     nameFont.setBold(true);
     painter->setFont(nameFont);
     painter->setPen(selected ? appearancesettings::accentTextColor()
@@ -59,7 +63,8 @@ void EntryListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
                           QFontMetrics(nameFont).elidedText(name, Qt::ElideRight,
                                                           nameRect.width()));
     } else {
-        QFont expiredFont(fonts::resolvedFamily(fonts::Role::Primary), 11);
+        QFont expiredFont(fonts::resolvedFamily(fonts::Role::Primary));
+        expiredFont.setPixelSize(11);
         expiredFont.setItalic(true);
         const QString suffix = tr("(expired)");
         const int suffixWidth = QFontMetrics(expiredFont).horizontalAdvance(suffix);
@@ -81,7 +86,7 @@ void EntryListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
     }
 
     QFont loginFont = option.font;
-    loginFont.setPointSize(11);
+    loginFont.setPixelSize(11);
     painter->setFont(loginFont);
     const bool strongSubtitle = index.data(EntryListModel::SubtitleStrongRole).toBool();
     QColor selectedLogin = appearancesettings::accentTextColor();

@@ -48,9 +48,16 @@ public:
                 // Preferably from the preloaded cache (decoded at app
                 // start on a background thread), so fast scrolling
                 // doesn't hitch on file loads.
-                const QImage image = standardicons::cachedGalleryImage(paths_[index.row()]);
-                icon = image.isNull() ? QIcon(paths_[index.row()])
-                                      : QIcon(QPixmap::fromImage(image));
+                const QVector<QImage> images =
+                    standardicons::cachedGalleryImages(paths_[index.row()]);
+                if (images.isEmpty()) {
+                    icon = QIcon(paths_[index.row()]);
+                } else {
+                    // Rebuild the multi-resolution QIcon on the GUI thread;
+                    // QImage decoding is thread-safe, QPixmap is not.
+                    for (const QImage& image : images)
+                        icon.addPixmap(QPixmap::fromImage(image));
+                }
             }
             return icon;
         }
@@ -214,12 +221,19 @@ void IconGalleryPopup::showEvent(QShowEvent* event) {
     QWidget::showEvent(event);
     backdrop_ = frosted::captureBackdrop(this, &backdropOffset_);
 
-    setWindowOpacity(0.0);
-    auto* fade = new QVariantAnimation(this);
-    fade->setDuration(130);
-    fade->setStartValue(0.0);
-    fade->setEndValue(1.0);
-    connect(fade, &QVariantAnimation::valueChanged, this,
-            [this](const QVariant& value) { setWindowOpacity(value.toReal()); });
-    fade->start(QAbstractAnimation::DeleteWhenStopped);
+    if constexpr (frosted::kUseOpaquePopupSurface) {
+        // Avoid a second alpha pass over the translucent Win32 popup.  The shared
+        // Windows panel path is already opaque inside its rounded outline.
+        setWindowOpacity(1.0);
+        update();
+    } else {
+        setWindowOpacity(0.0);
+        auto* fade = new QVariantAnimation(this);
+        fade->setDuration(130);
+        fade->setStartValue(0.0);
+        fade->setEndValue(1.0);
+        connect(fade, &QVariantAnimation::valueChanged, this,
+                [this](const QVariant& value) { setWindowOpacity(value.toReal()); });
+        fade->start(QAbstractAnimation::DeleteWhenStopped);
+    }
 }

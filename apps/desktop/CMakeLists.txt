@@ -88,8 +88,37 @@ if(APPLE)
 elseif(WIN32)
     # The GUI is Nightlock.exe at the install root; the CLI keeps the
     # lowercase name inside bin\ (the PATH entry), where the
-    # case-insensitive filesystem cannot clash the two.
-    target_sources(nightlock-desktop PRIVATE resources/nightlock.rc)
+    # case-insensitive filesystem cannot clash the two. Configure the PE
+    # resource so Explorer, Task Manager and installed-apps surfaces see the
+    # same semantic version as the application itself.
+    set(NIGHTLOCK_WINDOWS_ICON
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/nightlock.ico")
+    set(NIGHTLOCK_WINDOWS_MANIFEST
+        "${CMAKE_CURRENT_BINARY_DIR}/nightlock.manifest")
+    configure_file(resources/nightlock.manifest.in
+                   "${NIGHTLOCK_WINDOWS_MANIFEST}" @ONLY)
+    # MSVC's manifest tool merges .manifest sources with linker-generated
+    # dependencies. GNU-style Windows linkers instead need RT_MANIFEST in the
+    # compiled resource file.
+    if(MSVC)
+        set(NIGHTLOCK_WINDOWS_MANIFEST_RESOURCE "")
+    else()
+        set(NIGHTLOCK_WINDOWS_MANIFEST_RESOURCE
+            "1 RT_MANIFEST \"${NIGHTLOCK_WINDOWS_MANIFEST}\"")
+    endif()
+    set(NIGHTLOCK_WINDOWS_RESOURCE
+        "${CMAKE_CURRENT_BINARY_DIR}/nightlock.rc")
+    configure_file(resources/nightlock.rc.in
+                   "${NIGHTLOCK_WINDOWS_RESOURCE}" @ONLY)
+    set_source_files_properties("${NIGHTLOCK_WINDOWS_RESOURCE}" PROPERTIES
+        OBJECT_DEPENDS
+            "${NIGHTLOCK_WINDOWS_ICON};${NIGHTLOCK_WINDOWS_MANIFEST}")
+    target_sources(nightlock-desktop PRIVATE
+        "${NIGHTLOCK_WINDOWS_RESOURCE}")
+    if(MSVC)
+        target_sources(nightlock-desktop PRIVATE
+            "${NIGHTLOCK_WINDOWS_MANIFEST}")
+    endif()
     set_target_properties(nightlock-desktop PROPERTIES
         OUTPUT_NAME Nightlock
         WIN32_EXECUTABLE TRUE)

@@ -1,5 +1,6 @@
 #include "patternbackdrop.hpp"
 
+#include <QEvent>
 #include <QIcon>
 #include <QLineF>
 #include <QPainter>
@@ -322,11 +323,25 @@ void PatternBackdrop::resizeEvent(QResizeEvent* event) {
     cache_.clear();  // patterns are laid out for the exact zone size
 }
 
+bool PatternBackdrop::event(QEvent* event) {
+    if (event->type() == QEvent::DevicePixelRatioChange) {
+        cache_.clear();
+        update();
+    }
+    return QWidget::event(event);
+}
+
 void PatternBackdrop::paintEvent(QPaintEvent*) {
     if (kind_ == nightlock::Pattern::None || width() <= 0 || height() <= 0)
         return;
-    const quint64 key =
-        seed_ ^ (quint64(kind_) * 0x9E3779B97F4A7C15ULL) ^ qHash(iconPath_);
+    // Quantize only for a stable hash. Qt's Windows DPR values are exact
+    // quarter steps in practice; 1/1024 also safely distinguishes custom
+    // scale factors without hashing qreal's representation directly.
+    const quint64 dprKey = qRound64(devicePixelRatioF() * 1024.0);
+    const quint64 key = seed_ ^
+                        (quint64(kind_) * 0x9E3779B97F4A7C15ULL) ^
+                        qHash(iconPath_) ^
+                        (dprKey * 0xBF58476D1CE4E5B9ULL);
     auto it = cache_.constFind(key);
     if (it == cache_.constEnd())
         it = cache_.insert(key, generate());

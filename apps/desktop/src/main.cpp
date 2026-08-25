@@ -11,7 +11,6 @@
 #include "appearancesettings.hpp"
 #include "demovault.hpp"
 #include "fonts.hpp"
-#include "respaths.hpp"
 #include "standardicons.hpp"
 #include "vaultservice.hpp"
 #include "windows/entryeditdialog.hpp"
@@ -34,7 +33,7 @@ int main(int argc, char* argv[]) {
     // Dock icon for the running process (the squircle render of the
     // logo); resources/nightlock.icns carries the same art for the
     // .app bundle.
-    QApplication::setWindowIcon(QIcon(respaths::icon(QStringLiteral("appicon.png"))));
+    QApplication::setWindowIcon(standardicons::applicationIcon());
 
     // NIGHTLOCK_DEMO=1 runs on the in-memory mockup vault (no disk
     // I/O, unlock password "nightlock") — the screenshot/debug hooks
@@ -46,14 +45,14 @@ int main(int argc, char* argv[]) {
         service->setDemoRoot(createDemoVault());
 
     MainWindow window(service->root());
-    // Content extends into the title bar zone: the panes and their
-    // borders run from the very top edge of the window, with only the
-    // traffic-light buttons floating above the directory pane.
+#ifndef Q_OS_WIN
+    // Preserve the edge-to-edge client area used by the existing macOS/Linux
+    // chrome. On Windows these flags put content underneath the native title
+    // bar, so the regular framed client area is intentionally retained.
     window.setWindowFlag(Qt::ExpandedClientAreaHint, true);
     window.setWindowFlag(Qt::NoTitleBarBackgroundHint, true);
-    // Without this the layout still reserves the title-bar safe area,
-    // leaving a 28px white strip the pane borders never reach into.
     window.setAttribute(Qt::WA_ContentsMarginsRespectsSafeArea, false);
+#endif
     window.resize(843, 617);
     window.show();
 #ifdef Q_OS_MACOS

@@ -97,20 +97,6 @@ private:
     qreal pos_;  // knob position, 0 = off .. 1 = on
 };
 
-// Round color swatch for the accent picker's menu entries.
-QIcon dotIcon(const QColor& color) {
-    QPixmap pixmap(24, 24);
-    pixmap.fill(Qt::transparent);
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(color);
-    painter.drawEllipse(4, 4, 16, 16);
-    painter.end();
-    pixmap.setDevicePixelRatio(2.0);
-    return QIcon(pixmap);
-}
-
 // Closed dropdown drawn like the app's input fields; opening it pops
 // the frosted NlMenu, so the picker matches every other menu in the
 // app. Options may carry color dots (the accent picker); dotless
@@ -187,7 +173,8 @@ private:
                     onSelected_(i);
             });
             if (!dots_.isEmpty())
-                action->setIcon(dotIcon(dots_[i]));
+                action->setIcon(
+                    appearancesettings::colorSwatchIcon(dots_[i]));
             else if (i == current_)
                 action->setIcon(navIcon(QStringLiteral("check")));
             action->setEnabled(enabled_.value(i, true));
@@ -488,10 +475,11 @@ QWidget* SettingsWindow::buildDatabasePage() {
                 pathLabel->setText(QDir::toNativeSeparators(path));
             });
 
+    ToggleSwitch* touchIdToggle = nullptr;
+#ifndef Q_OS_WIN
     QString touchIdAvailability;
     const bool touchIdAvailable = touchid::isAvailable(&touchIdAvailability);
-    auto* touchIdToggle =
-        new ToggleSwitch(touchid::isEnabledForVault(service->vaultPath()));
+    touchIdToggle = new ToggleSwitch(touchid::isEnabledForVault(service->vaultPath()));
     // An existing opt-in can always be turned off, even when Touch ID
     // has since become unavailable or the vault is currently locked.
     touchIdToggle->setEnabled(
@@ -556,6 +544,7 @@ QWidget* SettingsWindow::buildDatabasePage() {
                         tr("Touch ID could not be enabled: %1").arg(error));
                 }
             });
+#endif
 
     auto* switchButton = inlineButton(tr("Choose File…"));
     connect(switchButton, &QPushButton::clicked, this, [this, service] {
@@ -648,8 +637,8 @@ QWidget* SettingsWindow::buildDatabasePage() {
                     repeatPassword->setFocus();
                     return;
                 }
-                const bool refreshTouchId = touchid::isEnabledForVault(
-                    service->vaultPath());
+                const bool refreshTouchId =
+                    touchIdToggle && touchid::isEnabledForVault(service->vaultPath());
                 const nightlock::VaultError error = service->changePassword(
                     currentPassword->text(), newPassword->text());
                 if (error == nightlock::VaultError::WrongPassword) {

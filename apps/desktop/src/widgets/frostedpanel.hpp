@@ -10,8 +10,18 @@ class QWidget;
 // snapshot of the window behind it under a translucent white veil.
 namespace frosted {
 
+#if defined(Q_OS_WIN)
+// A wide, hand-painted alpha shadow turns into a visibly banded halo on
+// Windows' layered popup windows.  Keep only enough transparent space for
+// antialiased rounded corners; paintPanel() supplies a crisp outline there.
+inline constexpr bool kUseOpaquePopupSurface = true;
+inline constexpr int kShadow = 2;
+inline constexpr int kRadius = 8;
+#else
+inline constexpr bool kUseOpaquePopupSurface = false;
 inline constexpr int kShadow = 12;  // translucent margin reserved for the shadow
 inline constexpr int kRadius = 10;
+#endif
 // Solid color share over the blurred backdrop; low enough that the
 // blurred app behind the panel clearly shows through the glass.
 inline constexpr qreal kVeil = 0.72;

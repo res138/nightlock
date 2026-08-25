@@ -33,6 +33,91 @@ function Assert-FileExists {
     }
 }
 
+function Assert-IcoCoverage {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LiteralPath
+    )
+
+    Assert-FileExists `
+        -LiteralPath $LiteralPath `
+        -Description 'Nightlock multi-resolution Windows icon'
+
+    $bytes = [IO.File]::ReadAllBytes($LiteralPath)
+    if ($bytes.Length -lt 6) {
+        throw "Windows icon header is truncated: $LiteralPath"
+    }
+
+    $reserved = [BitConverter]::ToUInt16($bytes, 0)
+    $imageType = [BitConverter]::ToUInt16($bytes, 2)
+    $imageCount = [BitConverter]::ToUInt16($bytes, 4)
+    if (($reserved -ne 0) -or ($imageType -ne 1) -or ($imageCount -eq 0)) {
+        throw "File is not a valid Windows ICO container: $LiteralPath"
+    }
+    if ($bytes.Length -lt (6 + (16 * $imageCount))) {
+        throw "Windows icon directory is truncated: $LiteralPath"
+    }
+
+    $sizes = [System.Collections.Generic.HashSet[int]]::new()
+    for ($index = 0; $index -lt $imageCount; $index++) {
+        $offset = 6 + (16 * $index)
+        $width = [int]$bytes[$offset]
+        $height = [int]$bytes[$offset + 1]
+        if ($width -eq 0) { $width = 256 }
+        if ($height -eq 0) { $height = 256 }
+
+        $planes = [BitConverter]::ToUInt16($bytes, $offset + 4)
+        $bitDepth = [BitConverter]::ToUInt16($bytes, $offset + 6)
+        $imageSize = [BitConverter]::ToUInt32($bytes, $offset + 8)
+        $imageOffset = [BitConverter]::ToUInt32($bytes, $offset + 12)
+        $imageEnd = [uint64]$imageOffset + [uint64]$imageSize
+        if (($width -ne $height) -or ($planes -ne 1) -or
+            ($bitDepth -lt 32) -or ($imageEnd -gt [uint64]$bytes.Length)) {
+            throw "Invalid $($width)x$height icon frame in $LiteralPath"
+        }
+        [void]$sizes.Add($width)
+    }
+
+    # These are the sizes Inno Setup recommends for a crisp Setup/Uninstall
+    # icon, plus 128px for Explorer's intermediate zoom levels.
+    foreach ($requiredSize in @(16, 32, 48, 64, 128, 256)) {
+        if (-not $sizes.Contains($requiredSize)) {
+            throw "Windows icon has no ${requiredSize}x${requiredSize} frame: $LiteralPath"
+        }
+    }
+}
+
+function Assert-NightlockVersionInfo {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LiteralPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ExpectedVersion
+    )
+
+    $versionInfo = (Get-Item -LiteralPath $LiteralPath).VersionInfo
+    $expectedFields = @{
+        FileDescription = 'Nightlock password manager'
+        FileVersion = "$ExpectedVersion.0"
+        OriginalFilename = 'Nightlock.exe'
+        ProductName = 'Nightlock'
+        ProductVersion = $ExpectedVersion
+    }
+    foreach ($field in $expectedFields.Keys) {
+        $actual = [string]$versionInfo.$field
+        if (-not [string]::Equals(
+                $actual.Trim(),
+                [string]$expectedFields[$field],
+                [StringComparison]::Ordinal)) {
+            throw @"
+Nightlock.exe has incorrect $field metadata: '$actual'
+Expected '$($expectedFields[$field])'. Reconfigure CMake after changing VERSION.
+"@
+        }
+    }
+}
+
 function Find-WinDeployQt {
     param([string]$PreferredBinDir)
 
@@ -194,6 +279,9 @@ function Assert-ReleasePayload {
         'Qt6Svg.dll',
         'qt.conf',
         'plugins\platforms\qwindows.dll',
+        'plugins\iconengines\qsvgicon.dll',
+        'plugins\imageformats\qico.dll',
+        'plugins\imageformats\qsvg.dll',
         'vc_redist.x64.exe'
     )
     foreach ($relativePath in $requiredFiles) {
@@ -246,6 +334,9 @@ The supported layout is plugins\platforms\qwindows.dll with root qt.conf.
         'Qt6Widgetsd.dll',
         'Qt6Svgd.dll',
         'qwindowsd.dll',
+        'qsvgicond.dll',
+        'qicod.dll',
+        'qsvgd.dll',
         'msvcp140d.dll',
         'vcruntime140d.dll',
         'ucrtbased.dll'
@@ -302,6 +393,12 @@ function Assert-OfficialVCRedist {
 $resolvedStageDir = (Resolve-Path -LiteralPath $StageDir).Path
 $guiExecutable = Join-Path $resolvedStageDir 'Nightlock.exe'
 Assert-FileExists -LiteralPath $guiExecutable -Description 'Nightlock GUI executable'
+Assert-NightlockVersionInfo `
+    -LiteralPath $guiExecutable `
+    -ExpectedVersion $AppVersion
+
+$installerIcon = Join-Path $PSScriptRoot '..\..\apps\desktop\resources\nightlock.ico'
+Assert-IcoCoverage -LiteralPath $installerIcon
 
 # CMake's Qt deploy script is the primary deployment path. Running the Qt tool
 # once more here is intentional: the installer is the final trust boundary and

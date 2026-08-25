@@ -163,14 +163,8 @@ PasswordGeneratorWindow::PasswordGeneratorWindow(QWidget* parent) : QDialog(pare
     generateButton_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     generateButton_->setIconSize(QSize(18, 18));
     const auto tintDiceGlyph = [this] {
-        QPixmap glyph =
-            QIcon(QStringLiteral(":/icons/menu/dice.svg")).pixmap(QSize(36, 36));
-        QPainter tint(&glyph);
-        tint.setCompositionMode(QPainter::CompositionMode_SourceIn);
-        tint.fillRect(glyph.rect(), appearancesettings::accentTextColor());
-        tint.end();
-        glyph.setDevicePixelRatio(2.0);
-        generateButton_->setIcon(QIcon(glyph));
+        generateButton_->setIcon(appearancesettings::tintedMenuIcon(
+            QStringLiteral("dice"), appearancesettings::accentTextColor()));
     };
     tintDiceGlyph();
     connect(appearancesettings::notifier(), &appearancesettings::Notifier::changed,

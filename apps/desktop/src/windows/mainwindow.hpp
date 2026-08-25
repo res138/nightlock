@@ -5,6 +5,7 @@
 #include "models/entrylistmodel.hpp"
 
 class QDialog;
+class QCloseEvent;
 class QHBoxLayout;
 class QLabel;
 class QListView;
@@ -132,6 +133,7 @@ private:
     QWidget* buildTreeHeader();
     QWidget* buildListHeader();
     void buildGlobalMenu();
+    NlMenu* showWindowsAppMenu();
     nightlock::Group* currentGroup() const;
     NlMenu* showSortMenu();
     void applySortMode(EntryListModel::SortMode mode);
@@ -212,6 +214,7 @@ private:
     QToolButton* searchButton_ = nullptr;
     QToolButton* graphButton_ = nullptr;
     QToolButton* lockButton_ = nullptr;
+    QToolButton* windowsMenuButton_ = nullptr;
     QToolButton* reopenTreeButton_;   // lives in the list header, shown
                                       // only while the tree pane is hidden
     QShortcut* graphShortcut_ = nullptr;
@@ -228,5 +231,6 @@ private:
     bool alwaysOnTop_ = false;
 
 protected:
+    void closeEvent(QCloseEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 };

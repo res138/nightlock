@@ -3,6 +3,7 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QClipboard>
+#include <QCloseEvent>
 #include <QCursor>
 #include <QDebug>
 #include <QDesktopServices>
@@ -45,7 +46,6 @@
 #include "hotkeys.hpp"
 #include "models/grouptreemodel.hpp"
 #include "qsecure.hpp"
-#include "respaths.hpp"
 #include "standardicons.hpp"
 #include "touchid.hpp"
 #include "vaultservice.hpp"
@@ -71,13 +71,21 @@ namespace {
 // Height shared by the tree-pane and list-pane toolbar headers, so
 // their bottom borders form one continuous line.
 constexpr int kHeaderHeight = 46;
+#ifndef Q_OS_WIN
 // Traffic-light row: left margin and the vertical center inside the
 // tree header (the buttons are repositioned to match on macOS).
 constexpr int kTrafficLeft = 20;
 constexpr int kTrafficSpan = 66;  // 3 buttons, 22pt pitch
+constexpr int kTreeHeaderLeft = kTrafficLeft + kTrafficSpan + 4;
 // List-header geometry while the tree pane is hidden: the reopen
 // button sits where the traffic lights end, the labels right after it.
 constexpr int kReopenButtonX = kTrafficLeft + kTrafficSpan + 8;
+#else
+// Native title-bar controls live outside the client area on Windows,
+// so toolbar content starts at the ordinary pane inset.
+constexpr int kTreeHeaderLeft = 14;
+constexpr int kReopenButtonX = 14;
+#endif
 constexpr int kHiddenLabelShift = kReopenButtonX + 28 + 4;
 
 nightlock::Group* findGroup(nightlock::Group* group, const QString& name) {
@@ -337,6 +345,19 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
 }
 
 void MainWindow::buildGlobalMenu() {
+#ifdef Q_OS_WIN
+    // This menu was introduced as a macOS application-global menu.
+    // A QMainWindow menu bar is a persistent in-window strip on
+    // Windows, where it competes with Nightlock's own pane headers and
+    // lock-screen overlay. A compact toolbar popup keeps the commands
+    // discoverable without permanently consuming client space.
+    auto* fullScreenShortcut =
+        new QShortcut(QKeySequence(QKeySequence::FullScreen), this);
+    connect(fullScreenShortcut, &QShortcut::activated, this, [this] {
+        isFullScreen() ? showNormal() : showFullScreen();
+    });
+    return;
+#else
 #ifdef Q_OS_MACOS
     // A parentless menu bar is Qt's application-wide default, so the
     // same native menu remains available while Settings, NetGraph or
@@ -605,20 +626,105 @@ void MainWindow::buildGlobalMenu() {
         macwindow::configureWindowMenu(globalMenuBar_, windowTitle);
     });
 #endif
+#endif
 }
 
-// Toolbar over the directory pane: the traffic lights keep their
-// corner (repositioned to the strip's vertical center on macOS), the
-// panel toggle sits right after them on its own, and every other
-// action — folder / search / graph / lock / settings — is
-// right-aligned like the list-header icons.
+NlMenu* MainWindow::showWindowsAppMenu() {
+#ifdef Q_OS_WIN
+    auto* menu = new NlMenu(this);
+    connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
+
+    auto* service = VaultService::instance();
+    const bool realVault = !service->demoMode();
+    const bool unlocked = realVault && service->isUnlocked() &&
+                          !lockScreen_->isVisible();
+
+    QAction* createDatabase = menu->addAction(
+        menuIcon(QStringLiteral("file-plus")), tr("Create Database…"), this,
+        &MainWindow::createVaultDialog);
+    QAction* openDatabase = menu->addAction(
+        menuIcon(QStringLiteral("database")), tr("Open Database…"), this,
+        &MainWindow::openVaultDialog);
+    QAction* saveAs = menu->addAction(
+        menuIcon(QStringLiteral("copy")), tr("Save Database As…"), this,
+        &MainWindow::saveVaultAs);
+    createDatabase->setEnabled(realVault);
+    openDatabase->setEnabled(realVault);
+    saveAs->setEnabled(unlocked);
+
+    menu->addSeparator();
+    QAction* closeDatabaseAction = menu->addAction(
+        tr("Close Database"), this, &MainWindow::closeDatabase);
+    QAction* lockDatabase = menu->addAction(
+        menuIcon(QStringLiteral("lock")), tr("Lock Database"), this,
+        &MainWindow::lockVault);
+    closeDatabaseAction->setEnabled(
+        realVault && service->vaultExists() &&
+        lockScreen_->mode() == LockScreen::Mode::Unlock);
+    lockDatabase->setEnabled(unlocked);
+
+    menu->addSeparator();
+    menu->addAction(menuIcon(QStringLiteral("settings")), tr("Settings…"),
+                    this, [this] { openSettings(); });
+
+    menu->addSeparator();
+    QAction* folderPanel = menu->addAction(tr("Show Directory Panel"));
+    folderPanel->setCheckable(true);
+    folderPanel->setChecked(treePane_->isVisible());
+    connect(folderPanel, &QAction::triggered, this,
+            [this](bool shown) { setTreePaneVisible(shown); });
+
+    QAction* alwaysOnTop = menu->addAction(tr("Always on Top"));
+    alwaysOnTop->setCheckable(true);
+    alwaysOnTop->setChecked(alwaysOnTop_);
+    connect(alwaysOnTop, &QAction::triggered, this,
+            &MainWindow::setAlwaysOnTop);
+
+    QAction* fullScreen = menu->addAction(
+        isFullScreen() ? tr("Exit Full Screen") : tr("Enter Full Screen"));
+    fullScreen->setCheckable(true);
+    fullScreen->setChecked(isFullScreen());
+    connect(fullScreen, &QAction::triggered, this, [this](bool enabled) {
+        enabled ? showFullScreen() : showNormal();
+    });
+    menu->addAction(tr("Fill Window"), this, &MainWindow::fillWindow);
+    menu->addAction(tr("Center Window"), this, &MainWindow::centerWindow);
+
+    menu->addSeparator();
+    menu->addAction(menuIcon(QStringLiteral("external-link")),
+                    tr("Documentation"), this, [] {
+                        QDesktopServices::openUrl(QUrl(
+                            QStringLiteral("https://github.com/res138/nightlock")));
+                    });
+
+    menu->popupAt(windowsMenuButton_->mapToGlobal(
+        QPoint(0, windowsMenuButton_->height() + 4)));
+    return menu;
+#else
+    return nullptr;
+#endif
+}
+
+// Toolbar over the directory pane: on macOS it clears the traffic
+// lights, while other platforms use the ordinary pane inset. The
+// panel toggle sits at the leading edge, and every other action —
+// folder / search / graph / lock / settings — is right-aligned like
+// the list-header icons.
 QWidget* MainWindow::buildTreeHeader() {
     auto* header = new HeaderBar;
     header->setObjectName(QStringLiteral("treeHeader"));
     header->setFixedHeight(kHeaderHeight);
     auto* layout = new QHBoxLayout(header);
-    layout->setContentsMargins(kTrafficLeft + kTrafficSpan + 4, 0, 14, 0);
+    layout->setContentsMargins(kTreeHeaderLeft, 0, 14, 0);
     layout->setSpacing(4);
+
+#ifdef Q_OS_WIN
+    windowsMenuButton_ =
+        headerButton(QStringLiteral("database"), tr("Nightlock menu"));
+    connect(windowsMenuButton_, &QToolButton::clicked, this,
+            &MainWindow::showWindowsAppMenu);
+    layout->addWidget(windowsMenuButton_);
+#endif
 
     auto* closePane = headerButton(QStringLiteral("sidebar"), tr("Hide folder panel"));
     connect(closePane, &QToolButton::clicked, this, [this] { setTreePaneVisible(false); });
@@ -767,9 +873,9 @@ void MainWindow::setTreePaneVisible(bool visible) {
         sizes[1] += sizes[0] - width;  // the middle pane absorbs the change
         sizes[0] = width;
         splitter_->setSizes(sizes);
-        // Labels follow the pane's edge until they reach the spot they
-        // hold while it is hidden (right of the traffic lights), then
-        // stay pinned there — no jump when the slide ends.
+        // Labels follow the pane's edge until they reach their hidden-
+        // pane position beside the reopen button, then stay pinned
+        // there — no jump when the slide ends.
         listHeaderLayout_->setContentsMargins(qMax(20, kHiddenLabelShift - width), 0, 14, 0);
     });
     connect(paneAnimation_, &QVariantAnimation::finished, this, [this, pane, visible] {
@@ -782,8 +888,8 @@ void MainWindow::setTreePaneVisible(bool visible) {
             listHeaderLayout_->setContentsMargins(20, 0, 14, 0);
         } else {
             pane->hide();
-            // The labels already rest right of the traffic lights; the
-            // way back fades into the gap reserved before them.
+            // The way back fades into the gap already reserved before
+            // the labels.
             fadeReopenButton(true);
         }
     });
@@ -1144,9 +1250,9 @@ void MainWindow::showLockScreen(bool create) {
     lockScreen_->reset();
     lockScreen_->show();
     lockScreen_->raise();
-    // Keynote-style: the Dock icon wears a padlock while locked.
-    QGuiApplication::setWindowIcon(
-        QIcon(respaths::icon(QStringLiteral("appicon-locked.png"))));
+    // Keynote-style on macOS: the Dock icon wears a padlock while locked.
+    // applicationIcon() deliberately keeps one legible icon on Windows.
+    QGuiApplication::setWindowIcon(standardicons::applicationIcon(true));
     // The opt-in is explicit, so begin authentication immediately;
     // cancelling simply leaves the password field and button ready.
     if (offerTouchId)
@@ -1325,9 +1431,8 @@ void MainWindow::finishUnlock(nightlock::Group* root) {
     touchid::cancelAuthentication();
     setVaultRoot(root);
     lockScreen_->hide();
-    // The Dock loses its lock badge together with the screen.
-    QGuiApplication::setWindowIcon(
-        QIcon(respaths::icon(QStringLiteral("appicon.png"))));
+    // The macOS Dock loses its lock badge together with the screen.
+    QGuiApplication::setWindowIcon(standardicons::applicationIcon());
 }
 
 void MainWindow::debugLock(bool fail) {
@@ -1753,7 +1858,13 @@ void MainWindow::detachDetail(const QPoint& globalPos) {
     const QSize paneSize = detail_->size();
     detail_->setParent(nullptr);
     detail_->setFloatingMode(true);
+#ifdef Q_OS_WIN
+    // Keep Windows' accessible move, resize, minimize and close
+    // controls instead of drawing traffic lights in a borderless window.
+    detail_->setWindowFlags(Qt::Window);
+#else
     detail_->setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
+#endif
     detail_->resize(paneSize);
     // Keep the grip (top-center of the panel) under the cursor.
     detail_->move(globalPos - QPoint(paneSize.width() / 2, 14));
@@ -1784,6 +1895,14 @@ void MainWindow::resizeEvent(QResizeEvent* event) {
     // relayouts; re-center them on the tree header after every resize.
     macwindow::layoutTrafficLights(this, kTrafficLeft, kHeaderHeight / 2);
 #endif
+}
+
+void MainWindow::closeEvent(QCloseEvent* event) {
+    // A detached detail view and the auxiliary windows are independent
+    // top-level windows. Close and re-parent them before accepting the main
+    // window close, then wipe every decrypted pointer/key held by the session.
+    closeVaultSession();
+    QMainWindow::closeEvent(event);
 }
 
 // Delays the toggle so NIGHTLOCK_SCREENSHOT (fixed at 800ms) can catch

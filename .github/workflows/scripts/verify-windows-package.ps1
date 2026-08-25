@@ -28,6 +28,308 @@ function Assert-File {
     }
 }
 
+function Assert-NonEmptyPng {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LiteralPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Description
+    )
+
+    Assert-File -LiteralPath $LiteralPath -Description $Description
+    $bytes = [IO.File]::ReadAllBytes($LiteralPath)
+    $pngSignature = [byte[]]@(137, 80, 78, 71, 13, 10, 26, 10)
+    if ($bytes.Length -le $pngSignature.Length) {
+        throw "$Description is empty or truncated: $LiteralPath"
+    }
+    for ($index = 0; $index -lt $pngSignature.Length; $index++) {
+        if ($bytes[$index] -ne $pngSignature[$index]) {
+            throw "$Description is not a PNG file: $LiteralPath"
+        }
+    }
+}
+
+function Initialize-WindowsResourceReader {
+    if ($null -ne ('Nightlock.PackageAudit.NativeResourceReader' -as [type])) {
+        return
+    }
+
+    # LoadLibraryEx with data/image-resource flags reads PE resources without
+    # resolving imports or executing any code from the package under test.
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+
+namespace Nightlock.PackageAudit
+{
+    public static class NativeResourceReader
+    {
+        private const uint LoadLibraryAsDataFile = 0x00000002;
+        private const uint LoadLibraryAsImageResource = 0x00000020;
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode,
+            ExactSpelling = true, SetLastError = true)]
+        private static extern IntPtr LoadLibraryExW(
+            string fileName,
+            IntPtr file,
+            uint flags);
+
+        [DllImport("kernel32.dll", ExactSpelling = true, SetLastError = true)]
+        private static extern IntPtr FindResourceW(
+            IntPtr module,
+            IntPtr name,
+            IntPtr type);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern uint SizeofResource(
+            IntPtr module,
+            IntPtr resourceInfo);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr LoadResource(
+            IntPtr module,
+            IntPtr resourceInfo);
+
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr LockResource(IntPtr resourceData);
+
+        [DllImport("kernel32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool FreeLibrary(IntPtr module);
+
+        [DllImport("shcore.dll")]
+        private static extern int GetProcessDpiAwareness(
+            IntPtr process,
+            out int awareness);
+
+        public static byte[] ReadResource(
+            string fileName,
+            int resourceType,
+            int resourceId)
+        {
+            IntPtr module = LoadLibraryExW(
+                fileName,
+                IntPtr.Zero,
+                LoadLibraryAsDataFile | LoadLibraryAsImageResource);
+            if (module == IntPtr.Zero)
+                throw new Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "Unable to load PE resources from " + fileName);
+
+            try
+            {
+                IntPtr resourceInfo = FindResourceW(
+                    module,
+                    new IntPtr(resourceId),
+                    new IntPtr(resourceType));
+                if (resourceInfo == IntPtr.Zero)
+                    throw new Win32Exception(
+                        Marshal.GetLastWin32Error(),
+                        "PE resource " + resourceType + "/" + resourceId +
+                        " is missing from " + fileName);
+
+                uint size = SizeofResource(module, resourceInfo);
+                IntPtr resourceData = LoadResource(module, resourceInfo);
+                IntPtr resourceBytes = LockResource(resourceData);
+                if (size == 0 || resourceData == IntPtr.Zero ||
+                    resourceBytes == IntPtr.Zero)
+                    throw new Win32Exception(
+                        Marshal.GetLastWin32Error(),
+                        "Unable to read PE resource " + resourceType + "/" +
+                        resourceId + " from " + fileName);
+
+                byte[] bytes = new byte[size];
+                Marshal.Copy(resourceBytes, bytes, 0, checked((int)size));
+                return bytes;
+            }
+            finally
+            {
+                FreeLibrary(module);
+            }
+        }
+
+        public static int ReadProcessDpiAwareness(IntPtr process)
+        {
+            int awareness;
+            int result = GetProcessDpiAwareness(process, out awareness);
+            if (result != 0)
+                Marshal.ThrowExceptionForHR(result);
+            return awareness;
+        }
+    }
+}
+'@
+}
+
+function Assert-NightlockWindowsIdentity {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LiteralPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ExpectedVersion
+    )
+
+    Assert-File -LiteralPath $LiteralPath -Description 'Nightlock GUI executable'
+    Initialize-WindowsResourceReader
+
+    $versionInfo = (Get-Item -LiteralPath $LiteralPath).VersionInfo
+    $expectedFields = @{
+        CompanyName = 'Nightlock contributors'
+        FileDescription = 'Nightlock password manager'
+        FileVersion = "$ExpectedVersion.0"
+        OriginalFilename = 'Nightlock.exe'
+        ProductName = 'Nightlock'
+        ProductVersion = $ExpectedVersion
+    }
+    foreach ($field in $expectedFields.Keys) {
+        $actual = ([string]$versionInfo.$field).Trim()
+        if (-not [string]::Equals(
+                $actual,
+                [string]$expectedFields[$field],
+                [StringComparison]::Ordinal)) {
+            throw @"
+Nightlock.exe has incorrect $field metadata: '$actual'
+Expected '$($expectedFields[$field])'.
+"@
+        }
+    }
+
+    # RT_MANIFEST = 24; application manifests use resource ID 1.
+    $manifestBytes = [Nightlock.PackageAudit.NativeResourceReader]::ReadResource(
+        $LiteralPath, 24, 1)
+    $manifestText = [Text.Encoding]::UTF8.GetString($manifestBytes)
+    # MSVC's manifest tool emits an UTF-8 BOM. Once the resource bytes are
+    # decoded to a .NET string that marker is an ordinary U+FEFF character;
+    # PowerShell's [xml] conversion then rejects the declaration because it is
+    # no longer the first character. Keep accepting both mt.exe output and the
+    # BOM-less MinGW resource generated from the same manifest.
+    if (($manifestText.Length -gt 0) -and
+        ($manifestText[0] -eq [char]0xFEFF)) {
+        $manifestText = $manifestText.Substring(1)
+    }
+    try {
+        [xml]$manifest = $manifestText
+    }
+    catch {
+        throw "Nightlock.exe contains malformed application-manifest XML: $_"
+    }
+
+    $expectedManifestSettings = @{
+        dpiAware = 'true/pm'
+        dpiAwareness = 'PerMonitorV2,PerMonitor'
+        longPathAware = 'true'
+    }
+    foreach ($setting in $expectedManifestSettings.Keys) {
+        $node = $manifest.SelectSingleNode("//*[local-name()='$setting']")
+        $actual = if ($null -eq $node) { '' } else { $node.InnerText.Trim() }
+        if (-not [string]::Equals(
+                $actual,
+                [string]$expectedManifestSettings[$setting],
+                [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Nightlock.exe manifest has incorrect $setting value: '$actual'"
+        }
+    }
+
+    $executionLevel = $manifest.SelectSingleNode(
+        "//*[local-name()='requestedExecutionLevel']")
+    if (($null -eq $executionLevel) -or
+        ($executionLevel.GetAttribute('level') -ne 'asInvoker') -or
+        ($executionLevel.GetAttribute('uiAccess') -ne 'false')) {
+        throw 'Nightlock.exe manifest must request asInvoker with uiAccess disabled.'
+    }
+
+    $supportedWindows = $manifest.SelectSingleNode(
+        "//*[local-name()='supportedOS' and " +
+        "@Id='{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}']")
+    if ($null -eq $supportedWindows) {
+        throw 'Nightlock.exe manifest does not declare Windows 10/11 compatibility.'
+    }
+
+    $applicationIdentity = $manifest.SelectSingleNode(
+        "/*[local-name()='assembly']/*[local-name()='assemblyIdentity' and " +
+        "@name='Nightlock.Nightlock']")
+    if (($null -eq $applicationIdentity) -or
+        ($applicationIdentity.GetAttribute('version') -ne "$ExpectedVersion.0")) {
+        throw 'Nightlock.exe manifest identity does not match the package version.'
+    }
+
+    # Keep this explicit dependency through MSVC's manifest merge and the
+    # MinGW RT_MANIFEST path to preserve themed controls and file dialogs.
+    $commonControls = $manifest.SelectSingleNode(
+        "//*[local-name()='assemblyIdentity' and " +
+        "@name='Microsoft.Windows.Common-Controls']")
+    if (($null -eq $commonControls) -or
+        ($commonControls.GetAttribute('version') -ne '6.0.0.0') -or
+        ($commonControls.GetAttribute('publicKeyToken') -ne '6595b64144ccf1df')) {
+        throw 'Nightlock.exe manifest is missing Common-Controls v6 activation.'
+    }
+
+    # RT_GROUP_ICON = 14; ID 101 is deliberately stable in nightlock.rc.in.
+    # Validate the actual resource embedded in the PE, not only the source ICO.
+    $iconGroup = [Nightlock.PackageAudit.NativeResourceReader]::ReadResource(
+        $LiteralPath, 14, 101)
+    if ($iconGroup.Length -lt 6) {
+        throw 'Nightlock.exe has a truncated group-icon resource.'
+    }
+    $iconType = [BitConverter]::ToUInt16($iconGroup, 2)
+    $iconCount = [BitConverter]::ToUInt16($iconGroup, 4)
+    if (($iconType -ne 1) -or
+        ($iconCount -eq 0) -or
+        ($iconGroup.Length -lt (6 + (14 * $iconCount)))) {
+        throw 'Nightlock.exe has an invalid group-icon resource.'
+    }
+
+    $iconSizes = [System.Collections.Generic.HashSet[int]]::new()
+    for ($index = 0; $index -lt $iconCount; $index++) {
+        $offset = 6 + (14 * $index)
+        $width = [int]$iconGroup[$offset]
+        $height = [int]$iconGroup[$offset + 1]
+        if ($width -eq 0) { $width = 256 }
+        if ($height -eq 0) { $height = 256 }
+        $bitDepth = [BitConverter]::ToUInt16($iconGroup, $offset + 6)
+        if (($width -ne $height) -or ($bitDepth -lt 32)) {
+            throw "Nightlock.exe contains an invalid $($width)x$height icon frame."
+        }
+        [void]$iconSizes.Add($width)
+    }
+    foreach ($requiredSize in @(16, 32, 48, 64, 128, 256)) {
+        if (-not $iconSizes.Contains($requiredSize)) {
+            throw "Nightlock.exe has no ${requiredSize}x${requiredSize} icon resource."
+        }
+    }
+}
+
+function Assert-InstallerVersionInfo {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LiteralPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ExpectedVersion
+    )
+
+    $versionInfo = (Get-Item -LiteralPath $LiteralPath).VersionInfo
+    $expectedFields = @{
+        CompanyName = 'Nightlock contributors'
+        FileDescription = 'Nightlock installer'
+        FileVersion = "$ExpectedVersion.0"
+        ProductName = 'Nightlock'
+        ProductVersion = $ExpectedVersion
+    }
+    foreach ($field in $expectedFields.Keys) {
+        $actual = ([string]$versionInfo.$field).Trim()
+        if (-not [string]::Equals(
+                $actual,
+                [string]$expectedFields[$field],
+                [StringComparison]::Ordinal)) {
+            throw "Setup has incorrect $field metadata: '$actual'"
+        }
+    }
+}
+
 function Assert-PayloadLayout {
     param(
         [Parameter(Mandatory = $true)]
@@ -44,7 +346,10 @@ function Assert-PayloadLayout {
         'Qt6Widgets.dll',
         'Qt6Svg.dll',
         'qt.conf',
-        'plugins\platforms\qwindows.dll'
+        'plugins\platforms\qwindows.dll',
+        'plugins\iconengines\qsvgicon.dll',
+        'plugins\imageformats\qico.dll',
+        'plugins\imageformats\qsvg.dll'
     )
     if ($RequireVCRedist) {
         $requiredFiles += 'vc_redist.x64.exe'
@@ -127,6 +432,9 @@ function Assert-PEDependencyClosure {
     )
     $objects += Get-ChildItem -LiteralPath $Root -Filter 'Qt6*.dll' -File
     $objects += Get-Item -LiteralPath (Join-Path $Root 'plugins\platforms\qwindows.dll')
+    $objects += Get-Item -LiteralPath (Join-Path $Root 'plugins\iconengines\qsvgicon.dll')
+    $objects += Get-Item -LiteralPath (Join-Path $Root 'plugins\imageformats\qico.dll')
+    $objects += Get-Item -LiteralPath (Join-Path $Root 'plugins\imageformats\qsvg.dll')
 
     foreach ($object in $objects) {
         $output = & $dumpBin /nologo /dependents $object.FullName 2>&1
@@ -156,6 +464,9 @@ function Assert-PEDependencyClosure {
 $resolvedStageDir = (Resolve-Path -LiteralPath $StageDir).Path
 $resolvedInstaller = (Resolve-Path -LiteralPath $InstallerPath).Path
 Assert-PayloadLayout -Root $resolvedStageDir -RequireVCRedist
+Assert-NightlockWindowsIdentity `
+    -LiteralPath (Join-Path $resolvedStageDir 'Nightlock.exe') `
+    -ExpectedVersion $ExpectedVersion
 
 $redistPath = Join-Path $resolvedStageDir 'vc_redist.x64.exe'
 $redist = Get-Item -LiteralPath $redistPath
@@ -178,6 +489,9 @@ $installer = Get-Item -LiteralPath $resolvedInstaller
 if ($installer.Length -lt 1MB) {
     throw "Generated Setup is unexpectedly small: $($installer.Length) bytes"
 }
+Assert-InstallerVersionInfo `
+    -LiteralPath $resolvedInstaller `
+    -ExpectedVersion $ExpectedVersion
 
 $smokeRoot = Join-Path ([IO.Path]::GetTempPath()) (
     'nightlock-windows-package-smoke-' + [Guid]::NewGuid().ToString('N')
@@ -209,6 +523,9 @@ if ($installProcess.ExitCode -notin @(0, 3010)) {
 
 Assert-PayloadLayout -Root $installDir
 Assert-PEDependencyClosure -Root $installDir
+Assert-NightlockWindowsIdentity `
+    -LiteralPath (Join-Path $installDir 'Nightlock.exe') `
+    -ExpectedVersion $ExpectedVersion
 
 if (-not (Test-Path -LiteralPath $installerLog -PathType Leaf)) {
     throw 'Inno Setup did not produce the requested installation log.'
@@ -249,6 +566,21 @@ $guiProcess = Start-Process `
     -FilePath $guiPath `
     -WorkingDirectory $installDir `
     -PassThru
+# Start-Process/CreateProcess returns before the child has finished loading its
+# manifest and initialized the GUI thread. Querying SHCore in that narrow
+# window reports the temporary default (PROCESS_DPI_UNAWARE = 0), even though
+# the process switches to PMv2 during startup. Wait for its message loop first.
+if (-not $guiProcess.WaitForInputIdle(10000)) {
+    $guiProcess.Kill()
+    throw 'Installed GUI did not become input-idle before the DPI audit.'
+}
+$dpiAwareness = `
+    [Nightlock.PackageAudit.NativeResourceReader]::ReadProcessDpiAwareness(
+        $guiProcess.Handle)
+if ($dpiAwareness -ne 2) {
+    $guiProcess.Kill()
+    throw "Installed GUI is not per-monitor DPI aware (value: $dpiAwareness)."
+}
 if (-not $guiProcess.WaitForExit(30000)) {
     $guiProcess.Kill()
     throw 'Installed GUI did not finish its deterministic smoke run within 30 seconds.'
@@ -256,9 +588,30 @@ if (-not $guiProcess.WaitForExit(30000)) {
 if ($guiProcess.ExitCode -ne 0) {
     throw "Installed GUI exited with code $($guiProcess.ExitCode)."
 }
-Assert-File -LiteralPath $screenshotPath -Description 'Installed GUI smoke screenshot'
-if ((Get-Item -LiteralPath $screenshotPath).Length -eq 0) {
-    throw 'Installed GUI smoke screenshot is empty.'
+Assert-NonEmptyPng `
+    -LiteralPath $screenshotPath `
+    -Description 'Installed GUI smoke screenshot'
+
+# Exercise the Windows layered/context-popup path independently of the main
+# window screenshot. It catches startup crashes and missing image/icon plugins
+# even though final shadow/compositor quality still needs visual QA on Windows.
+Remove-Item Env:NIGHTLOCK_SCREENSHOT -ErrorAction SilentlyContinue
+Remove-Item Env:NIGHTLOCK_SCREENSHOT_DELAY -ErrorAction SilentlyContinue
+$menuScreenshotPath = Join-Path $smokeRoot 'nightlock-context-menu.png'
+$env:NIGHTLOCK_SCREENSHOT_MENU = $menuScreenshotPath
+$menuProcess = Start-Process `
+    -FilePath $guiPath `
+    -WorkingDirectory $installDir `
+    -PassThru
+if (-not $menuProcess.WaitForExit(30000)) {
+    $menuProcess.Kill()
+    throw 'Installed GUI context-menu smoke run timed out after 30 seconds.'
 }
+if ($menuProcess.ExitCode -ne 0) {
+    throw "Installed GUI context-menu smoke exited with code $($menuProcess.ExitCode)."
+}
+Assert-NonEmptyPng `
+    -LiteralPath $menuScreenshotPath `
+    -Description 'Installed GUI context-menu screenshot'
 
 Write-Host "Windows package smoke test passed for Nightlock $ExpectedVersion."

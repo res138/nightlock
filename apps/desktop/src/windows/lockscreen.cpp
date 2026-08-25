@@ -1,9 +1,11 @@
 #include "lockscreen.hpp"
 
 #include <QDir>
+#include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -23,6 +25,36 @@ constexpr int kFieldHeight = 42;
 constexpr int kRowSpacing = 8;
 constexpr int kShakeReach = 14;  // widest shake swing, plus a hair
 constexpr int kSelectFolderWidth = 118;
+constexpr int kArtworkSize = 96;
+
+// QLabel otherwise keeps the raster produced during construction. Rebuild
+// from the 2048px source whenever Windows moves the lock screen between
+// monitors with different scale factors.
+class DpiAwareArtLabel : public QLabel {
+public:
+    explicit DpiAwareArtLabel(const QString& path) : icon_(path) {
+        setAlignment(Qt::AlignHCenter);
+        refreshPixmap();
+    }
+
+protected:
+    bool event(QEvent* event) override {
+        const bool handled = QLabel::event(event);
+        if (event->type() == QEvent::DevicePixelRatioChange ||
+            event->type() == QEvent::ParentChange ||
+            event->type() == QEvent::Show)
+            refreshPixmap();
+        return handled;
+    }
+
+private:
+    void refreshPixmap() {
+        setPixmap(icon_.pixmap(QSize(kArtworkSize, kArtworkSize),
+                               devicePixelRatioF()));
+    }
+
+    QIcon icon_;
+};
 
 }  // namespace
 
@@ -30,16 +62,10 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     setObjectName(QStringLiteral("lockScreen"));
     setAttribute(Qt::WA_StyledBackground);  // opaque white over the vault
 
-    auto* icon = new QLabel;
-    icon->setAlignment(Qt::AlignHCenter);
-    // The art ships huge; render it at 96pt, crisp on retina.
-    const QPixmap art(respaths::icon(QStringLiteral("lock.png")));
-    if (!art.isNull()) {
-        QPixmap scaled =
-            art.scaled(QSize(192, 192), Qt::KeepAspectRatio, Qt::SmoothTransformation);
-        scaled.setDevicePixelRatio(2.0);
-        icon->setPixmap(scaled);
-    }
+    // The art ships huge and is rasterized at 96 logical pixels for the
+    // current monitor (including Windows fractional and >200% DPI).
+    auto* icon = new DpiAwareArtLabel(
+        respaths::icon(QStringLiteral("lock.png")));
 
     title_ = new QLabel(tr("Nightlock Vault is Locked"));
     title_->setObjectName(QStringLiteral("lockTitle"));
@@ -154,7 +180,7 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     openExisting_->hide();
 
     auto* link = new QLabel(QStringLiteral(
-        "<a style=\"color:#6E6A75;\" href=\"https://github.com/rodukov/nightlock\">"
+        "<a style=\"color:#6E6A75;\" href=\"https://github.com/res138/nightlock\">"
         "Read more about nightlock encryption and security.</a>"));
     link->setObjectName(QStringLiteral("lockLink"));
     link->setAlignment(Qt::AlignHCenter);

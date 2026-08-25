@@ -18,14 +18,18 @@ using frosted::kRadius;
 using frosted::kShadow;
 using frosted::panelRect;
 
-constexpr int kItemHeight = 30;
 constexpr int kPadLeft = 12;
 constexpr int kPadRight = 12;
-constexpr int kIconSize = 11;
 constexpr int kIconTextGap = 10;
 constexpr int kChevronColumn = 14;
 constexpr int kBandHeight = 5;
-constexpr int kMinItemWidth = 172;
+
+// Segoe UI and the one-pixel menu SVG strokes need a little more room at
+// Windows' common 100% scale than their Retina/macOS counterparts.
+constexpr int kItemHeight = frosted::kUseOpaquePopupSurface ? 32 : 30;
+constexpr int kIconSize = frosted::kUseOpaquePopupSurface ? 14 : 11;
+constexpr int kMinItemWidth = frosted::kUseOpaquePopupSurface ? 180 : 172;
+constexpr int kFontPixelSize = frosted::kUseOpaquePopupSurface ? 12 : 11;
 
 constexpr int kRevealMs = 130;
 
@@ -154,7 +158,7 @@ public:
         const QIcon icon = action ? action->icon() : item->icon;
         if (!icon.isNull()) {
             QPixmap pixmap = icon.pixmap(QSize(kIconSize, kIconSize),
-                                         widget->devicePixelRatio(),
+                                         widget->devicePixelRatioF(),
                                          enabled ? QIcon::Normal : QIcon::Disabled);
             if (danger) {
                 QPainter tint(&pixmap);
@@ -163,6 +167,25 @@ public:
             }
             const QRect iconRect(x, rect.center().y() - kIconSize / 2, kIconSize, kIconSize);
             painter->drawPixmap(iconRect, pixmap);
+        } else if (item->checked && item->checkType != QStyleOptionMenuItem::NotCheckable) {
+            // QProxyStyle normally supplies this indicator.  CE_MenuItem is
+            // fully custom here, so checked text-only actions (notably the
+            // pattern picker) otherwise have no visible selected state.
+            QColor checkColor = textColor();
+            if (!enabled)
+                checkColor.setAlpha(90);
+            QPen checkPen(checkColor, 1.7);
+            checkPen.setCapStyle(Qt::RoundCap);
+            checkPen.setJoinStyle(Qt::RoundJoin);
+            painter->setPen(checkPen);
+            painter->setBrush(Qt::NoBrush);
+            const qreal cx = x + kIconSize / 2.0;
+            const qreal cy = rect.center().y();
+            QPainterPath check;
+            check.moveTo(cx - 4.0, cy);
+            check.lineTo(cx - 1.2, cy + 2.8);
+            check.lineTo(cx + 4.2, cy - 3.0);
+            painter->drawPath(check);
         }
         x += kIconSize + kIconTextGap;
 
@@ -208,7 +231,7 @@ NlMenu::NlMenu(QWidget* parent) : QMenu(parent) {
     setStyle(sharedStyle());
     setContentsMargins(kShadow, kShadow, kShadow, kShadow);
     QFont f = font();
-    f.setPixelSize(11);  // 13px of the middle-pane counter, scaled down 1.2×
+    f.setPixelSize(kFontPixelSize);
     f.setWeight(QFont::DemiBold);
     setFont(f);
 }
@@ -232,8 +255,18 @@ void NlMenu::paintEvent(QPaintEvent* event) {
 
 void NlMenu::showEvent(QShowEvent* event) {
     QMenu::showEvent(event);
-    captureBackdrop();
-    startRevealAnimation();
+    if constexpr (frosted::kUseOpaquePopupSurface) {
+        // Whole-window opacity on a translucent Win32 popup is both expensive and
+        // prone to dark/banded edges.  Paint the final, crisp surface immediately.
+        backdrop_ = {};
+        backdropOffset_ = {};
+        reveal_ = 1.0;
+        setWindowOpacity(1.0);
+        update();
+    } else {
+        captureBackdrop();
+        startRevealAnimation();
+    }
 }
 
 void NlMenu::captureBackdrop() {

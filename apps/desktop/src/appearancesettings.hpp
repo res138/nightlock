@@ -61,6 +61,15 @@ const Palette& palette();
 // white for accent-colored selections.
 QIcon themedMenuIcon(const QString& name);
 
+// Same vector-backed icon with a caller-supplied tint. Unlike first
+// rasterizing at a hard-coded 2x size, the engine renders at the painter's
+// actual (including fractional) device-pixel ratio.
+QIcon tintedMenuIcon(const QString& name, const QColor& color);
+
+// Painter-backed color swatch used by popup menus. It remains sharp at
+// Windows' fractional scale factors instead of stretching a fixed 2x raster.
+QIcon colorSwatchIcon(const QColor& color);
+
 // Loads style.qss, substitutes the @theme and @accent tokens and
 // installs the result on the application. Startup and every setter go
 // through it; it also follows the OS scheme while theme is "system".
