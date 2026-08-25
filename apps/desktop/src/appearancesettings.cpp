@@ -67,31 +67,101 @@ constexpr ThemeToken kThemeTokens[] = {
 // light theme paints the SVG as authored.
 class ThemedIconEngine : public QIconEngine {
 public:
-    explicit ThemedIconEngine(QString path) : path_(std::move(path)) {}
+    explicit ThemedIconEngine(QString path, QColor fixedColor = {})
+        : path_(std::move(path)), fixedColor_(std::move(fixedColor)) {}
 
-    QPixmap pixmap(const QSize& size, QIcon::Mode mode, QIcon::State) override {
-        QPixmap base = QIcon(path_).pixmap(size);
-        const bool onAccent = mode == QIcon::Selected;
-        if (!onAccent && !darkActive())
-            return base;
-        QPainter painter(&base);
-        painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
-        painter.fillRect(base.rect(), onAccent ? accentTextColor() : palette().ink);
-        return base;
+    QPixmap pixmap(const QSize& size, QIcon::Mode mode,
+                   QIcon::State state) override {
+        return render(size, 1.0, mode, state);
+    }
+
+    QPixmap scaledPixmap(const QSize& size, QIcon::Mode mode,
+                         QIcon::State state, qreal scale) override {
+        return render(size, scale, mode, state);
     }
 
     void paint(QPainter* painter, const QRect& rect, QIcon::Mode mode,
                QIcon::State state) override {
-        const qreal ratio = painter->device()->devicePixelRatio();
-        QPixmap drawn = pixmap(rect.size() * ratio, mode, state);
-        drawn.setDevicePixelRatio(ratio);
-        painter->drawPixmap(rect, drawn);
+        const qreal ratio = painter->device()->devicePixelRatioF();
+        painter->drawPixmap(rect, scaledPixmap(rect.size(), mode, state, ratio));
     }
 
-    QIconEngine* clone() const override { return new ThemedIconEngine(path_); }
+    QIconEngine* clone() const override {
+        return new ThemedIconEngine(path_, fixedColor_);
+    }
 
 private:
+    QPixmap render(const QSize& size, qreal scale, QIcon::Mode mode,
+                   QIcon::State state) const {
+        // QIcon's DPR overload asks the SVG engine for physical pixels and
+        // tags the result with the requested ratio. This matters on Windows
+        // at 125/150/175% as well as on integer Retina scaling.
+        QPixmap base = QIcon(path_).pixmap(size, scale, mode, state);
+        if (base.isNull())
+            return base;
+        const bool onAccent = mode == QIcon::Selected;
+        if (!fixedColor_.isValid() && !onAccent && !darkActive())
+            return base;
+        QPainter painter(&base);
+        painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+        const QColor tint = fixedColor_.isValid()
+                                ? fixedColor_
+                                : onAccent ? accentTextColor() : palette().ink;
+        painter.fillRect(base.rect(), tint);
+        return base;
+    }
+
     QString path_;
+    QColor fixedColor_;
+};
+
+class ColorSwatchIconEngine : public QIconEngine {
+public:
+    explicit ColorSwatchIconEngine(QColor color) : color_(std::move(color)) {}
+
+    QPixmap pixmap(const QSize& size, QIcon::Mode mode,
+                   QIcon::State state) override {
+        return scaledPixmap(size, mode, state, 1.0);
+    }
+
+    QPixmap scaledPixmap(const QSize& size, QIcon::Mode mode,
+                         QIcon::State, qreal scale) override {
+        const QSize physical(qCeil(size.width() * scale),
+                             qCeil(size.height() * scale));
+        QPixmap result(physical);
+        result.fill(Qt::transparent);
+        result.setDevicePixelRatio(scale);
+        QPainter painter(&result);
+        draw(&painter, QRect(QPoint(), size), mode);
+        return result;
+    }
+
+    void paint(QPainter* painter, const QRect& rect, QIcon::Mode mode,
+               QIcon::State) override {
+        draw(painter, rect, mode);
+    }
+
+    QIconEngine* clone() const override {
+        return new ColorSwatchIconEngine(color_);
+    }
+
+private:
+    void draw(QPainter* painter, const QRect& rect, QIcon::Mode mode) const {
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing);
+        painter->setPen(Qt::NoPen);
+        QColor color = color_;
+        if (mode == QIcon::Disabled)
+            color.setAlphaF(color.alphaF() * 0.45);
+        painter->setBrush(color);
+        const qreal inset =
+            qMax<qreal>(1.5, qMin(rect.width(), rect.height()) / 6.0);
+        painter->drawEllipse(
+            QRectF(rect).adjusted(inset, inset, -inset, -inset));
+        painter->restore();
+    }
+
+    QColor color_;
 };
 
 }  // namespace
@@ -207,6 +277,15 @@ const Palette& palette() {
 
 QIcon themedMenuIcon(const QString& name) {
     return QIcon(new ThemedIconEngine(QStringLiteral(":/icons/menu/%1.svg").arg(name)));
+}
+
+QIcon tintedMenuIcon(const QString& name, const QColor& color) {
+    return QIcon(new ThemedIconEngine(QStringLiteral(":/icons/menu/%1.svg").arg(name),
+                                      color));
+}
+
+QIcon colorSwatchIcon(const QColor& color) {
+    return QIcon(new ColorSwatchIconEngine(color));
 }
 
 void applyStylesheet() {

@@ -27,6 +27,7 @@ public:
     void setIconCenterY(int y);
 
 protected:
+    bool event(QEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
@@ -37,7 +38,7 @@ private:
     QString iconPath_;        // resolved icon path (default when empty)
     quint64 seed_ = 0;        // std::hash of Entry::created
     int iconCenterY_ = 0;
-    // Rendered patterns keyed by seed/kind/icon; cleared on resize so
-    // the picture is regenerated for the new zone.
+    // Rendered patterns keyed by seed/kind/icon/DPR; cleared on resize or a
+    // monitor-DPI change so no 1x cache is stretched after moving to 2x.
     mutable QHash<quint64, QPixmap> cache_;
 };

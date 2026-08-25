@@ -19,6 +19,28 @@ void paintPanel(QWidget* widget, const QRectF& panel, qreal reveal,
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setPen(Qt::NoPen);
 
+    if constexpr (kUseOpaquePopupSurface) {
+        // QMenu/Qt::Popup is a layered window when WA_TranslucentBackground is
+        // enabled.  Repeated, almost-transparent shadow rings and a blurred grab
+        // look heavily banded after Windows composites that layer (and again when
+        // whole-window opacity is animated).  Use an opaque elevated surface with
+        // one device-independent outline instead.  The two-pixel transparent
+        // margin is retained solely for clean antialiased corners.
+        // Clear the alpha backing store explicitly.  This prevents pixels from
+        // an earlier paint/theme from surviving in the rounded corner margin.
+        painter.setCompositionMode(QPainter::CompositionMode_Source);
+        painter.fillRect(widget->rect(), Qt::transparent);
+        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+
+        const auto& palette = appearancesettings::palette();
+        const QRectF outlined = panel.adjusted(0.5, 0.5, -0.5, -0.5);
+        QPainterPath path;
+        path.addRoundedRect(outlined, kRadius - 0.5, kRadius - 0.5);
+        painter.fillPath(path, palette.veil);
+        painter.strokePath(path, QPen(palette.borderStrong, 1.0));
+        return;
+    }
+
     for (int i = kShadow; i >= 1; --i) {
         const qreal t = 1.0 - static_cast<qreal>(i) / kShadow;
         const qreal alpha = (1 + 4 * t * t) * reveal;
@@ -42,6 +64,13 @@ void paintPanel(QWidget* widget, const QRectF& panel, qreal reveal,
 
 QPixmap captureBackdrop(QWidget* widget, QPoint* offsetOut) {
     *offsetOut = QPoint();
+
+    if constexpr (kUseOpaquePopupSurface) {
+        // Windows popups deliberately use the opaque path in paintPanel().
+        // Avoid grabbing and scaling the parent window on every menu open.
+        Q_UNUSED(widget);
+        return {};
+    }
 
     // The popup may overhang its nearest window (a gallery over the
     // edit dialog, a menu at the window edge), so compose the grab

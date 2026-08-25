@@ -1,6 +1,8 @@
 #include "entrydetailview.hpp"
 
+#include <QCloseEvent>
 #include <QDateTime>
+#include <QEvent>
 #include <QFrame>
 #include <QIcon>
 #include <QLabel>
@@ -174,6 +176,7 @@ private:
 
 EntryDetailView::EntryDetailView(QWidget* parent)
     : QScrollArea(parent), entryColor_(nightlock::EntryColor::None) {
+    setWindowTitle(tr("Entry Details"));
     setWidgetResizable(true);
     new OverlayScrollBar(this);
 
@@ -316,14 +319,8 @@ EntryDetailView::EntryDetailView(QWidget* parent)
     // The toolbar's graph glyph, recolored to the accent's text color
     // for the accent pill; re-tinted when the theme or accent changes.
     const auto tintGraphGlyph = [this] {
-        QPixmap glyph =
-            QIcon(QStringLiteral(":/icons/menu/graph.svg")).pixmap(QSize(34, 34));
-        QPainter tint(&glyph);
-        tint.setCompositionMode(QPainter::CompositionMode_SourceIn);
-        tint.fillRect(glyph.rect(), appearancesettings::accentTextColor());
-        tint.end();
-        glyph.setDevicePixelRatio(2.0);
-        graphButton_->setIcon(QIcon(glyph));
+        graphButton_->setIcon(appearancesettings::tintedMenuIcon(
+            QStringLiteral("graph"), appearancesettings::accentTextColor()));
     };
     tintGraphGlyph();
     connect(appearancesettings::notifier(), &appearancesettings::Notifier::changed, this,
@@ -399,6 +396,13 @@ EntryDetailView::EntryDetailView(QWidget* parent)
     setEntry(nullptr);
 }
 
+bool EntryDetailView::event(QEvent* event) {
+    const bool handled = QScrollArea::event(event);
+    if (event->type() == QEvent::DevicePixelRatioChange)
+        refreshEntryIcon();
+    return handled;
+}
+
 void EntryDetailView::resizeEvent(QResizeEvent* event) {
     QScrollArea::resizeEvent(event);
     headerFade_->setGeometry(0, 0, width(), kHeaderFadeHeight);
@@ -431,17 +435,43 @@ void EntryDetailView::updatePatternGeometry() {
 }
 
 void EntryDetailView::setFloatingMode(bool floating) {
-    setAttribute(Qt::WA_TranslucentBackground, floating);
-    setProperty("floatingWindow", floating);
-    floatingControls_->setVisible(floating);
+#ifdef Q_OS_WIN
+    // A translucent, frameless panel and painted traffic lights are
+    // foreign chrome. Native frames are clearer and fully functional
+    // on Windows.
+    Q_UNUSED(floating);
+    constexpr bool customChrome = false;
+#else
+    const bool customChrome = floating;
+#endif
+    setAttribute(Qt::WA_TranslucentBackground, customChrome);
+    setProperty("floatingWindow", customChrome);
+    floatingControls_->setVisible(customChrome);
     floatingBackdrop_->setGeometry(rect());
-    floatingBackdrop_->setVisible(floating);
+    floatingBackdrop_->setVisible(customChrome);
     floatingBackdrop_->lower();
     // Re-evaluate the [floatingWindow] stylesheet selectors.
     style()->unpolish(this);
     style()->polish(this);
     content_->style()->unpolish(content_);
     content_->style()->polish(content_);
+}
+
+void EntryDetailView::closeEvent(QCloseEvent* event) {
+    if (isWindow()) {
+        // Closing a detached detail restores it to the splitter; it
+        // must not leave a hidden top-level widget and an empty pane. Hide
+        // first and defer re-parenting until native WM_CLOSE processing has
+        // unwound; recreating the HWND synchronously here is unsafe on Windows.
+        event->ignore();
+        hide();
+        QTimer::singleShot(0, this, [this] {
+            if (isWindow())
+                emit dockRequested();
+        });
+        return;
+    }
+    QScrollArea::closeEvent(event);
 }
 
 void EntryDetailView::gripPressed(const QPoint& globalPos) {
@@ -496,6 +526,8 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     editButton_->setVisible(entry != nullptr);
     syncGeneratorVisibility();
     if (!entry) {
+        iconPath_.clear();
+        iconLabel_->clear();
         entryColor_ = nightlock::EntryColor::None;
         refreshCardColors();
         return;
@@ -504,14 +536,13 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     entryColor_ = entry->color;
     refreshCardColors();
 
-    const QString iconPath = entry->icon.empty() ? QStringLiteral(":/icons/entry.png")
-                                                 : QString::fromStdString(entry->icon);
+    iconPath_ = entry->icon.empty() ? QStringLiteral(":/icons/entry.png")
+                                    : QString::fromStdString(entry->icon);
     // Select the variant through QIcon, exactly like the entry list
     // does: pack .ico files hold several sizes and color depths, and
     // QPixmap would load only the first sub-image — often a different
     // rendition than the one the list shows.
-    iconLabel_->setPixmap(QIcon(iconPath).pixmap(QSize(kIconSize, kIconSize),
-                                                 iconLabel_->devicePixelRatioF()));
+    refreshEntryIcon();
 
     titleLabel_->setText(QString::fromStdString(entry->name));
     applyPresetLabels(static_cast<int>(entry->preset));
@@ -638,6 +669,13 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
 
     patternBackdrop_->setEntry(entry);
     updatePatternGeometry();
+}
+
+void EntryDetailView::refreshEntryIcon() {
+    if (!iconLabel_ || iconPath_.isEmpty())
+        return;
+    iconLabel_->setPixmap(QIcon(iconPath_).pixmap(QSize(kIconSize, kIconSize),
+                                                  iconLabel_->devicePixelRatioF()));
 }
 
 void EntryDetailView::syncGeneratorVisibility() {

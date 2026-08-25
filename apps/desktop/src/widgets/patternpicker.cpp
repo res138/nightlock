@@ -81,7 +81,10 @@ NlMenu* PatternPicker::openMenu() {
     auto* menu = new NlMenu(this);
     for (const auto& option : kOptions) {
         const auto kind = option.kind;
-        menu->addAction(tr(option.title), this, [this, kind] { setValue(kind); });
+        auto* action =
+            menu->addAction(tr(option.title), this, [this, kind] { setValue(kind); });
+        action->setCheckable(true);
+        action->setChecked(kind == value_);
     }
     connect(menu, &QMenu::aboutToHide, this, [this, menu] {
         menuOpen_ = false;

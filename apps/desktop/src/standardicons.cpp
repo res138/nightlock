@@ -4,11 +4,16 @@
 #include <QDir>
 #include <QFile>
 #include <QHash>
+#include <QImageReader>
+#include <QPixmap>
+#include <QSet>
 #include <QSettings>
 
 #include "respaths.hpp"
 
+#include <algorithm>
 #include <atomic>
+#include <limits>
 #include <mutex>
 #include <thread>
 
@@ -25,6 +30,41 @@ const QVector<StandardIcon>& entryIcons() {
 
 const StandardIcon& defaultEntryIcon() {
     return entryIcons().first();
+}
+
+QIcon applicationIcon(bool locked) {
+#ifdef Q_OS_WIN
+    Q_UNUSED(locked);
+    // A lock badge is useful in the macOS Dock, but its detailed 1024px PNG
+    // collapses into an illegible Windows 16px title-bar icon. Windows keeps
+    // the crisp, stable multi-frame executable icon in both vault states.
+    QIcon icon(QStringLiteral(":/nightlock.ico"));
+    const QImage source(respaths::icon(QStringLiteral("appicon.png")));
+    if (!source.isNull()) {
+        static constexpr int kAllSizes[] = {
+            16, 20, 24, 32, 40, 48, 64, 80, 96, 128, 256,
+        };
+        static constexpr int kFractionalSizes[] = {20, 24, 40, 80, 96};
+        // Normally the ICO contributes the native sizes and we only fill the
+        // 125/150/250/300% gaps. kAllSizes is a robust fallback if a build
+        // accidentally omits the embedded ICO resource.
+        const int* sizes = icon.isNull() ? kAllSizes : kFractionalSizes;
+        const qsizetype count = icon.isNull() ? std::size(kAllSizes)
+                                              : std::size(kFractionalSizes);
+        for (qsizetype i = 0; i < count; ++i) {
+            const int extent = sizes[i];
+            icon.addPixmap(QPixmap::fromImage(
+                source.scaled(extent, extent, Qt::KeepAspectRatio,
+                              Qt::SmoothTransformation)));
+        }
+    }
+    if (!icon.isNull())
+        return icon;
+#endif
+
+    return QIcon(respaths::icon(
+        locked ? QStringLiteral("appicon-locked.png")
+               : QStringLiteral("appicon.png")));
 }
 
 QString idForEntryIcon(const QString& icon) {
@@ -67,13 +107,118 @@ QStringList galleryIconPaths() {
 namespace {
 
 std::mutex g_galleryCacheMutex;
-QHash<QString, QImage> g_galleryCache;
+QHash<QString, QVector<QImage>> g_galleryCache;
 std::atomic<bool> g_stopPreload{false};
 std::thread g_preloadThread;
 
-constexpr int kGalleryDecodeSize = 64;  // 32px cells on a 2x display
+// The gallery paints 32 logical pixels. Keep enough source data for Windows
+// at 300% while bounding modern 256/512px pack artwork in memory.
+constexpr int kGalleryDecodeSize = 96;
 constexpr int kMaxRecentIcons = 14;
 const QLatin1String kRecentIconsKey("recentIcons");
+
+struct DecodedFrame {
+    QImage image;
+    int quality = std::numeric_limits<int>::min();
+};
+
+quint64 sizeKey(const QSize& size) {
+    return (static_cast<quint64>(static_cast<quint32>(size.width())) << 32) |
+           static_cast<quint32>(size.height());
+}
+
+int frameQuality(const QImage& image) {
+    // ICO packs often contain same-size 4/8/32-bit duplicates. Qt expands
+    // all of them to ARGB32, so decoded depth/colorCount alone cannot tell a
+    // 16-color frame from its true-color sibling. A bounded unique-pixel
+    // sample preserves that distinction without scanning a full 1024px PNG.
+    int stride = 1;
+    while (static_cast<qint64>((image.width() + stride - 1) / stride) *
+               ((image.height() + stride - 1) / stride) >
+           4096)
+        ++stride;
+    QSet<QRgb> colors;
+    for (int y = 0; y < image.height(); y += stride) {
+        for (int x = 0; x < image.width(); x += stride) {
+            const QRgb pixel = image.pixel(x, y);
+            if (qAlpha(pixel) != 0)
+                colors.insert(pixel);
+        }
+    }
+    return image.depth() * 10000 + (image.hasAlphaChannel() ? 10000 : 0) +
+           qMin(colors.size(), 9999);
+}
+
+void keepBestFrame(QHash<quint64, DecodedFrame>& frames, QImage image) {
+    if (image.isNull())
+        return;
+    const quint64 key = sizeKey(image.size());
+    const int quality = frameQuality(image);
+    auto it = frames.find(key);
+    if (it == frames.end() || quality > it->quality)
+        frames.insert(key, {std::move(image), quality});
+}
+
+QVector<QImage> decodeGalleryIcon(const QString& path) {
+    QImageReader probe(path);
+    probe.setAutoTransform(true);
+    const int frameCount = qMax(1, probe.imageCount());
+
+    QHash<quint64, DecodedFrame> kept;
+    QImage largest;
+    int largestQuality = std::numeric_limits<int>::min();
+    for (int frame = 0; frame < frameCount; ++frame) {
+        if (g_stopPreload.load(std::memory_order_relaxed))
+            return {};
+
+        // A fresh reader makes random access reliable for ICO plugins whose
+        // read() advances internal state. The OS file cache makes the repeated
+        // opens cheap, and all work stays off the GUI thread.
+        QImageReader reader(path);
+        reader.setAutoTransform(true);
+        if (frame > 0 && !reader.jumpToImage(frame))
+            continue;
+        QImage image = reader.read();
+        if (image.isNull())
+            continue;
+
+        const int quality = frameQuality(image);
+        const qint64 pixels = static_cast<qint64>(image.width()) * image.height();
+        const qint64 largestPixels =
+            static_cast<qint64>(largest.width()) * largest.height();
+        if (pixels > largestPixels ||
+            (pixels == largestPixels && quality > largestQuality)) {
+            largest = image;
+            largestQuality = quality;
+        }
+
+        if (image.width() <= kGalleryDecodeSize &&
+            image.height() <= kGalleryDecodeSize)
+            keepBestFrame(kept, std::move(image));
+    }
+
+    // Modern icons frequently jump straight from 48 to 256px. Retain one
+    // bounded 96px rendition so 200-300% Windows displays downscale a clean
+    // source instead of enlarging the 48px legacy frame.
+    if (!largest.isNull() &&
+        (largest.width() > kGalleryDecodeSize ||
+         largest.height() > kGalleryDecodeSize)) {
+        keepBestFrame(kept, largest.scaled(kGalleryDecodeSize,
+                                           kGalleryDecodeSize,
+                                           Qt::KeepAspectRatio,
+                                           Qt::SmoothTransformation));
+    }
+
+    QVector<QImage> result;
+    result.reserve(kept.size());
+    for (auto it = kept.cbegin(); it != kept.cend(); ++it)
+        result.append(it->image);
+    std::sort(result.begin(), result.end(), [](const QImage& left, const QImage& right) {
+        return static_cast<qint64>(left.width()) * left.height() <
+               static_cast<qint64>(right.width()) * right.height();
+    });
+    return result;
+}
 
 }  // namespace
 
@@ -83,18 +228,16 @@ void preloadGalleryIcons() {
     // converts the cached images on the GUI thread when painting. The
     // thread must be stopped before the application tears down —
     // decoding against unloaded image plugins crashes.
+    g_stopPreload.store(false, std::memory_order_relaxed);
     g_preloadThread = std::thread([paths] {
         for (const QString& path : paths) {
             if (g_stopPreload.load(std::memory_order_relaxed))
                 return;
-            QImage image(path);
-            if (image.isNull())
+            QVector<QImage> images = decodeGalleryIcon(path);
+            if (images.isEmpty())
                 continue;
-            if (image.width() > kGalleryDecodeSize || image.height() > kGalleryDecodeSize)
-                image = image.scaled(kGalleryDecodeSize, kGalleryDecodeSize,
-                                     Qt::KeepAspectRatio, Qt::SmoothTransformation);
             std::lock_guard<std::mutex> lock(g_galleryCacheMutex);
-            g_galleryCache.insert(path, image);
+            g_galleryCache.insert(path, std::move(images));
         }
     });
 }
@@ -105,7 +248,7 @@ void stopGalleryPreload() {
         g_preloadThread.join();
 }
 
-QImage cachedGalleryImage(const QString& path) {
+QVector<QImage> cachedGalleryImages(const QString& path) {
     std::lock_guard<std::mutex> lock(g_galleryCacheMutex);
     return g_galleryCache.value(path);
 }

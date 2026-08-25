@@ -5,6 +5,8 @@
 
 class CopyLabel;
 class PatternBackdrop;
+class QCloseEvent;
+class QEvent;
 class QFrame;
 class QHBoxLayout;
 class QLabel;
@@ -32,8 +34,9 @@ public:
     // floating window mid-drag, so the drag continues seamlessly.
     void beginFloatingDrag(const QPoint& globalPos);
 
-    // Toggles the floating-window look: transparent base with a
-    // rounded panel and the traffic-light controls in the corner.
+    // Toggles the floating-window look. macOS uses the custom rounded
+    // panel and traffic-light controls; other platforms retain their
+    // native window frame.
     void setFloatingMode(bool floating);
 
     // Grip callbacks (used by the internal drag handle).
@@ -56,10 +59,12 @@ signals:
     // The floating window was dropped at globalPos: dock me back if
     // this lands on the main window.
     void dropped(const QPoint& globalPos);
-    // The red traffic-light button of the floating window was clicked.
+    // The floating window's close control was clicked.
     void dockRequested();
 
 protected:
+    bool event(QEvent* event) override;
+    void closeEvent(QCloseEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
 private:
@@ -76,6 +81,7 @@ private:
     void refreshUrlText();
     void refreshLastVisibleRow();
     void refreshCardColors();
+    void refreshEntryIcon();
     void syncGeneratorVisibility();
     void updatePatternGeometry();
 
@@ -108,6 +114,7 @@ private:
     SpoilerLabel* passwordSpoiler_;
     FieldRow urlRow_;
     QString url_;  // shown link, re-colored on a theme switch
+    QString iconPath_;  // re-rasterized when a window crosses DPI boundaries
     nightlock::EntryColor entryColor_;
     FieldRow codeRow_;
     QList<FieldRow> additionalRows_;
