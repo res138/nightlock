@@ -5,9 +5,10 @@
 class QLabel;
 class QLineEdit;
 class QPushButton;
+class DpiAwareArtLabel;
 
 // Full-window lock screen: the vault hides behind a centered password
-// prompt (lock art, title, password field with an arrow button). A
+// prompt (selected application art, title, password field with an arrow button). A
 // rejected password shakes the field and shows an error line; the link
 // at the bottom leads to the project's security notes.
 //
@@ -68,6 +69,7 @@ private:
 
     Mode mode_ = Mode::Unlock;
     QString vaultTarget_;  // full file path shown in the location row
+    DpiAwareArtLabel* artwork_;
     QLabel* title_;
     QWidget* row_;  // field + arrow button; shaken as one piece
     QLineEdit* field_;

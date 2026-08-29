@@ -17,6 +17,8 @@
 #include <mutex>
 #include <thread>
 
+#include "appearancesettings.hpp"
+
 namespace standardicons {
 
 const QVector<StandardIcon>& entryIcons() {
@@ -32,14 +34,43 @@ const StandardIcon& defaultEntryIcon() {
     return entryIcons().first();
 }
 
-QIcon applicationIcon(bool locked) {
+const QVector<ApplicationIcon>& applicationIcons() {
+    static const QVector<ApplicationIcon> icons = {
+        {QStringLiteral("petal-keyhole"),
+         QCoreApplication::translate("standardicons", "Petal Keyhole"),
+         QStringLiteral("appicon-petal-keyhole.png"),
+         QStringLiteral("appicon-petal-keyhole-locked.png"),
+         QStringLiteral("appicon-petal-keyhole.ico")},
+        {QStringLiteral("flower"),
+         QCoreApplication::translate("standardicons", "Blue Flower"),
+         QStringLiteral("appicon-flower.png"),
+         QStringLiteral("appicon-flower-locked.png"),
+         QStringLiteral("appicon-flower.ico")},
+    };
+    return icons;
+}
+
+const ApplicationIcon& defaultApplicationIcon() {
+    return applicationIcons().first();
+}
+
+QIcon applicationIconForId(const QString& id, bool locked) {
+    const ApplicationIcon* selected = &defaultApplicationIcon();
+    for (const ApplicationIcon& choice : applicationIcons()) {
+        if (choice.id == id) {
+            selected = &choice;
+            break;
+        }
+    }
+
 #ifdef Q_OS_WIN
+    // A detailed lock badge collapses at 16px. Preserve the selected family,
+    // but use its regular multi-frame ICO in both vault states.
     Q_UNUSED(locked);
-    // A lock badge is useful in the macOS Dock, but its detailed 1024px PNG
-    // collapses into an illegible Windows 16px title-bar icon. Windows keeps
-    // the crisp, stable multi-frame executable icon in both vault states.
-    QIcon icon(QStringLiteral(":/nightlock.ico"));
-    const QImage source(respaths::icon(QStringLiteral("appicon.png")));
+    QIcon icon(respaths::icon(selected->windowsResource));
+    if (icon.isNull() && selected->id == defaultApplicationIcon().id)
+        icon = QIcon(QStringLiteral(":/nightlock.ico"));
+    const QImage source(respaths::icon(selected->resource));
     if (!source.isNull()) {
         static constexpr int kAllSizes[] = {
             16, 20, 24, 32, 40, 48, 64, 80, 96, 128, 256,
@@ -60,11 +91,27 @@ QIcon applicationIcon(bool locked) {
     }
     if (!icon.isNull())
         return icon;
+#else
+    const QString resource = locked ? selected->lockedResource : selected->resource;
+    QIcon icon(respaths::icon(resource));
+    if (!icon.isNull())
+        return icon;
 #endif
 
+    // Robust fallback for incomplete development/install trees. Keep the
+    // semantic vault state on macOS/Linux instead of silently dropping the
+    // badge when one selected-family asset is missing.
+#ifdef Q_OS_WIN
+    return QIcon(respaths::icon(defaultApplicationIcon().resource));
+#else
     return QIcon(respaths::icon(
-        locked ? QStringLiteral("appicon-locked.png")
-               : QStringLiteral("appicon.png")));
+        locked ? defaultApplicationIcon().lockedResource
+               : defaultApplicationIcon().resource));
+#endif
+}
+
+QIcon applicationIcon(bool locked) {
+    return applicationIconForId(appearancesettings::applicationIcon(), locked);
 }
 
 QString idForEntryIcon(const QString& icon) {

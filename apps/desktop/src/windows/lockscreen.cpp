@@ -15,8 +15,11 @@
 #include <QVariantAnimation>
 
 #include <cmath>
+#include <functional>
+#include <utility>
 
-#include "respaths.hpp"
+#include "appearancesettings.hpp"
+#include "standardicons.hpp"
 
 namespace {
 
@@ -27,14 +30,23 @@ constexpr int kShakeReach = 14;  // widest shake swing, plus a hair
 constexpr int kSelectFolderWidth = 118;
 constexpr int kArtworkSize = 96;
 
+}  // namespace
+
 // QLabel otherwise keeps the raster produced during construction. Rebuild
 // from the 2048px source whenever Windows moves the lock screen between
 // monitors with different scale factors.
 class DpiAwareArtLabel : public QLabel {
 public:
-    explicit DpiAwareArtLabel(const QString& path) : icon_(path) {
+    explicit DpiAwareArtLabel(std::function<QIcon()> iconProvider)
+        : iconProvider_(std::move(iconProvider)) {
         setAlignment(Qt::AlignHCenter);
         refreshPixmap();
+    }
+
+    void refreshPixmap() {
+        const QIcon icon = iconProvider_();
+        setPixmap(icon.pixmap(QSize(kArtworkSize, kArtworkSize),
+                              devicePixelRatioF()));
     }
 
 protected:
@@ -48,24 +60,23 @@ protected:
     }
 
 private:
-    void refreshPixmap() {
-        setPixmap(icon_.pixmap(QSize(kArtworkSize, kArtworkSize),
-                               devicePixelRatioF()));
-    }
-
-    QIcon icon_;
+    std::function<QIcon()> iconProvider_;
 };
-
-}  // namespace
 
 LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     setObjectName(QStringLiteral("lockScreen"));
     setAttribute(Qt::WA_StyledBackground);  // opaque white over the vault
 
-    // The art ships huge and is rasterized at 96 logical pixels for the
-    // current monitor (including Windows fractional and >200% DPI).
-    auto* icon = new DpiAwareArtLabel(
-        respaths::icon(QStringLiteral("lock.png")));
+    // Keep the first-run/closed screen in the selected icon family. Unlock
+    // mode uses the corresponding lock-badged variant, while Create mode
+    // shows the regular application art. Both are rasterized for the current
+    // monitor (including Windows fractional and >200% DPI).
+    artwork_ = new DpiAwareArtLabel([this] {
+        return standardicons::applicationIcon(mode_ == Mode::Unlock);
+    });
+    connect(appearancesettings::notifier(),
+            &appearancesettings::Notifier::applicationIconChanged, artwork_,
+            [this] { artwork_->refreshPixmap(); });
 
     title_ = new QLabel(tr("Nightlock Vault is Locked"));
     title_->setObjectName(QStringLiteral("lockTitle"));
@@ -189,7 +200,7 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(24, 24, 24, 18);
     layout->addStretch(5);
-    layout->addWidget(icon);
+    layout->addWidget(artwork_);
     layout->addSpacing(18);
     layout->addWidget(title_);
     layout->addSpacing(16);
@@ -208,6 +219,7 @@ LockScreen::LockScreen(QWidget* parent) : QWidget(parent) {
 
 void LockScreen::setMode(Mode mode) {
     mode_ = mode;
+    artwork_->refreshPixmap();
     const bool create = mode == Mode::Create;
     title_->setText(create ? tr("Create Your Nightlock Vault")
                            : tr("Nightlock Vault is Locked"));

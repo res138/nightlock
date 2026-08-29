@@ -6,14 +6,15 @@
 #include <QString>
 
 // User-facing appearance switches (Settings → Appearance): the color
-// scheme, the accent color and folder-icon visibility. Everything
+// scheme, accent, application icon and folder-icon visibility. Everything
 // persists via QSettings; setters reinstall the app stylesheet where
 // needed and ping notifier() so open views refresh live.
 namespace appearancesettings {
 
-// Stored option ids, index-aligned with the Settings dropdowns.
+// Stable option ids, index-aligned with their Settings controls.
 inline constexpr const char* kThemes[] = {"light", "dark", "system"};
 inline constexpr const char* kAccents[] = {"black", "blue", "green"};
+inline constexpr const char* kApplicationIcons[] = {"petal-keyhole", "flower"};
 
 QString theme();  // one of kThemes
 void setTheme(const QString& theme);
@@ -29,6 +30,11 @@ QColor accentColor();
 // near-black once the accent itself is light (dark theme's "black").
 QColor accentTextColor();
 void setAccent(const QString& accent);
+
+// Stable catalog id used by the Dock/taskbar/window icon. Missing or
+// obsolete values always resolve to the first entry: Petal Keyhole.
+QString applicationIcon();  // one of kApplicationIcons
+void setApplicationIcon(const QString& icon);
 
 bool folderIcons();
 void setFolderIcons(bool shown);
@@ -79,8 +85,13 @@ class Notifier : public QObject {
     Q_OBJECT
 public:
     void notify() { emit changed(); }
+    void notifyApplicationIcon() {
+        emit applicationIconChanged();
+        emit changed();
+    }
 signals:
     void changed();
+    void applicationIconChanged();
 };
 Notifier* notifier();
 

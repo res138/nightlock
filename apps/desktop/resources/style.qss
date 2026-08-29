@@ -477,6 +477,11 @@ QListWidget#settingsNav::item:selected {
     background: @accent;
     color: @accent-text;
 }
+QLabel#settingsSectionTitle {
+    font-size: 11px;
+    font-weight: 500;
+    color: @text-muted;
+}
 QFrame#settingsRow {
     border: none;
     border-bottom: 1px solid @border-row;

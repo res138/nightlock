@@ -225,6 +225,28 @@ void setAccent(const QString& accent) {
     notifier()->notify();
 }
 
+QString applicationIcon() {
+    const QString value = read("application-icon", kApplicationIcons[0]);
+    for (const char* known : kApplicationIcons)
+        if (value == QLatin1String(known))
+            return value;
+    return QLatin1String(kApplicationIcons[0]);
+}
+
+void setApplicationIcon(const QString& icon) {
+    QString valid = QLatin1String(kApplicationIcons[0]);
+    for (const char* known : kApplicationIcons) {
+        if (icon == QLatin1String(known)) {
+            valid = icon;
+            break;
+        }
+    }
+    if (read("application-icon", kApplicationIcons[0]) == valid)
+        return;
+    write("application-icon", valid);
+    notifier()->notifyApplicationIcon();
+}
+
 bool folderIcons() {
     return QSettings().value(QStringLiteral("appearance/folder-icons"), true).toBool();
 }

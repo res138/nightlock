@@ -19,6 +19,7 @@ qt_add_executable(nightlock-desktop
     src/models/grouptreemodel.cpp
     src/models/entrylistmodel.cpp
     src/widgets/copylabel.cpp
+    src/widgets/applicationiconpicker.cpp
     src/widgets/entrydetailview.cpp
     src/widgets/entrycolorpicker.cpp
     src/widgets/entrylistdelegate.cpp
@@ -70,11 +71,44 @@ else()
 endif()
 target_link_libraries(nightlock-desktop PRIVATE Qt6::Widgets Qt6::Svg nightlock-core)
 
+if(NIGHTLOCK_BUILD_TESTS)
+    enable_testing()
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+
+    qt_add_executable(nightlock-desktop-icon-tests
+        tests/test_application_icons.cpp
+        src/appearancesettings.cpp
+        src/fonts.cpp
+        src/respaths.cpp
+        src/standardicons.cpp
+        src/widgets/applicationiconpicker.cpp
+        resources/resources.qrc
+    )
+    target_include_directories(nightlock-desktop-icon-tests PRIVATE src)
+    target_compile_definitions(nightlock-desktop-icon-tests PRIVATE
+        NIGHTLOCK_ICONS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
+        NIGHTLOCK_FONTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/fonts")
+    target_link_libraries(nightlock-desktop-icon-tests PRIVATE
+        Qt6::Widgets Qt6::Svg Qt6::Test)
+
+    add_test(NAME desktop_app_icons COMMAND nightlock-desktop-icon-tests)
+    set_tests_properties(desktop_app_icons PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endif()
+
 # --- application identity per platform ------------------------------
 if(APPLE)
-    set_source_files_properties(resources/nightlock.icns PROPERTIES
+    # Give icon revisions a semantic bundle filename instead of reusing the
+    # historical nightlock.icns cache key. SecurityAgent renders the bundle
+    # icon in legacy Keychain prompts through IconServices, whose cache may
+    # otherwise keep showing artwork from an earlier build.
+    set(NIGHTLOCK_MACOS_ICON_NAME NightlockPetalKeyhole.icns)
+    set(NIGHTLOCK_MACOS_ICON
+        "${CMAKE_CURRENT_BINARY_DIR}/${NIGHTLOCK_MACOS_ICON_NAME}")
+    configure_file(resources/nightlock.icns "${NIGHTLOCK_MACOS_ICON}" COPYONLY)
+    set_source_files_properties("${NIGHTLOCK_MACOS_ICON}" PROPERTIES
         MACOSX_PACKAGE_LOCATION Resources)
-    target_sources(nightlock-desktop PRIVATE resources/nightlock.icns)
+    target_sources(nightlock-desktop PRIVATE "${NIGHTLOCK_MACOS_ICON}")
     set_target_properties(nightlock-desktop PROPERTIES
         OUTPUT_NAME Nightlock
         MACOSX_BUNDLE TRUE
@@ -84,7 +118,32 @@ if(APPLE)
         MACOSX_BUNDLE_GUI_IDENTIFIER com.nightlock.Nightlock
         MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
         MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
-        MACOSX_BUNDLE_ICON_FILE nightlock.icns)
+        MACOSX_BUNDLE_ICON_FILE "${NIGHTLOCK_MACOS_ICON_NAME}")
+
+    # CMake's command-line generators only linker-sign the Mach-O executable.
+    # Sign the complete development bundle so macOS can safely resolve the
+    # bound Info.plist and current icon in SecurityAgent. The DMG pipeline
+    # deploys dependencies and signs the staged bundle again afterwards.
+    add_custom_command(TARGET nightlock-desktop POST_BUILD
+        COMMAND /usr/bin/codesign --force --sign -
+                --identifier com.nightlock.Nightlock
+                "$<TARGET_BUNDLE_DIR:nightlock-desktop>"
+        COMMENT "Ad-hoc signing the complete Nightlock.app bundle"
+        VERBATIM)
+
+    # Launching the executable inside the bundle directly bypasses Launch
+    # Services, which can leave macOS system dialogs attached to stale bundle
+    # metadata and icon caches. This development target registers the freshly
+    # built bundle first, then asks Launch Services for a new app instance.
+    add_custom_target(run-nightlock
+        COMMAND
+            /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+            -f "$<TARGET_BUNDLE_DIR:nightlock-desktop>"
+        COMMAND /usr/bin/open -n "$<TARGET_BUNDLE_DIR:nightlock-desktop>"
+        DEPENDS nightlock-desktop
+        COMMENT "Registering and launching the development Nightlock.app bundle"
+        VERBATIM
+        USES_TERMINAL)
 elseif(WIN32)
     # The GUI is Nightlock.exe at the install root; the CLI keeps the
     # lowercase name inside bin\ (the PATH entry), where the
