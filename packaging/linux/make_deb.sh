@@ -62,13 +62,15 @@ CLI="$STAGE/usr/bin/nightlock"
 rm -rf -- "$APP_DIR/plugins" "$APP_DIR/lib"
 mkdir -p "$APP_DIR/plugins" "$APP_DIR/lib"
 
-# The xcb plugin is the baseline Linux desktop backend. The image and
-# icon plugins below are required by Nightlock's on-disk ICO/JPEG/SVG
-# icon packs. Refuse to produce an installer that starts but cannot
-# render its assets.
+# The xcb plugin is the baseline Linux desktop backend. The OpenSSL backend is
+# the supported HTTPS implementation for update checks. The image and icon
+# plugins below are required by Nightlock's on-disk ICO/JPEG/SVG icon packs.
+# Refuse to produce an installer that starts but cannot use its required
+# network or rendering features.
 REQUIRED_PLUGINS=(
     platforms/libqxcb.so
     platforms/libqoffscreen.so
+    tls/libqopensslbackend.so
     imageformats/libqico.so
     imageformats/libqjpeg.so
     imageformats/libqsvg.so
@@ -215,6 +217,9 @@ while [ "$copied" -eq 1 ]; do
     done < <(elf_objects)
 done
 
+[ -e "$APP_DIR/lib/libQt6Network.so.6" ] || \
+    die "Qt Network runtime was not collected from the desktop executable"
+
 # Every object gets an origin-relative RUNPATH. Setting it on the Qt
 # libraries themselves matters: DT_RUNPATH on the GUI is not
 # transitive when one bundled Qt module needs another.
@@ -294,6 +299,16 @@ if grep -Eqi '(^|, )(libqt6|libsodium)' <<<"$RUNTIME_DEPENDS"; then
     die "bundled library unexpectedly remained in Depends: $RUNTIME_DEPENDS"
 fi
 
+# Qt's OpenSSL TLS plugin resolves OpenSSL at runtime instead of declaring a
+# normal ELF dependency, and certificate roots are data. dpkg-shlibdeps cannot
+# infer either requirement, so make both explicit for the Ubuntu 22.04 target.
+for required_dependency in libssl3 ca-certificates; do
+    if ! grep -Eq "(^|, )${required_dependency}([[:space:]]|,|$)" \
+            <<<"$RUNTIME_DEPENDS"; then
+        RUNTIME_DEPENDS="$RUNTIME_DEPENDS, $required_dependency"
+    fi
+done
+
 strip --strip-unneeded "$BIN" "$CLI" 2>/dev/null || true
 
 # Debian metadata. The native architecture is used instead of a
@@ -314,7 +329,7 @@ Installed-Size: $INSTALLED_SIZE
 Depends: $RUNTIME_DEPENDS
 Section: utils
 Priority: optional
-Homepage: https://github.com/rodukov/nightlock
+Homepage: https://github.com/res138/nightlock
 Description: Encrypted password vault
  Nightlock is a desktop password manager with an encrypted vault
  (XChaCha20-Poly1305, Argon2id) and a matching command-line tool.

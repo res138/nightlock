@@ -67,3 +67,33 @@ Secrets in the core live in `secure::String`/`secure::Bytes`
   exists for scripts and tests and is as safe as the pipe feeding it.
 - The generator (`nightlock gen`, `nightlock::generatePassword`) draws
   through `randombytes_uniform` — unbiased, CSPRNG-backed.
+
+## Network access and update checks
+
+The desktop application checks Nightlock's latest stable GitHub Release after
+startup by default. The check is asynchronous and can be disabled under
+**Settings → General → Check for updates at startup**. The adjacent manual
+button remains available when automatic checks are disabled. Demo mode does
+not make the startup request.
+
+The request is an unauthenticated HTTPS `GET` to
+`api.github.com/repos/res138/nightlock/releases/latest`. GitHub and the network
+path can observe the user's IP address, request time, TLS metadata, and the
+`Nightlock/<version>` User-Agent. Nightlock sends no vault contents, vault path,
+password, entry data, persistent installation identifier, or application
+setting. It has no telemetry, crash upload, or diagnostic upload path.
+
+Release metadata is accepted only for a stable `vMAJOR.MINOR.PATCH` tag and
+exact HTTPS release and installer paths in the official repository. If a newer
+version exists, Nightlock asks before opening the platform asset in the user's
+default browser. It does not download, execute, elevate, or install the package
+itself. Startup network and parsing errors are logged locally and do not block
+access to the vault; manual checks display the error.
+
+Current packages remain unsigned, and checksums published by the same mutable
+GitHub Release are not independent proof of publisher identity. Automatic
+installer execution is out of scope until release immutability and platform
+code signing establish a stronger trust chain. See
+[RFC-0001](rfcs/0001-stable-release-update-checks.md), the
+[desktop update manager](../apps/desktop/src/updatemanager.cpp), and its
+[release-metadata tests](../apps/desktop/tests/test_updates.cpp).

@@ -11,7 +11,7 @@ Nightlock is under active development and does not yet offer a long-term-support
 | `main` | Active development | Best effort | Best effort |
 | Tagged historical versions | Historical | Not guaranteed | Not guaranteed |
 
-The current source version is `1.2.4`, with [VERSION](VERSION) as the authoritative source. Release tags must match it exactly with a leading `v`; see [CHANGELOG.md](CHANGELOG.md).
+The current source version is `1.2.5`, with [VERSION](VERSION) as the authoritative source. Release tags must match it exactly with a leading `v`; see [CHANGELOG.md](CHANGELOG.md).
 
 ## Platform baseline
 
@@ -39,7 +39,7 @@ CI cannot prove compatibility with every hardware, driver, policy, or future OS 
 
 - CMake 3.21 or newer;
 - a C++20-capable compiler;
-- Qt 6.10.1 with Widgets and SVG for the desktop application;
+- Qt 6.10.1 with Widgets, SVG, and Network for the desktop application;
 - libsodium 1.0.18 or newer, or the pinned vendored source path;
 - platform packaging tools only when producing release artifacts.
 

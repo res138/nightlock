@@ -13,6 +13,7 @@ GitHub-generated release notes are a publication aid, not a second authoritative
 - Initial developer documentation program, governance model, onboarding guides, ADR/RFC framework, support policy, and third-party inventory.
 - Release-package smoke tests now install and launch the final Windows Setup, macOS DMG, and Debian package with build-time Qt paths removed; Linux is additionally tested in a clean Ubuntu 22.04 container.
 - Appearance settings now offer rendered, clickable application-icon choices; the Petal Keyhole artwork is the new default and the original Blue Flower remains available.
+- The desktop application can check the latest stable GitHub Release manually and, by default, at startup; newer releases offer the matching platform installer in the user's browser.
 
 ### Changed
 
@@ -43,6 +44,7 @@ GitHub-generated release notes are a publication aid, not a second authoritative
 ### Security
 
 - Documented the current unsigned-release limitation and the required private vulnerability-reporting path.
+- Documented the outbound GitHub request made by startup update checks; no vault data or persistent installation identifier is sent, and unsigned installers are never executed automatically.
 
 ## Historical versions
 

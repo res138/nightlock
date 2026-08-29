@@ -60,10 +60,12 @@ INFO_PLIST="$CONTENTS/Info.plist"
 REQUIRED_QT_FILES=(
     Frameworks/QtCore.framework/Versions/A/QtCore
     Frameworks/QtGui.framework/Versions/A/QtGui
+    Frameworks/QtNetwork.framework/Versions/A/QtNetwork
     Frameworks/QtWidgets.framework/Versions/A/QtWidgets
     Frameworks/QtSvg.framework/Versions/A/QtSvg
     PlugIns/platforms/libqcocoa.dylib
     PlugIns/styles/libqmacstyle.dylib
+    PlugIns/tls/libqsecuretransportbackend.dylib
     PlugIns/imageformats/libqico.dylib
     PlugIns/imageformats/libqjpeg.dylib
     PlugIns/imageformats/libqsvg.dylib
@@ -75,14 +77,16 @@ done
 
 # Some Qt installations expose optional plugins even when their addon
 # frameworks were not installed (qpdf/QtPdf and virtual keyboard are
-# common examples). Nightlock needs only Cocoa, the native style and
-# its ICO/JPEG/SVG renderers. Keeping an explicit runtime allowlist
-# prevents an unrelated builder plugin from making a clean Mac fail.
+# common examples). Nightlock needs only Cocoa, the native style,
+# SecureTransport for HTTPS update checks and its ICO/JPEG/SVG renderers.
+# Keeping an explicit runtime allowlist prevents an unrelated builder plugin
+# from making a clean Mac fail or silently changing the TLS implementation.
 while IFS= read -r -d '' plugin; do
     relative="${plugin#"$PLUGINS/"}"
     case "$relative" in
         platforms/libqcocoa.dylib|\
         styles/libqmacstyle.dylib|\
+        tls/libqsecuretransportbackend.dylib|\
         imageformats/libqico.dylib|\
         imageformats/libqjpeg.dylib|\
         imageformats/libqsvg.dylib|\

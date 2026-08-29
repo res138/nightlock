@@ -275,10 +275,12 @@ function Assert-ReleasePayload {
         'bin\nightlock.exe',
         'Qt6Core.dll',
         'Qt6Gui.dll',
+        'Qt6Network.dll',
         'Qt6Widgets.dll',
         'Qt6Svg.dll',
         'qt.conf',
         'plugins\platforms\qwindows.dll',
+        'plugins\tls\qschannelbackend.dll',
         'plugins\iconengines\qsvgicon.dll',
         'plugins\imageformats\qico.dll',
         'plugins\imageformats\qsvg.dll',
@@ -331,9 +333,11 @@ The supported layout is plugins\platforms\qwindows.dll with root qt.conf.
     $debugRuntimeNames = @(
         'Qt6Cored.dll',
         'Qt6Guid.dll',
+        'Qt6Networkd.dll',
         'Qt6Widgetsd.dll',
         'Qt6Svgd.dll',
         'qwindowsd.dll',
+        'qschannelbackendd.dll',
         'qsvgicond.dll',
         'qicod.dll',
         'qsvgd.dll',
@@ -412,10 +416,27 @@ $pluginsDirectory = Join-Path $resolvedStageDir 'plugins'
     --release `
     --no-compiler-runtime `
     --no-translations `
+    --include-plugins qschannelbackend `
     --exclude-plugins qpdf `
     $guiExecutable
 if ($LASTEXITCODE -ne 0) {
     throw "windeployqt failed with exit code $LASTEXITCODE."
+}
+
+# Nightlock relies on Windows' native Schannel trust store. Keep the TLS plugin
+# set deterministic even if a Qt SDK also exposes OpenSSL or certificate-only
+# backends that windeployqt considers deployable on the build runner.
+$tlsPluginsDirectory = Join-Path $pluginsDirectory 'tls'
+if (Test-Path -LiteralPath $tlsPluginsDirectory -PathType Container) {
+    Get-ChildItem -LiteralPath $tlsPluginsDirectory -Filter '*.dll' -File |
+        Where-Object {
+            -not [string]::Equals(
+                $_.Name,
+                'qschannelbackend.dll',
+                [StringComparison]::OrdinalIgnoreCase
+            )
+        } |
+        Remove-Item -Force
 }
 
 # Keep the runtime lookup layout explicit even if windeployqt changes when it

@@ -18,13 +18,15 @@ Nightlock is under active development. The current source version is `1.2.5`, re
 
 Release packages are currently unsigned. Treat operating-system warnings and artifact-origin verification as material security limitations. See the [release workflow](.github/workflows/release.yml) and the planned release-security documentation before distributing binaries.
 
+The desktop application checks the official stable GitHub Release at startup by default. This can be disabled in General settings; manual checks remain available. The request includes the ordinary network metadata and `Nightlock/<version>` User-Agent described in the [security notes](docs/security.md#network-access-and-update-checks), never vault data. Nightlock asks before opening the installer download in the default browser and does not execute unsigned packages automatically.
+
 ## Capabilities
 
 - encrypted `.nlck` vaults using Argon2id and XChaCha20-Poly1305;
 - hierarchical groups and password entries;
 - login, password, URL, note, icon, code, timestamps, and visual pattern fields;
 - cryptographically secure password generation;
-- a Qt Widgets desktop interface with search, graph, settings, and lock flows;
+- a Qt Widgets desktop interface with search, graph, settings, lock flows, and stable-release update checks;
 - a scriptable CLI for vault creation, inspection, mutation, password changes, and generation;
 - atomic saves with a previous-image `.bak` file;
 - shared vault-format behavior across macOS, Windows, and Linux.
@@ -49,7 +51,7 @@ The public core API is Qt-free. The desktop and CLI are separate adapters over t
 
 ## Quick build
 
-Prerequisites are CMake 3.21 or newer, a C++20 compiler, Qt 6.10.1 with Widgets and SVG, and either a system libsodium installation or network access for the pinned vendored build.
+Prerequisites are CMake 3.21 or newer, a C++20 compiler, Qt 6.10.1 with Widgets, SVG, and Network, and either a system libsodium installation or network access for the pinned vendored build.
 
 ```bash
 cmake -S . -B build \

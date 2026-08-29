@@ -460,7 +460,8 @@ graph TD
     CLI --> CORE
     CORE --> SODIUM["libsodium cryptographic backend"]
     CORE --> VAULT["Encrypted .nlck vault"]
-    GUI --> QT["Qt Widgets and Qt SVG"]
+    GUI --> QT["Qt Widgets, Qt SVG, and Qt Network"]
+    GUI --> RELEASES["Official GitHub Releases API"]
     GUI --> RES["Icons, fonts, and Qt resources"]
     BUILD["CMake"] --> GUI
     BUILD --> CLI

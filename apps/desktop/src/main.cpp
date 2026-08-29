@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QFile>
 #include <QMenu>
+#include <QSslSocket>
 #include <QTimer>
 
 #include <nightlock/group.hpp>
@@ -12,6 +13,7 @@
 #include "demovault.hpp"
 #include "fonts.hpp"
 #include "standardicons.hpp"
+#include "updatemanager.hpp"
 #include "vaultservice.hpp"
 #include "windows/entryeditdialog.hpp"
 #include "windows/mainwindow.hpp"
@@ -24,6 +26,34 @@ int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
     QApplication::setOrganizationName(QStringLiteral("Nightlock"));
     QApplication::setApplicationName(QStringLiteral("Nightlock"));
+    QApplication::setApplicationVersion(QStringLiteral(NIGHTLOCK_VERSION));
+
+    // Package verification uses the installed executable itself to force-load
+    // the TLS backend without depending on GitHub or any other live service.
+    // The endpoint remains fixed in UpdateManager; this hook only audits the
+    // platform runtime selected by Qt and exits before opening a vault.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_TEST_TLS_RUNTIME")) {
+#if defined(Q_OS_MACOS)
+        const QString expectedBackend = QStringLiteral("securetransport");
+#elif defined(Q_OS_WIN)
+        const QString expectedBackend = QStringLiteral("schannel");
+#elif defined(Q_OS_LINUX)
+        const QString expectedBackend = QStringLiteral("openssl");
+#else
+        const QString expectedBackend;
+#endif
+        const QString activeBackend = QSslSocket::activeBackend();
+        if (!QSslSocket::supportsSsl() || expectedBackend.isEmpty() ||
+            activeBackend.compare(expectedBackend, Qt::CaseInsensitive) != 0) {
+            qCritical().noquote()
+                << "Nightlock TLS runtime check failed: expected"
+                << expectedBackend << "but Qt selected" << activeBackend;
+            return 1;
+        }
+        qInfo().noquote() << "Nightlock TLS runtime check passed:"
+                          << activeBackend;
+        return 0;
+    }
 
     // San Francisco everywhere, not "whatever the platform default
     // is" — critical for the Windows/Linux ports.
@@ -79,6 +109,16 @@ int main(int argc, char* argv[]) {
         // startLocked() resolves the remembered vault (or the first-run
         // default) and titles the window after it.
         window.startLocked();
+    }
+
+    // The opt-out startup check is asynchronous and deliberately stays quiet
+    // when this build is current or GitHub cannot be reached. Demo mode avoids
+    // outbound traffic so screenshots and UI diagnostics remain deterministic.
+    if (!demoMode && updates::checkOnStartupEnabled()) {
+        QTimer::singleShot(0, &window, [&window] {
+            updates::UpdateManager::instance()->checkForUpdates(
+                &window, updates::UpdateManager::CheckMode::Startup);
+        });
     }
 
     // Debug hook: NIGHTLOCK_TEST_MOVE="<group>:<target>" drops a folder

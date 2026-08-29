@@ -343,10 +343,12 @@ function Assert-PayloadLayout {
         'bin\nightlock.exe',
         'Qt6Core.dll',
         'Qt6Gui.dll',
+        'Qt6Network.dll',
         'Qt6Widgets.dll',
         'Qt6Svg.dll',
         'qt.conf',
         'plugins\platforms\qwindows.dll',
+        'plugins\tls\qschannelbackend.dll',
         'plugins\iconengines\qsvgicon.dll',
         'plugins\imageformats\qico.dll',
         'plugins\imageformats\qsvg.dll'
@@ -393,6 +395,22 @@ qwindows.dll was deployed outside the plugins directory: $legacyPlatformPlugin
 This can hide a broken qt.conf/plugin layout on the build runner.
 "@
     }
+
+    $unexpectedTlsPlugin = Get-ChildItem `
+        -LiteralPath (Join-Path $Root 'plugins\tls') `
+        -Filter '*.dll' -File |
+        Where-Object {
+            -not [string]::Equals(
+                $_.Name,
+                'qschannelbackend.dll',
+                [StringComparison]::OrdinalIgnoreCase
+            )
+        } |
+        Select-Object -First 1
+    if ($null -ne $unexpectedTlsPlugin) {
+        throw "Unexpected Windows TLS backend in package: $($unexpectedTlsPlugin.FullName)"
+    }
+
 }
 
 function Find-DumpBin {
@@ -432,6 +450,7 @@ function Assert-PEDependencyClosure {
     )
     $objects += Get-ChildItem -LiteralPath $Root -Filter 'Qt6*.dll' -File
     $objects += Get-Item -LiteralPath (Join-Path $Root 'plugins\platforms\qwindows.dll')
+    $objects += Get-Item -LiteralPath (Join-Path $Root 'plugins\tls\qschannelbackend.dll')
     $objects += Get-Item -LiteralPath (Join-Path $Root 'plugins\iconengines\qsvgicon.dll')
     $objects += Get-Item -LiteralPath (Join-Path $Root 'plugins\imageformats\qico.dll')
     $objects += Get-Item -LiteralPath (Join-Path $Root 'plugins\imageformats\qsvg.dll')
@@ -555,6 +574,20 @@ $cliOutput = & $cliPath --version 2>&1
 if (($LASTEXITCODE -ne 0) -or
     (($cliOutput -join "`n").Trim() -ne "nightlock $ExpectedVersion")) {
     throw "Installed CLI smoke test failed: $cliOutput"
+}
+
+$env:NIGHTLOCK_TEST_TLS_RUNTIME = '1'
+$tlsProcess = Start-Process `
+    -FilePath (Join-Path $installDir 'Nightlock.exe') `
+    -WorkingDirectory $installDir `
+    -PassThru
+if (-not $tlsProcess.WaitForExit(30000)) {
+    $tlsProcess.Kill()
+    throw 'Installed GUI TLS runtime check timed out after 30 seconds.'
+}
+Remove-Item Env:NIGHTLOCK_TEST_TLS_RUNTIME -ErrorAction SilentlyContinue
+if ($tlsProcess.ExitCode -ne 0) {
+    throw "Installed GUI could not load the Schannel backend (exit code $($tlsProcess.ExitCode))."
 }
 
 $screenshotPath = Join-Path $smokeRoot 'nightlock-gui.png'

@@ -1,6 +1,6 @@
 # Development prerequisites
 
-**Status:** Reviewed for the 1.2.2 source baseline
+**Status:** Reviewed for the 1.2.5 source baseline
 
 **Audience:** Contributors preparing a first local build
 
@@ -10,7 +10,7 @@
 |---|---:|---|
 | CMake | 3.21 | Configure all targets and install layouts |
 | C++ compiler | C++20-capable | Build core, CLI, and desktop |
-| Qt | 6.10.1, Widgets and SVG | Build the desktop application |
+| Qt | 6.10.1, Widgets, SVG, and Network | Build the desktop application and update checks |
 | libsodium | 1.0.18 or vendored path | Cryptography and secure memory |
 | Git | Modern supported release | Source and dependency checkout |
 | Python | 3.9–3.13 when using `aqtinstall` | Install official Qt packages in CI-like setups |
@@ -94,7 +94,7 @@ graph TD
     CORE --> SODIUM["System or vendored libsodium"]
     CLI["Build CLI"] --> CORE
     DESKTOP["Build desktop"] --> CORE
-    DESKTOP --> QT["Qt Widgets and SVG"]
+    DESKTOP --> QT["Qt Widgets, SVG, and Network"]
     TESTS["Build tests"] --> CORE
     PACKAGE["Build packages"] --> DESKTOP
     PACKAGE --> TOOLS["Platform packaging tools"]
