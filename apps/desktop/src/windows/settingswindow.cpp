@@ -33,6 +33,7 @@
 #include "hotkeys.hpp"
 #include "touchid.hpp"
 #include "vaultservice.hpp"
+#include "widgets/applicationiconpicker.hpp"
 #include "widgets/nlmenu.hpp"
 
 namespace {
@@ -783,6 +784,28 @@ QWidget* SettingsWindow::buildAppearancePage() {
     finishCard(rows);
 
     column->addWidget(card);
+
+    auto* iconSection = new QVBoxLayout;
+    iconSection->setContentsMargins(0, 0, 0, 0);
+    iconSection->setSpacing(8);
+    auto* iconHeading = new QLabel(tr("APPLICATION ICON"));
+    iconHeading->setObjectName(QStringLiteral("settingsSectionTitle"));
+    iconHeading->setContentsMargins(6, 0, 0, 0);
+    iconSection->addWidget(iconHeading);
+
+    QVBoxLayout* iconRows = nullptr;
+    QFrame* iconCard = makeCard(iconRows);
+    iconRows->setContentsMargins(18, 18, 18, 16);
+    auto* applicationIcon =
+        new ApplicationIconPicker(appearancesettings::applicationIcon());
+    connect(applicationIcon, &ApplicationIconPicker::iconSelected,
+            applicationIcon, [](const QString& id) {
+                appearancesettings::setApplicationIcon(id);
+            });
+    iconRows->addWidget(applicationIcon);
+    iconSection->addWidget(iconCard);
+    column->addLayout(iconSection);
+
     column->addStretch(1);
     return page;
 }

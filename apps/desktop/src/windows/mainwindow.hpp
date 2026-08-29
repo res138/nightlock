@@ -181,6 +181,9 @@ private:
     // Covers the window with the lock screen (Create or Unlock), the
     // location row prefilled from the service's current path.
     void showLockScreen(bool create);
+    // Uses a lock-badged icon only for an existing vault awaiting unlock;
+    // first-run/create/closed states keep the selected regular icon.
+    void refreshApplicationIcon();
     // Window title = the vault file's name.
     void updateVaultTitle();
     // Points both models (and the detail pane) at a new tree; nullptr

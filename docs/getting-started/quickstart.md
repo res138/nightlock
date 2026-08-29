@@ -55,6 +55,18 @@ ctest --test-dir build-core --output-on-failure
 
 ## Run the applications
 
+On macOS, launch the desktop bundle through Launch Services. The target
+registers the freshly signed bundle before opening it, so system-owned UI
+such as Touch ID reads the current application metadata and icon:
+
+```bash
+cmake --build build --target run-nightlock
+```
+
+Do not launch `Nightlock.app/Contents/MacOS/Nightlock` directly during UI
+development; doing so bypasses bundle registration and can leave system
+dialogs attached to stale metadata.
+
 ```bash
 build/apps/cli/nightlock --version
 build/apps/cli/nightlock --help

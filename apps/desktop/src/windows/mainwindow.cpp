@@ -263,6 +263,9 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
             &MainWindow::handlePassword);
     connect(lockScreen_, &LockScreen::touchIdRequested, this,
             &MainWindow::handleTouchId);
+    connect(appearancesettings::notifier(),
+            &appearancesettings::Notifier::applicationIconChanged, this,
+            &MainWindow::refreshApplicationIcon);
     connect(lockScreen_, &LockScreen::openExistingRequested, this, [this] {
         const QString path = QFileDialog::getOpenFileName(
             this, tr("Open Vault"),
@@ -1250,13 +1253,19 @@ void MainWindow::showLockScreen(bool create) {
     lockScreen_->reset();
     lockScreen_->show();
     lockScreen_->raise();
-    // Keynote-style on macOS: the Dock icon wears a padlock while locked.
-    // applicationIcon() deliberately keeps one legible icon on Windows.
-    QGuiApplication::setWindowIcon(standardicons::applicationIcon(true));
+    refreshApplicationIcon();
     // The opt-in is explicit, so begin authentication immediately;
     // cancelling simply leaves the password field and button ready.
     if (offerTouchId)
         QTimer::singleShot(0, this, &MainWindow::handleTouchId);
+}
+
+void MainWindow::refreshApplicationIcon() {
+    // The padlock communicates an existing encrypted vault awaiting unlock.
+    // A closed database lands in Create mode and is not itself a locked vault.
+    const bool locked = !lockScreen_->isHidden() &&
+                        lockScreen_->mode() == LockScreen::Mode::Unlock;
+    QGuiApplication::setWindowIcon(standardicons::applicationIcon(locked));
 }
 
 void MainWindow::updateVaultTitle() {
@@ -1432,7 +1441,7 @@ void MainWindow::finishUnlock(nightlock::Group* root) {
     setVaultRoot(root);
     lockScreen_->hide();
     // The macOS Dock loses its lock badge together with the screen.
-    QGuiApplication::setWindowIcon(standardicons::applicationIcon());
+    refreshApplicationIcon();
 }
 
 void MainWindow::debugLock(bool fail) {

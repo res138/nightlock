@@ -17,14 +17,31 @@ struct StandardIcon {
     QString resource;  // Qt resource path
 };
 
+// Rendered choices shown in Settings → Appearance. `resource` and
+// `lockedResource` live in the installed icons directory; `windowsResource`
+// keeps native multi-frame title-bar/taskbar sizes on Windows.
+struct ApplicationIcon {
+    QString id;
+    QString title;
+    QString resource;
+    QString lockedResource;
+    QString windowsResource;
+};
+
 const QVector<StandardIcon>& entryIcons();
 
 // The icon used when Entry::icon is empty. First item of entryIcons().
 const StandardIcon& defaultEntryIcon();
 
-// Multi-resolution application icon. On Windows this keeps the native
-// executable/icon-resource sizes (and supplies fractional-DPI sizes), rather
-// than asking the shell to shrink a single 1024px PNG for every surface.
+// Selectable application-icon catalog. The first item is the product default.
+const QVector<ApplicationIcon>& applicationIcons();
+const ApplicationIcon& defaultApplicationIcon();
+
+// Renders one catalog choice, or the default for an unknown id.
+QIcon applicationIconForId(const QString& id, bool locked = false);
+
+// Multi-resolution icon for the persisted appearance choice. On Windows this
+// keeps native ICO sizes and supplies fractional-DPI sizes from the 1024px PNG.
 QIcon applicationIcon(bool locked = false);
 
 // Maps a persisted Entry::icon value (resource path; empty = default)

@@ -12,6 +12,7 @@ GitHub-generated release notes are a publication aid, not a second authoritative
 
 - Initial developer documentation program, governance model, onboarding guides, ADR/RFC framework, support policy, and third-party inventory.
 - Release-package smoke tests now install and launch the final Windows Setup, macOS DMG, and Debian package with build-time Qt paths removed; Linux is additionally tested in a clean Ubuntu 22.04 container.
+- Appearance settings now offer rendered, clickable application-icon choices; the Petal Keyhole artwork is the new default and the original Blue Flower remains available.
 
 ### Changed
 
@@ -30,6 +31,7 @@ GitHub-generated release notes are a publication aid, not a second authoritative
 
 ### Fixed
 
+- macOS system authentication prompts now resolve the current Petal Keyhole bundle icon instead of retaining the previous Blue Flower artwork.
 - Windows release staging now uses an absolute install prefix, as required by Qt 6.10 deployment.
 - Windows packaging now resolves Inno Setup through the platform API and is exercised by pull-request CI before release tags are created.
 - Fixed Windows GUI startup on clean systems by placing Qt DLLs beside `Nightlock.exe`, keeping plugins under the path declared by `qt.conf`, and rejecting incomplete release payloads.

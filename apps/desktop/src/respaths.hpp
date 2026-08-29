@@ -12,7 +12,7 @@ namespace respaths {
 
 // Directory of the icon packs and app art (no trailing slash).
 QString iconsDir();
-// One file inside iconsDir(): respaths::icon("appicon.png").
+// One file inside iconsDir(): respaths::icon("appicon-petal-keyhole.png").
 QString icon(const QString& name);
 
 // Directory of the side-loaded *.otf/*.ttf fonts.
