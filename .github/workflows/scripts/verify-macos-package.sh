@@ -58,9 +58,11 @@ required_files=(
     "$INFO_PLIST"
     "$APP_COPY/Contents/Frameworks/QtCore.framework/Versions/A/QtCore"
     "$APP_COPY/Contents/Frameworks/QtGui.framework/Versions/A/QtGui"
+    "$APP_COPY/Contents/Frameworks/QtNetwork.framework/Versions/A/QtNetwork"
     "$APP_COPY/Contents/Frameworks/QtWidgets.framework/Versions/A/QtWidgets"
     "$APP_COPY/Contents/Frameworks/QtSvg.framework/Versions/A/QtSvg"
     "$APP_COPY/Contents/PlugIns/platforms/libqcocoa.dylib"
+    "$APP_COPY/Contents/PlugIns/tls/libqsecuretransportbackend.dylib"
 )
 for required_file in "${required_files[@]}"; do
     [ -f "$required_file" ] || {
@@ -68,6 +70,21 @@ for required_file in "${required_files[@]}"; do
         exit 1
     }
 done
+
+# The release package intentionally selects Apple's native TLS implementation.
+# Reject a fallback plugin even when it happens to work on the build runner;
+# QtNetwork's own linked dependency closure remains allowed and is audited
+# separately below.
+while IFS= read -r -d '' tls_plugin; do
+    case "$(basename "$tls_plugin")" in
+        libqsecuretransportbackend.dylib) ;;
+        *)
+            echo "error: unexpected macOS TLS backend: $tls_plugin" >&2
+            exit 1
+            ;;
+    esac
+done < <(find "$APP_COPY/Contents/PlugIns/tls" -maxdepth 1 -type f \
+    -name '*.dylib' -print0)
 
 for resource_directory in icons fonts; do
     [ -d "$APP_COPY/Contents/Resources/$resource_directory" ] || {
@@ -218,6 +235,26 @@ CLI_OUTPUT="$({
 } 2>&1)"
 [ "$CLI_OUTPUT" = "nightlock $EXPECTED_VERSION" ] || {
     echo "error: installed CLI smoke failed: $CLI_OUTPUT" >&2
+    exit 1
+}
+
+TLS_OUTPUT="$({
+    env -i \
+        HOME="$SMOKE_HOME" \
+        TMPDIR="$SMOKE_TMP" \
+        PATH='/usr/bin:/bin:/usr/sbin:/sbin' \
+        LANG='en_US.UTF-8' \
+        NIGHTLOCK_TEST_TLS_RUNTIME=1 \
+        "$GUI"
+} 2>&1)" || {
+    echo "$TLS_OUTPUT" >&2
+    echo 'error: packaged GUI could not load the SecureTransport backend' >&2
+    exit 1
+}
+grep -Fq 'Nightlock TLS runtime check passed: securetransport' \
+    <<<"$TLS_OUTPUT" || {
+    echo "$TLS_OUTPUT" >&2
+    echo 'error: packaged GUI did not confirm the SecureTransport backend' >&2
     exit 1
 }
 

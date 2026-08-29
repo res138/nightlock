@@ -32,6 +32,7 @@
 #include "graphsettings.hpp"
 #include "hotkeys.hpp"
 #include "touchid.hpp"
+#include "updatemanager.hpp"
 #include "vaultservice.hpp"
 #include "widgets/applicationiconpicker.hpp"
 #include "widgets/nlmenu.hpp"
@@ -403,11 +404,34 @@ QWidget* SettingsWindow::buildGeneralPage() {
     QFrame* card = makeCard(rows);
 
     auto* checkUpdates = inlineButton(tr("Check for updates"));
-    addRow(rows, tr("Version %1").arg(QStringLiteral(NIGHTLOCK_VERSION)),
-           tr("Nightlock password manager."), checkUpdates);
+    checkUpdates->setObjectName(QStringLiteral("checkForUpdatesButton"));
+    auto* updateManager = updates::UpdateManager::instance();
+    checkUpdates->setEnabled(!updateManager->isChecking());
+    QLabel* updateStatus = addRow(
+        rows, tr("Version %1").arg(QStringLiteral(NIGHTLOCK_VERSION)),
+        updateManager->isChecking() ? tr("Checking for a stable GitHub release…")
+                                    : tr("Nightlock password manager."),
+        checkUpdates);
+    connect(updateManager, &updates::UpdateManager::checkingChanged, checkUpdates,
+            [this, checkUpdates, updateStatus](bool checking) {
+                checkUpdates->setEnabled(!checking);
+                updateStatus->setText(
+                    checking ? tr("Checking for a stable GitHub release…")
+                             : tr("Nightlock password manager."));
+            });
+    connect(checkUpdates, &QPushButton::clicked, this, [this, updateManager] {
+        updateManager->checkForUpdates(
+            this, updates::UpdateManager::CheckMode::Manual);
+    });
 
-    addRow(rows, tr("Automatic updates"),
-           tr("Check for and download updates in the background."), new ToggleSwitch(true));
+    auto* startupUpdates =
+        new ToggleSwitch(updates::checkOnStartupEnabled());
+    startupUpdates->setObjectName(QStringLiteral("checkUpdatesOnStartupToggle"));
+    connect(startupUpdates, &QAbstractButton::toggled, startupUpdates,
+            [](bool enabled) { updates::setCheckOnStartupEnabled(enabled); });
+    addRow(rows, tr("Check for updates at startup"),
+           tr("Look for a newer stable GitHub release when Nightlock starts."),
+           startupUpdates);
 
     addRow(rows, tr("Language"), tr("Changes the interface language."),
            new DropdownButton({tr("English")}, 0));

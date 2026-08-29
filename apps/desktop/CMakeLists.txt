@@ -1,4 +1,4 @@
-find_package(Qt6 REQUIRED COMPONENTS Widgets Svg)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Svg Network)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -15,6 +15,7 @@ qt_add_executable(nightlock-desktop
     src/respaths.cpp
     src/standardicons.cpp
     src/touchid.hpp
+    src/updatemanager.cpp
     src/vaultservice.cpp
     src/models/grouptreemodel.cpp
     src/models/entrylistmodel.cpp
@@ -69,7 +70,8 @@ if(APPLE)
 else()
     target_sources(nightlock-desktop PRIVATE src/touchid.cpp)
 endif()
-target_link_libraries(nightlock-desktop PRIVATE Qt6::Widgets Qt6::Svg nightlock-core)
+target_link_libraries(nightlock-desktop PRIVATE
+    Qt6::Widgets Qt6::Svg Qt6::Network nightlock-core)
 
 if(NIGHTLOCK_BUILD_TESTS)
     enable_testing()
@@ -93,6 +95,21 @@ if(NIGHTLOCK_BUILD_TESTS)
 
     add_test(NAME desktop_app_icons COMMAND nightlock-desktop-icon-tests)
     set_tests_properties(desktop_app_icons PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    qt_add_executable(nightlock-desktop-update-tests
+        tests/test_updates.cpp
+        src/updatemanager.cpp
+    )
+    target_include_directories(nightlock-desktop-update-tests PRIVATE src)
+    target_compile_definitions(nightlock-desktop-update-tests PRIVATE
+        NIGHTLOCK_VERSION="${PROJECT_VERSION}"
+        NIGHTLOCK_UPDATE_TESTING=1)
+    target_link_libraries(nightlock-desktop-update-tests PRIVATE
+        Qt6::Widgets Qt6::Network Qt6::Test)
+
+    add_test(NAME desktop_updates COMMAND nightlock-desktop-update-tests)
+    set_tests_properties(desktop_updates PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
 

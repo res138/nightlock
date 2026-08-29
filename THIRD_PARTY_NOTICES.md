@@ -6,7 +6,7 @@ This inventory supports engineering and release review. It is not legal advice. 
 
 | Component | Use | Included in end-user artifact | Current source/version | License status |
 |---|---|---:|---|---|
-| Qt Core/Gui/Widgets/SVG and runtime plugins | Desktop UI and resources | Yes | Qt 6.10.1 from the official Qt distribution | Verify the exact LGPL/GPL module terms and required notices before release |
+| Qt Core/Gui/Widgets/SVG/Network and runtime plugins, including the selected SecureTransport, Schannel, or OpenSSL TLS backend | Desktop UI, resources, and HTTPS update checks | Yes | Qt 6.10.1 from the official Qt distribution | Verify the exact LGPL/GPL module terms, the complete TLS dependency closure (some Qt builds link or bundle OpenSSL even with a native backend selected), and required notices before release |
 | libsodium | KDF, AEAD, random generation, memory utilities | Yes, normally static in CI/release builds | `libsodium-cmake` pinned at commit `9b2848dfc1b917a9410f0de9d81059b26cbfaa8d` | libsodium is ISC-licensed; verify wrapper and transitive notices |
 | doctest | Unit-test framework | No | Vendored single header in `third_party/doctest/` | MIT; retain the upstream notice in source distributions |
 | Inno Setup | Windows installer builder | Build tool; generated runtime may be included | Installed by Chocolatey in release CI | Verify tool and generated-runtime notices before release |

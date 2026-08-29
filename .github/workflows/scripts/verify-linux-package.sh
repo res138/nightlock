@@ -16,6 +16,7 @@ DEB_PATH="$(cd "$(dirname "$DEB_PATH")" && pwd)/$(basename "$DEB_PATH")"
 PACKAGE_NAME="$(dpkg-deb -f "$DEB_PATH" Package)"
 PACKAGE_VERSION="$(dpkg-deb -f "$DEB_PATH" Version)"
 PACKAGE_ARCH="$(dpkg-deb -f "$DEB_PATH" Architecture)"
+PACKAGE_DEPENDS="$(dpkg-deb -f "$DEB_PATH" Depends)"
 [ "$PACKAGE_NAME" = 'nightlock' ] || {
     echo "error: unexpected Debian package name: $PACKAGE_NAME" >&2
     exit 1
@@ -28,6 +29,13 @@ PACKAGE_ARCH="$(dpkg-deb -f "$DEB_PATH" Architecture)"
     echo "error: Debian package architecture must be amd64, got $PACKAGE_ARCH" >&2
     exit 1
 }
+for required_dependency in libssl3 ca-certificates; do
+    grep -Eq "(^|, )${required_dependency}([[:space:]]|,|$)" \
+        <<<"$PACKAGE_DEPENDS" || {
+        echo "error: Debian package is missing $required_dependency in Depends" >&2
+        exit 1
+    }
+done
 
 WORK_ROOT="$(mktemp -d "${RUNNER_TEMP:-/tmp}/nightlock-linux-package-smoke.XXXXXX")"
 cleanup() {
@@ -50,10 +58,12 @@ required_paths=(
     "$APP_ROOT/qt.conf"
     "$APP_ROOT/lib/libQt6Core.so.6"
     "$APP_ROOT/lib/libQt6Gui.so.6"
+    "$APP_ROOT/lib/libQt6Network.so.6"
     "$APP_ROOT/lib/libQt6Widgets.so.6"
     "$APP_ROOT/lib/libQt6Svg.so.6"
     "$APP_ROOT/plugins/platforms/libqxcb.so"
     "$APP_ROOT/plugins/platforms/libqoffscreen.so"
+    "$APP_ROOT/plugins/tls/libqopensslbackend.so"
     "$EXTRACT_ROOT/usr/bin/nightlock-desktop"
 )
 for required_path in "${required_paths[@]}"; do
@@ -78,7 +88,8 @@ GUI_RPATH="$(patchelf --print-rpath "$GUI")"
 }
 for plugin in \
     "$APP_ROOT/plugins/platforms/libqxcb.so" \
-    "$APP_ROOT/plugins/platforms/libqoffscreen.so"; do
+    "$APP_ROOT/plugins/platforms/libqoffscreen.so" \
+    "$APP_ROOT/plugins/tls/libqopensslbackend.so"; do
     PLUGIN_RPATH="$(patchelf --print-rpath "$plugin")"
     [ "$PLUGIN_RPATH" = '$ORIGIN/../../lib' ] || {
         echo "error: plugin RPATH must be \$ORIGIN/../../lib, got $PLUGIN_RPATH ($plugin)" >&2
@@ -185,6 +196,13 @@ docker run --rm --platform linux/amd64 \
         done < <(find /usr/lib/nightlock /usr/bin/nightlock -type f -print0)
 
         mkdir -p /tmp/nightlock-home
+        HOME=/tmp/nightlock-home \
+        NIGHTLOCK_TEST_TLS_RUNTIME=1 \
+        xvfb-run -a -s "-screen 0 1280x800x24" /usr/bin/nightlock-desktop \
+            2>&1 | tee /tmp/nightlock-tls.log
+        grep -Fq "Nightlock TLS runtime check passed: openssl" \
+            /tmp/nightlock-tls.log
+
         HOME=/tmp/nightlock-home \
         NIGHTLOCK_DEMO=1 \
         NIGHTLOCK_SCREENSHOT=/tmp/nightlock-gui.png \
