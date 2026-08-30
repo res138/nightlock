@@ -6,15 +6,17 @@
 #include <QString>
 
 // User-facing appearance switches (Settings → Appearance): the color
-// scheme, accent, application icon and folder-icon visibility. Everything
-// persists via QSettings; setters reinstall the app stylesheet where
-// needed and ping notifier() so open views refresh live.
+// scheme, accent, application icon, list density and folder-icon visibility.
+// Everything persists via QSettings; setters reinstall the app stylesheet
+// where needed and ping notifier() so open views refresh live.
 namespace appearancesettings {
 
 // Stable option ids, index-aligned with their Settings controls.
 inline constexpr const char* kThemes[] = {"light", "dark", "system"};
 inline constexpr const char* kAccents[] = {"black", "blue", "green"};
 inline constexpr const char* kApplicationIcons[] = {"petal-keyhole", "flower"};
+inline constexpr const char* kSidebarItemSizes[] = {"small", "default", "large"};
+inline constexpr const char* kEntryListItemSizes[] = {"default", "small"};
 
 QString theme();  // one of kThemes
 void setTheme(const QString& theme);
@@ -38,6 +40,30 @@ void setApplicationIcon(const QString& icon);
 
 bool folderIcons();
 void setFolderIcons(bool shown);
+
+// Stable preset ids used by the two density dropdowns. Missing and obsolete
+// values resolve to "default", preserving the pre-setting layout exactly.
+QString sidebarItemSize();  // one of kSidebarItemSizes
+void setSidebarItemSize(const QString& size);
+
+QString entryListItemSize();  // one of kEntryListItemSizes
+void setEntryListItemSize(const QString& size);
+
+struct SidebarItemMetrics {
+    int fontPixelSize;
+    int iconExtent;
+    int rowHeight;
+    int indentation;
+};
+SidebarItemMetrics sidebarItemMetrics();
+
+struct EntryListItemMetrics {
+    int rowHeight;
+    int iconExtent;
+    int nameFontPixelSize;
+    int subtitleFontPixelSize;
+};
+EntryListItemMetrics entryListItemMetrics();
 
 // Semantic colors for hand-painted widgets, resolved for the active
 // scheme. Read at paint time — a theme switch repolishes every
@@ -89,9 +115,19 @@ public:
         emit applicationIconChanged();
         emit changed();
     }
+    void notifySidebarItemSize() {
+        emit sidebarItemSizeChanged();
+        emit changed();
+    }
+    void notifyEntryListItemSize() {
+        emit entryListItemSizeChanged();
+        emit changed();
+    }
 signals:
     void changed();
     void applicationIconChanged();
+    void sidebarItemSizeChanged();
+    void entryListItemSizeChanged();
 };
 Notifier* notifier();
 

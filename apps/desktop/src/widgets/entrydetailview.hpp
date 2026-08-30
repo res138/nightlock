@@ -83,9 +83,11 @@ private:
     void refreshCardColors();
     void refreshEntryIcon();
     void syncGeneratorVisibility();
+    void updateHorizontalInsets();
     void updatePatternGeometry();
 
     QWidget* content_;
+    QVBoxLayout* contentLayout_;
     QWidget* headerFade_;
     QWidget* grip_;
     QToolButton* generatorButton_;

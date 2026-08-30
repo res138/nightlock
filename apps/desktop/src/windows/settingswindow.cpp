@@ -800,6 +800,28 @@ QWidget* SettingsWindow::buildAppearancePage() {
     addRow(rows, tr("Secondary font"), tr("Serif font of the tree, titles and entry names."),
            fontDropdown(fonts::Role::Secondary));
 
+    auto* sidebarItemSize = new DropdownButton(
+        {tr("Small"), tr("Default"), tr("Large")},
+        indexIn(appearancesettings::kSidebarItemSizes,
+                appearancesettings::sidebarItemSize()));
+    sidebarItemSize->setOnSelected([](int index) {
+        appearancesettings::setSidebarItemSize(
+            QLatin1String(appearancesettings::kSidebarItemSizes[index]));
+    });
+    addRow(rows, tr("Sidebar item size"),
+           tr("Size of folder names and the icons next to them."), sidebarItemSize);
+
+    auto* entryListItemSize = new DropdownButton(
+        {tr("Default"), tr("Small")},
+        indexIn(appearancesettings::kEntryListItemSizes,
+                appearancesettings::entryListItemSize()));
+    entryListItemSize->setOnSelected([](int index) {
+        appearancesettings::setEntryListItemSize(
+            QLatin1String(appearancesettings::kEntryListItemSizes[index]));
+    });
+    addRow(rows, tr("Entry list item size"),
+           tr("Size of entry names and the icons next to them."), entryListItemSize);
+
     auto* folderIcons = new ToggleSwitch(appearancesettings::folderIcons());
     connect(folderIcons, &QAbstractButton::toggled, folderIcons,
             [](bool shown) { appearancesettings::setFolderIcons(shown); });

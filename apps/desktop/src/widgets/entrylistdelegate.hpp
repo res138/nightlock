@@ -7,7 +7,7 @@
 class EntryListDelegate : public QStyledItemDelegate {
     Q_OBJECT
 public:
-    using QStyledItemDelegate::QStyledItemDelegate;
+    explicit EntryListDelegate(QObject* parent = nullptr);
 
     void paint(QPainter* painter, const QStyleOptionViewItem& option,
                const QModelIndex& index) const override;

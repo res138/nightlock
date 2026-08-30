@@ -86,9 +86,7 @@ private:
 GroupTreeView::GroupTreeView(QWidget* parent) : QTreeView(parent) {
     setObjectName(QStringLiteral("groupTree"));
     setHeaderHidden(true);
-    setIndentation(33);
     setRootIsDecorated(false);
-    setIconSize(QSize(22, 22));
     setSelectionMode(QAbstractItemView::ExtendedSelection);
     // Renaming starts only from the context menu (via edit()); a plain
     // double-click keeps toggling expand/collapse.
@@ -101,6 +99,23 @@ GroupTreeView::GroupTreeView(QWidget* parent) : QTreeView(parent) {
     setAnimated(true);         // smooth expand/collapse of branches
     setAutoExpandDelay(350);   // hovered folders unfold during a drag
     setStyle(sharedStyle());
+
+    connect(appearancesettings::notifier(),
+            &appearancesettings::Notifier::sidebarItemSizeChanged, this,
+            &GroupTreeView::syncItemSize);
+    syncItemSize();
+}
+
+void GroupTreeView::syncItemSize() {
+    const appearancesettings::SidebarItemMetrics metrics =
+        appearancesettings::sidebarItemMetrics();
+    setIconSize(QSize(metrics.iconExtent, metrics.iconExtent));
+    setIndentation(metrics.indentation);
+    // The font and row height are stylesheet-backed; force one layout pass so
+    // geometry and cached row positions settle immediately after the signal.
+    doItemsLayout();
+    updateGeometry();
+    viewport()->update();
 }
 
 void GroupTreeView::flashRow(const QModelIndex& index) {
