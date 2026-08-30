@@ -4,6 +4,7 @@
 
 class QTimer;
 class QVariantAnimation;
+class QContextMenuEvent;
 
 // Click-to-copy value label (used for the login row): the text is
 // always visible; clicking copies it to the clipboard and briefly
@@ -28,6 +29,7 @@ public:
 protected:
     void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
+    void contextMenuEvent(QContextMenuEvent* event) override;
 
 private:
     QString text_;

@@ -50,6 +50,42 @@ function Assert-NonEmptyPng {
     }
 }
 
+function Assert-MinimumPngDimensions {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LiteralPath,
+
+        [Parameter(Mandatory = $true)]
+        [int]$MinimumWidth,
+
+        [Parameter(Mandatory = $true)]
+        [int]$MinimumHeight
+    )
+
+    # PNG stores IHDR width/height as unsigned big-endian 32-bit integers.
+    # Parse it directly to avoid taking a dependency on System.Drawing in the
+    # clean-package smoke environment.
+    $bytes = [IO.File]::ReadAllBytes($LiteralPath)
+    if ($bytes.Length -lt 24) {
+        throw "PNG header is truncated: $LiteralPath"
+    }
+    [uint32]$width = ([uint32]$bytes[16] -shl 24) -bor `
+                      ([uint32]$bytes[17] -shl 16) -bor `
+                      ([uint32]$bytes[18] -shl 8) -bor `
+                      [uint32]$bytes[19]
+    [uint32]$height = ([uint32]$bytes[20] -shl 24) -bor `
+                       ([uint32]$bytes[21] -shl 16) -bor `
+                       ([uint32]$bytes[22] -shl 8) -bor `
+                       [uint32]$bytes[23]
+    if (($width -lt $MinimumWidth) -or ($height -lt $MinimumHeight)) {
+        throw @"
+Screenshot is only ${width}x${height}; expected at least
+${MinimumWidth}x${MinimumHeight}. The installed GUI may have regressed to 1x
+pixmaps instead of honoring the forced fractional scale factor.
+"@
+    }
+}
+
 function Initialize-WindowsResourceReader {
     if ($null -ne ('Nightlock.PackageAudit.NativeResourceReader' -as [type])) {
         return
@@ -295,7 +331,11 @@ Expected '$($expectedFields[$field])'.
         }
         [void]$iconSizes.Add($width)
     }
-    foreach ($requiredSize in @(16, 32, 48, 64, 128, 256)) {
+    # Audit the icon actually compiled into Nightlock.exe. These cover the
+    # 16px and 32px Windows metrics at 100/125/150/175/200%, followed by the
+    # larger Explorer sizes.
+    foreach ($requiredSize in @(
+            16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 128, 256)) {
         if (-not $iconSizes.Contains($requiredSize)) {
             throw "Nightlock.exe has no ${requiredSize}x${requiredSize} icon resource."
         }
@@ -594,6 +634,11 @@ $screenshotPath = Join-Path $smokeRoot 'nightlock-gui.png'
 $env:NIGHTLOCK_DEMO = '1'
 $env:NIGHTLOCK_SCREENSHOT = $screenshotPath
 $env:NIGHTLOCK_SCREENSHOT_DELAY = '1000'
+# Force the most common non-integer Windows scale during the final installed
+# payload smoke. This covers qwindows, Qt's SVG/ICO plugins and every custom
+# icon engine under the exact 150% path users see on Windows 11.
+$env:QT_SCALE_FACTOR = '1.5'
+$env:QT_SCALE_FACTOR_ROUNDING_POLICY = 'PassThrough'
 $guiPath = Join-Path $installDir 'Nightlock.exe'
 $guiProcess = Start-Process `
     -FilePath $guiPath `
@@ -624,6 +669,10 @@ if ($guiProcess.ExitCode -ne 0) {
 Assert-NonEmptyPng `
     -LiteralPath $screenshotPath `
     -Description 'Installed GUI smoke screenshot'
+Assert-MinimumPngDimensions `
+    -LiteralPath $screenshotPath `
+    -MinimumWidth 1264 `
+    -MinimumHeight 925
 
 # Exercise the Windows layered/context-popup path independently of the main
 # window screenshot. It catches startup crashes and missing image/icon plugins

@@ -1,11 +1,17 @@
 #include "nlmenu.hpp"
 
 #include <QAction>
+#include <QApplication>
+#include <QContextMenuEvent>
 #include <QEasingCurve>
+#include <QLineEdit>
 #include <QPainter>
 #include <QPainterPath>
+#include <QPlainTextEdit>
 #include <QProxyStyle>
+#include <QRegion>
 #include <QStyleOptionMenuItem>
+#include <QTextEdit>
 #include <QVariantAnimation>
 
 #include "appearancesettings.hpp"
@@ -222,18 +228,137 @@ NlMenuStyle* sharedStyle() {
     return style;
 }
 
+void copySubmenuPresentation(const QAction* source, QAction* target) {
+    target->setText(source->text());
+    target->setIcon(source->icon());
+    target->setEnabled(source->isEnabled());
+    target->setVisible(source->isVisible());
+    target->setCheckable(source->isCheckable());
+    target->setChecked(source->isChecked());
+    target->setToolTip(source->toolTip());
+    target->setStatusTip(source->statusTip());
+    target->setWhatsThis(source->whatsThis());
+    target->setData(source->data());
+    target->setObjectName(source->objectName());
+    target->setShortcut(source->shortcut());
+}
+
+void adoptStandardMenuContents(QMenu* source, NlMenu* target) {
+    target->setTitle(source->title());
+    target->setIcon(source->icon());
+    const QList<QAction*> actions = source->actions();
+    for (QAction* action : actions) {
+        if (QMenu* sourceSubmenu = action->menu()) {
+            auto* submenu = new NlMenu(target);
+            // The source menu owns its menuAction, so copy presentation before
+            // recursively consuming (and deleting) that source submenu.
+            copySubmenuPresentation(action, submenu->menuAction());
+            adoptStandardMenuContents(sourceSubmenu, submenu);
+            target->addMenu(submenu);
+            continue;
+        }
+
+        // createStandardContextMenu() has already connected each action to
+        // the editor. Moving the QAction preserves those slots, shortcuts,
+        // enabled states and accessibility semantics verbatim.
+        source->removeAction(action);
+        action->setParent(target);
+        target->addAction(action);
+    }
+    delete source;
+}
+
+// Returns the nearest text editor owning the object that received the context
+// event. QPlainTextEdit/QTextEdit receive mouse events through their viewport,
+// while QLineEdit receives them directly.
+QWidget* textEditorFor(QObject* watched) {
+    auto* widget = qobject_cast<QWidget*>(watched);
+    for (QWidget* candidate = widget; candidate; candidate = candidate->parentWidget()) {
+        if (qobject_cast<QLineEdit*>(candidate) ||
+            qobject_cast<QPlainTextEdit*>(candidate) ||
+            qobject_cast<QTextEdit*>(candidate)) {
+            return candidate;
+        }
+        if (candidate->isWindow())
+            break;
+    }
+    return nullptr;
+}
+
+QMenu* standardTextMenu(QWidget* editor, const QPoint& globalPos) {
+    if (auto* lineEdit = qobject_cast<QLineEdit*>(editor))
+        return lineEdit->createStandardContextMenu();
+    if (auto* plainTextEdit = qobject_cast<QPlainTextEdit*>(editor))
+        return plainTextEdit->createStandardContextMenu(
+            plainTextEdit->viewport()->mapFromGlobal(globalPos));
+    if (auto* textEdit = qobject_cast<QTextEdit*>(editor))
+        return textEdit->createStandardContextMenu(
+            textEdit->viewport()->mapFromGlobal(globalPos));
+    return nullptr;
+}
+
+class TextContextMenuAdapter final : public QObject {
+public:
+    explicit TextContextMenuAdapter(QApplication* application)
+        : QObject(application) {}
+
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override {
+        if (event->type() != QEvent::ContextMenu)
+            return QObject::eventFilter(watched, event);
+
+        QWidget* editor = textEditorFor(watched);
+        if (!editor || editor->contextMenuPolicy() != Qt::DefaultContextMenu)
+            return QObject::eventFilter(watched, event);
+
+        auto* contextEvent = static_cast<QContextMenuEvent*>(event);
+        QMenu* standard = standardTextMenu(editor, contextEvent->globalPos());
+        if (!standard)
+            return QObject::eventFilter(watched, event);
+
+        auto* menu = NlMenu::fromStandardMenu(standard, editor);
+        QObject::connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
+        menu->popupAt(contextEvent->globalPos());
+        contextEvent->accept();
+        return true;
+    }
+};
+
 }  // namespace
 
 NlMenu::NlMenu(QWidget* parent) : QMenu(parent) {
     setWindowFlag(Qt::FramelessWindowHint);
+#ifdef Q_OS_WIN
+    // Per-pixel layered HWNDs are excluded from Windows 11's native corner
+    // policy.  A transparent DWM-extended client surface gives us Acrylic and
+    // system shadows without that limitation.
+    setAttribute(Qt::WA_NoSystemBackground);
+    setAutoFillBackground(false);
+#else
     setWindowFlag(Qt::NoDropShadowWindowHint);
     setAttribute(Qt::WA_TranslucentBackground);
+#endif
     setStyle(sharedStyle());
     setContentsMargins(kShadow, kShadow, kShadow, kShadow);
     QFont f = font();
     f.setPixelSize(kFontPixelSize);
     f.setWeight(QFont::DemiBold);
     setFont(f);
+}
+
+NlMenu* NlMenu::fromStandardMenu(QMenu* standardMenu, QWidget* parent) {
+    auto* menu = new NlMenu(parent);
+    if (!standardMenu)
+        return menu;
+    adoptStandardMenuContents(standardMenu, menu);
+    return menu;
+}
+
+void NlMenu::installTextContextMenuAdapter(QApplication* application) {
+    if (!application || application->property("nightlockTextMenuAdapter").toBool())
+        return;
+    application->setProperty("nightlockTextMenuAdapter", true);
+    application->installEventFilter(new TextContextMenuAdapter(application));
 }
 
 void NlMenu::popupAt(const QPoint& globalPos) {
@@ -249,28 +374,49 @@ QRect NlMenu::currentPanelRect() const {
 }
 
 void NlMenu::paintEvent(QPaintEvent* event) {
-    frosted::paintPanel(this, currentPanelRect(), reveal_, backdrop_, backdropOffset_);
+    const auto material = nativeBackdropActive_
+                              ? frosted::PanelMaterial::NativeBackdrop
+                              : frosted::PanelMaterial::CapturedBlur;
+    frosted::paintPanel(this, currentPanelRect(), reveal_, backdrop_, backdropOffset_,
+                        material);
     QMenu::paintEvent(event);
 }
 
 void NlMenu::showEvent(QShowEvent* event) {
     QMenu::showEvent(event);
-    if constexpr (frosted::kUseOpaquePopupSurface) {
-        // Whole-window opacity on a translucent Win32 popup is both expensive and
-        // prone to dark/banded edges.  Paint the final, crisp surface immediately.
-        backdrop_ = {};
-        backdropOffset_ = {};
-        reveal_ = 1.0;
-        setWindowOpacity(1.0);
-        update();
-    } else {
+#ifdef Q_OS_WIN
+    // showEvent runs after QMenu has materialized its popup HWND. This reaches
+    // every NlMenu, including recursively-built submenus and standard editor
+    // menus adapted above.
+    nativeBackdropActive_ =
+        frosted::enableNativeMenuBackdrop(this, appearancesettings::darkActive());
+    if (nativeBackdropActive_) {
+        clearMask();
+        // Native Desktop Acrylic is primary. A faint software capture remains
+        // under it so a DWM/remote-session false positive never produces a
+        // raw transparent popup.
         captureBackdrop();
-        startRevealAnimation();
+    } else {
+        // Windows 10 / early Windows 11 / disabled transparency: retain the
+        // same Nightlock surface and a real blurred parent snapshot. A mask
+        // keeps the fallback rounded without requiring a layered HWND.
+        QPainterPath rounded;
+        rounded.addRoundedRect(rect(), kRadius, kRadius);
+        setMask(QRegion(rounded.toFillPolygon().toPolygon()));
+        captureBackdrop();
     }
+    reveal_ = 1.0;
+    setWindowOpacity(1.0);
+    update();
+#else
+    nativeBackdropActive_ = false;
+    captureBackdrop();
+    startRevealAnimation();
+#endif
 }
 
 void NlMenu::captureBackdrop() {
-    backdrop_ = frosted::captureBackdrop(this, &backdropOffset_);
+    backdrop_ = frosted::captureBackdrop(this, &backdropOffset_, true);
 }
 
 void NlMenu::startRevealAnimation() {

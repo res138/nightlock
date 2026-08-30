@@ -72,22 +72,23 @@ QIcon applicationIconForId(const QString& id, bool locked) {
         icon = QIcon(QStringLiteral(":/nightlock.ico"));
     const QImage source(respaths::icon(selected->resource));
     if (!source.isNull()) {
-        static constexpr int kAllSizes[] = {
-            16, 20, 24, 32, 40, 48, 64, 80, 96, 128, 256,
+        // The ICO supplies native shell/title-bar frames. Fill any gaps from
+        // the 1024px master (important for development trees carrying an old
+        // ICO), then retain the master itself. The latter keeps the 96px lock
+        // artwork sharp at Windows 300/400% instead of enlarging a 256px ICO
+        // frame to 288/384 physical pixels.
+        static constexpr int kWindowsSizes[] = {
+            16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 128, 256,
         };
-        static constexpr int kFractionalSizes[] = {20, 24, 40, 80, 96};
-        // Normally the ICO contributes the native sizes and we only fill the
-        // 125/150/250/300% gaps. kAllSizes is a robust fallback if a build
-        // accidentally omits the embedded ICO resource.
-        const int* sizes = icon.isNull() ? kAllSizes : kFractionalSizes;
-        const qsizetype count = icon.isNull() ? std::size(kAllSizes)
-                                              : std::size(kFractionalSizes);
-        for (qsizetype i = 0; i < count; ++i) {
-            const int extent = sizes[i];
+        const QList<QSize> available = icon.availableSizes();
+        for (const int extent : kWindowsSizes) {
+            if (available.contains(QSize(extent, extent)))
+                continue;
             icon.addPixmap(QPixmap::fromImage(
                 source.scaled(extent, extent, Qt::KeepAspectRatio,
                               Qt::SmoothTransformation)));
         }
+        icon.addPixmap(QPixmap::fromImage(source));
     }
     if (!icon.isNull())
         return icon;

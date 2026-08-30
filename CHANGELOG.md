@@ -8,6 +8,17 @@ GitHub-generated release notes are a publication aid, not a second authoritative
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [1.2.7] - 2026-08-31
+
+### Fixed
+
+- Fixed low-resolution rendering of application artwork and SVG/ICO interface icons on Windows 11, including fractional display scaling.
+- Reworked Windows context menus to use Nightlock's rounded frosted surface instead of the opaque legacy-looking fallback.
+
+## Changes through 1.2.6
+
 ### Added
 
 - Initial developer documentation program, governance model, onboarding guides, ADR/RFC framework, support policy, and third-party inventory.
@@ -50,4 +61,5 @@ GitHub-generated release notes are a publication aid, not a second authoritative
 
 Tags `alpha-0.1`, `alpha-0.2`, and the release now named `v1.1.0` predate this changelog policy. The `v1.1.0` release used an internal CMake version of `0.1.0`; this historical mismatch is preserved rather than rewriting published artifacts. Starting with `v1.2.0`, the release tag, package metadata, and application version must match [VERSION](VERSION).
 
-[Unreleased]: https://github.com/res138/nightlock/compare/main...HEAD
+[Unreleased]: https://github.com/res138/nightlock/compare/v1.2.7...HEAD
+[1.2.7]: https://github.com/res138/nightlock/compare/v1.2.6...v1.2.7
