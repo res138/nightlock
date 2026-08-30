@@ -5,6 +5,7 @@
 
 class QTimer;
 class QVariantAnimation;
+class QContextMenuEvent;
 
 // Telegram-style spoiler for the password value: a cloud of drifting
 // particles (each fading in and out on its own) hides the secret.
@@ -34,6 +35,7 @@ protected:
     void paintEvent(QPaintEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
+    void contextMenuEvent(QContextMenuEvent* event) override;
     void leaveEvent(QEvent* event) override;
     void hideEvent(QHideEvent* event) override;
     void showEvent(QShowEvent* event) override;

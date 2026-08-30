@@ -3,6 +3,7 @@
 #include <QDebug>
 #include <QDialog>
 #include <QFile>
+#include <QGuiApplication>
 #include <QMenu>
 #include <QSslSocket>
 #include <QTimer>
@@ -15,6 +16,7 @@
 #include "standardicons.hpp"
 #include "updatemanager.hpp"
 #include "vaultservice.hpp"
+#include "widgets/nlmenu.hpp"
 #include "windows/entryeditdialog.hpp"
 #include "windows/mainwindow.hpp"
 
@@ -23,6 +25,13 @@
 #endif
 
 int main(int argc, char* argv[]) {
+#ifdef Q_OS_WIN
+    // Keep Qt's logical-to-physical mapping exact on Windows' common
+    // 125/150/175% displays. Declaring the policy before QApplication also
+    // makes the contract explicit if Qt's platform default changes later.
+    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(
+        Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+#endif
     QApplication app(argc, argv);
     QApplication::setOrganizationName(QStringLiteral("Nightlock"));
     QApplication::setApplicationName(QStringLiteral("Nightlock"));
@@ -59,6 +68,11 @@ int main(int argc, char* argv[]) {
     // is" — critical for the Windows/Linux ports.
     fonts::applyApplicationFont();
     appearancesettings::applyStylesheet();
+#ifdef Q_OS_WIN
+    // Qt's stock edit menus otherwise bypass Nightlock's popup styling and
+    // fall back to the legacy Windows QMenu appearance.
+    NlMenu::installTextContextMenuAdapter(&app);
+#endif
 
     // Dock icon for the running process (the squircle render of the
     // logo); resources/nightlock.icns carries the same art for the
@@ -85,6 +99,27 @@ int main(int argc, char* argv[]) {
 #endif
     window.resize(843, 617);
     window.show();
+
+    // Package smoke tests can force a fractional Qt scale and validate the
+    // effective DPR in-process. A screenshot's pixel dimensions are not a
+    // reliable proxy because Windows constrains oversized windows to the
+    // available desktop before QWidget::grab() runs.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_EXPECT_DEVICE_PIXEL_RATIO")) {
+        bool validExpectedRatio = false;
+        const QString expectedText =
+            qEnvironmentVariable("NIGHTLOCK_EXPECT_DEVICE_PIXEL_RATIO");
+        const qreal expectedRatio = expectedText.toDouble(&validExpectedRatio);
+        const qreal actualRatio = window.devicePixelRatioF();
+        if (!validExpectedRatio || expectedRatio <= 0.0 ||
+            qAbs(actualRatio - expectedRatio) > 0.01) {
+            qCritical().noquote()
+                << "Nightlock device-pixel-ratio check failed: expected"
+                << expectedText << "but Qt selected" << actualRatio;
+            return 1;
+        }
+        qInfo().noquote() << "Nightlock device-pixel-ratio check passed:"
+                          << actualRatio;
+    }
 #ifdef Q_OS_MACOS
     macwindow::hideTitleBar(&window);
     // Center the traffic lights on the tree-pane header (46px tall,

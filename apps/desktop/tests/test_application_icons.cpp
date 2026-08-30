@@ -1,4 +1,5 @@
 #include <QAbstractButton>
+#include <QFile>
 #include <QFileInfo>
 #include <QImage>
 #include <QSet>
@@ -27,6 +28,8 @@ private slots:
     void appearanceSizePreferencesPersistAndNotify();
     void catalogAssetsAreUsableAndIdsAreUnique();
     void lockedResourcesDecodeAndPetalArtworkDiffers();
+    void windowsIcoAssetsCoverFractionalDpi();
+    void fractionalDprIconsUsePhysicalPixels();
     void pickerRendersExclusiveOptionsAndSelectsOnClick();
 
 private:
@@ -273,6 +276,149 @@ void ApplicationIconTests::lockedResourcesDecodeAndPetalArtworkDiffers() {
     }
     QVERIFY2(foundPetalKeyhole, "Petal Keyhole is missing from the application-icon catalog");
 #endif
+}
+
+void ApplicationIconTests::windowsIcoAssetsCoverFractionalDpi() {
+    using Asset = QPair<QString, QString>;
+    QVector<Asset> assets = {
+        {QStringLiteral(":/nightlock.ico"),
+         respaths::icon(standardicons::defaultApplicationIcon().resource)},
+    };
+    for (const standardicons::ApplicationIcon& choice :
+         standardicons::applicationIcons())
+        assets.append({respaths::icon(choice.windowsResource),
+                       respaths::icon(choice.resource)});
+
+    const QSet<int> expectedSizes = {
+        16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 128, 256,
+    };
+    for (const auto& [path, masterPath] : assets) {
+        QFile file(path);
+        QVERIFY2(file.open(QIODevice::ReadOnly), qPrintable(path));
+        const QByteArray bytes = file.readAll();
+        QVERIFY2(bytes.size() >= 6, qPrintable(path));
+
+        const auto word = [&bytes](qsizetype offset) {
+            return static_cast<quint16>(
+                static_cast<quint8>(bytes[offset]) |
+                (static_cast<quint16>(static_cast<quint8>(bytes[offset + 1]))
+                 << 8));
+        };
+        const auto dword = [&bytes](qsizetype offset) {
+            return static_cast<quint32>(
+                static_cast<quint8>(bytes[offset]) |
+                (static_cast<quint32>(static_cast<quint8>(bytes[offset + 1]))
+                 << 8) |
+                (static_cast<quint32>(static_cast<quint8>(bytes[offset + 2]))
+                 << 16) |
+                (static_cast<quint32>(static_cast<quint8>(bytes[offset + 3]))
+                 << 24));
+        };
+
+        QCOMPARE(word(0), quint16(0));
+        QCOMPARE(word(2), quint16(1));
+        const int count = word(4);
+        QCOMPARE(count, expectedSizes.size());
+        QVERIFY(bytes.size() >= 6 + 16 * count);
+
+        QSet<int> actualSizes;
+        QImage largestFrame;
+        for (int index = 0; index < count; ++index) {
+            const qsizetype directoryOffset = 6 + 16 * index;
+            const int encodedWidth = static_cast<quint8>(bytes[directoryOffset]);
+            const int encodedHeight =
+                static_cast<quint8>(bytes[directoryOffset + 1]);
+            const int width = encodedWidth == 0 ? 256 : encodedWidth;
+            const int height = encodedHeight == 0 ? 256 : encodedHeight;
+            QCOMPARE(width, height);
+            QCOMPARE(word(directoryOffset + 4), quint16(1));
+            QCOMPARE(word(directoryOffset + 6), quint16(32));
+
+            const quint32 payloadSize = dword(directoryOffset + 8);
+            const quint32 payloadOffset = dword(directoryOffset + 12);
+            QVERIFY(payloadOffset <= static_cast<quint32>(bytes.size()));
+            QVERIFY(payloadSize <=
+                    static_cast<quint32>(bytes.size()) - payloadOffset);
+            QCOMPARE(bytes.mid(payloadOffset, 8),
+                     QByteArray::fromHex("89504e470d0a1a0a"));
+            actualSizes.insert(width);
+            if (width == 256)
+                largestFrame = QImage::fromData(
+                    bytes.mid(payloadOffset, payloadSize), "PNG");
+        }
+        QCOMPARE(actualSizes, expectedSizes);
+
+        // The approved 1024px PNG is the artwork oracle. This catches SVG
+        // renderers that silently lose its gradients/masks and produce a
+        // technically valid but visually broken black ICO.
+        const QImage master(masterPath);
+        QVERIFY2(!master.isNull(), qPrintable(masterPath));
+        QVERIFY(!largestFrame.isNull());
+        const QImage expected =
+            master.scaled(256, 256, Qt::IgnoreAspectRatio,
+                          Qt::SmoothTransformation)
+                .convertToFormat(QImage::Format_RGBA8888);
+        const QImage actual =
+            largestFrame.convertToFormat(QImage::Format_RGBA8888);
+        quint64 channelDelta = 0;
+        for (int y = 0; y < actual.height(); ++y) {
+            for (int x = 0; x < actual.width(); ++x) {
+                const QColor actualColor = actual.pixelColor(x, y);
+                const QColor expectedColor = expected.pixelColor(x, y);
+                channelDelta += qAbs(actualColor.red() - expectedColor.red());
+                channelDelta += qAbs(actualColor.green() - expectedColor.green());
+                channelDelta += qAbs(actualColor.blue() - expectedColor.blue());
+                channelDelta += qAbs(actualColor.alpha() - expectedColor.alpha());
+            }
+        }
+        const qreal meanChannelDelta =
+            qreal(channelDelta) / (actual.width() * actual.height() * 4);
+        QVERIFY2(meanChannelDelta < 20.0,
+                 qPrintable(QStringLiteral("%1 differs from %2 (mean delta %3)")
+                                .arg(path, masterPath)
+                                .arg(meanChannelDelta)));
+    }
+}
+
+void ApplicationIconTests::fractionalDprIconsUsePhysicalPixels() {
+    // These are the scale factors Windows 11 commonly exposes for
+    // 125/150/175/200% displays. A 20px logical request deliberately has an
+    // integral physical extent at every ratio, making this a strict guard
+    // against accidentally returning and stretching a 1x raster.
+    constexpr qreal ratios[] = {1.25, 1.5, 1.75, 2.0};
+    const QSize logicalSize(20, 20);
+    const QIcon icons[] = {
+        appearancesettings::themedMenuIcon(QStringLiteral("settings")),
+        appearancesettings::tintedMenuIcon(QStringLiteral("copy"), Qt::red),
+        appearancesettings::colorSwatchIcon(Qt::blue),
+        standardicons::applicationIconForId(
+            standardicons::defaultApplicationIcon().id),
+        QIcon(standardicons::defaultEntryIcon().resource),
+    };
+
+    for (const QIcon& icon : icons) {
+        QVERIFY(!icon.isNull());
+        for (const qreal ratio : ratios) {
+            const QPixmap pixmap = icon.pixmap(logicalSize, ratio);
+            QVERIFY(!pixmap.isNull());
+            QCOMPARE(pixmap.size(), logicalSize * ratio);
+            QVERIFY2(qAbs(pixmap.devicePixelRatioF() - ratio) < 0.001,
+                     qPrintable(QStringLiteral("Expected DPR %1, got %2")
+                                    .arg(ratio)
+                                    .arg(pixmap.devicePixelRatioF())));
+        }
+    }
+
+    // Lock-screen art is 96 logical pixels. Its source must survive in the
+    // application QIcon beyond the 256px ICO ceiling, otherwise Windows at
+    // 300/400% enlarges a smaller shell frame.
+    const QIcon applicationIcon = standardicons::applicationIconForId(
+        standardicons::defaultApplicationIcon().id);
+    for (const qreal ratio : {3.0, 4.0}) {
+        const QPixmap pixmap = applicationIcon.pixmap(QSize(96, 96), ratio);
+        QCOMPARE(pixmap.size(), QSize(96, 96) * ratio);
+        QVERIFY(qAbs(pixmap.devicePixelRatioF() - ratio) < 0.001);
+    }
 }
 
 void ApplicationIconTests::pickerRendersExclusiveOptionsAndSelectsOnClick() {

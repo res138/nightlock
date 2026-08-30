@@ -78,9 +78,11 @@ function Assert-IcoCoverage {
         [void]$sizes.Add($width)
     }
 
-    # These are the sizes Inno Setup recommends for a crisp Setup/Uninstall
-    # icon, plus 128px for Explorer's intermediate zoom levels.
-    foreach ($requiredSize in @(16, 32, 48, 64, 128, 256)) {
+    # Cover Windows' 16px and 32px metrics at 100/125/150/175/200%, plus
+    # Explorer's larger zoom levels. Without the fractional frames Windows 11
+    # rescales a neighbor and the Setup/taskbar artwork looks visibly soft.
+    foreach ($requiredSize in @(
+            16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 128, 256)) {
         if (-not $sizes.Contains($requiredSize)) {
             throw "Windows icon has no ${requiredSize}x${requiredSize} frame: $LiteralPath"
         }
