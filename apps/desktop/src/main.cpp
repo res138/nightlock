@@ -99,6 +99,27 @@ int main(int argc, char* argv[]) {
 #endif
     window.resize(843, 617);
     window.show();
+
+    // Package smoke tests can force a fractional Qt scale and validate the
+    // effective DPR in-process. A screenshot's pixel dimensions are not a
+    // reliable proxy because Windows constrains oversized windows to the
+    // available desktop before QWidget::grab() runs.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_EXPECT_DEVICE_PIXEL_RATIO")) {
+        bool validExpectedRatio = false;
+        const QString expectedText =
+            qEnvironmentVariable("NIGHTLOCK_EXPECT_DEVICE_PIXEL_RATIO");
+        const qreal expectedRatio = expectedText.toDouble(&validExpectedRatio);
+        const qreal actualRatio = window.devicePixelRatioF();
+        if (!validExpectedRatio || expectedRatio <= 0.0 ||
+            qAbs(actualRatio - expectedRatio) > 0.01) {
+            qCritical().noquote()
+                << "Nightlock device-pixel-ratio check failed: expected"
+                << expectedText << "but Qt selected" << actualRatio;
+            return 1;
+        }
+        qInfo().noquote() << "Nightlock device-pixel-ratio check passed:"
+                          << actualRatio;
+    }
 #ifdef Q_OS_MACOS
     macwindow::hideTitleBar(&window);
     // Center the traffic lights on the tree-pane header (46px tall,
