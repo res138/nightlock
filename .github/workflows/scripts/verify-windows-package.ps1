@@ -295,7 +295,11 @@ Expected '$($expectedFields[$field])'.
         }
         [void]$iconSizes.Add($width)
     }
-    foreach ($requiredSize in @(16, 32, 48, 64, 128, 256)) {
+    # Audit the icon actually compiled into Nightlock.exe. These cover the
+    # 16px and 32px Windows metrics at 100/125/150/175/200%, followed by the
+    # larger Explorer sizes.
+    foreach ($requiredSize in @(
+            16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 128, 256)) {
         if (-not $iconSizes.Contains($requiredSize)) {
             throw "Nightlock.exe has no ${requiredSize}x${requiredSize} icon resource."
         }
@@ -594,6 +598,15 @@ $screenshotPath = Join-Path $smokeRoot 'nightlock-gui.png'
 $env:NIGHTLOCK_DEMO = '1'
 $env:NIGHTLOCK_SCREENSHOT = $screenshotPath
 $env:NIGHTLOCK_SCREENSHOT_DELAY = '1000'
+# Force the most common non-integer Windows scale during the final installed
+# payload smoke. This covers qwindows, Qt's SVG/ICO plugins and every custom
+# icon engine under the exact 150% path users see on Windows 11.
+$env:QT_SCALE_FACTOR = '1.5'
+$env:QT_SCALE_FACTOR_ROUNDING_POLICY = 'PassThrough'
+# Validate the effective Qt DPR inside the installed process. Screenshot
+# dimensions cannot prove this: the hosted runner's 1024x768 desktop clamps a
+# 843x617 logical window before QWidget::grab() runs.
+$env:NIGHTLOCK_EXPECT_DEVICE_PIXEL_RATIO = '1.5'
 $guiPath = Join-Path $installDir 'Nightlock.exe'
 $guiProcess = Start-Process `
     -FilePath $guiPath `

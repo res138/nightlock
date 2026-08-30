@@ -1,6 +1,8 @@
 #include "copylabel.hpp"
 
+#include <QAction>
 #include <QClipboard>
+#include <QContextMenuEvent>
 #include <QFontMetrics>
 #include <QGuiApplication>
 #include <QIcon>
@@ -10,6 +12,7 @@
 #include <QVariantAnimation>
 
 #include "appearancesettings.hpp"
+#include "nlmenu.hpp"
 
 namespace {
 
@@ -141,4 +144,15 @@ void CopyLabel::paintEvent(QPaintEvent*) {
 void CopyLabel::mousePressEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton)
         copyAndFlash();
+}
+
+void CopyLabel::contextMenuEvent(QContextMenuEvent* event) {
+    auto* menu = new NlMenu(this);
+    connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
+    QAction* copy = menu->addAction(
+        appearancesettings::themedMenuIcon(QStringLiteral("copy")), tr("Copy"),
+        this, &CopyLabel::copyAndFlash);
+    copy->setEnabled(!clipboardText_.isEmpty());
+    menu->popupAt(event->globalPos());
+    event->accept();
 }

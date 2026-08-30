@@ -111,6 +111,26 @@ if(NIGHTLOCK_BUILD_TESTS)
     add_test(NAME desktop_updates COMMAND nightlock-desktop-update-tests)
     set_tests_properties(desktop_updates PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    qt_add_executable(nightlock-desktop-menu-tests
+        tests/test_nlmenu.cpp
+        src/appearancesettings.cpp
+        src/fonts.cpp
+        src/respaths.cpp
+        src/widgets/frostedpanel.cpp
+        src/widgets/nlmenu.cpp
+        resources/resources.qrc
+    )
+    target_include_directories(nightlock-desktop-menu-tests PRIVATE src)
+    target_compile_definitions(nightlock-desktop-menu-tests PRIVATE
+        NIGHTLOCK_ICONS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
+        NIGHTLOCK_FONTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/fonts")
+    target_link_libraries(nightlock-desktop-menu-tests PRIVATE
+        Qt6::Widgets Qt6::Svg Qt6::Test)
+
+    add_test(NAME desktop_menus COMMAND nightlock-desktop-menu-tests)
+    set_tests_properties(desktop_menus PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
 
 # --- application identity per platform ------------------------------

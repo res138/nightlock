@@ -1,6 +1,8 @@
 #include "spoilerlabel.hpp"
 
+#include <QAction>
 #include <QClipboard>
+#include <QContextMenuEvent>
 #include <QEasingCurve>
 #include <QFontMetrics>
 #include <QGuiApplication>
@@ -12,6 +14,7 @@
 #include <QVariantAnimation>
 
 #include "appearancesettings.hpp"
+#include "nlmenu.hpp"
 
 #include <cmath>
 
@@ -255,6 +258,28 @@ void SpoilerLabel::mousePressEvent(QMouseEvent* event) {
         reveal();
     else
         copyAndFlash();
+}
+
+void SpoilerLabel::contextMenuEvent(QContextMenuEvent* event) {
+    auto* menu = new NlMenu(this);
+    connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
+    if (reveal_ < 0.5) {
+        menu->addAction(tr("Reveal"), this, [this] {
+            if (coordinatedReveal_)
+                emit revealRequested();
+            else
+                reveal();
+        });
+    } else {
+        menu->addAction(tr("Conceal"), this, &SpoilerLabel::conceal);
+    }
+    menu->addSeparator();
+    QAction* copy = menu->addAction(
+        appearancesettings::themedMenuIcon(QStringLiteral("copy")), tr("Copy"),
+        this, &SpoilerLabel::copyAndFlash);
+    copy->setEnabled(!secret_.isEmpty());
+    menu->popupAt(event->globalPos());
+    event->accept();
 }
 
 void SpoilerLabel::leaveEvent(QEvent* event) {
