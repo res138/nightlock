@@ -25,6 +25,7 @@ public:
     void setCoordinatedReveal(bool enabled);
 
     QSize sizeHint() const override;
+    int naturalTextWidth() const;
 
 signals:
     void revealRequested();

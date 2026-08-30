@@ -7,11 +7,13 @@
 #include <QIcon>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPen>
 #include <QRandomGenerator>
 #include <QTimer>
 #include <QVariantAnimation>
 
 #include "appearancesettings.hpp"
+#include "overflowfade.hpp"
 
 #include <cmath>
 
@@ -56,6 +58,7 @@ qreal fadeEnvelope(qreal t) {
 
 SpoilerLabel::SpoilerLabel(QWidget* parent) : QWidget(parent) {
     setCursor(Qt::PointingHandCursor);
+    setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     QFont f = font();
     f.setPixelSize(12);
     setFont(f);
@@ -110,8 +113,11 @@ void SpoilerLabel::setSecret(const QString& secret) {
 }
 
 QSize SpoilerLabel::sizeHint() const {
-    const int text = QFontMetrics(font()).horizontalAdvance(secret_);
-    return {qBound(70, text + 8, 240), kHeight};
+    return {qBound(70, naturalTextWidth() + 8, 240), kHeight};
+}
+
+int SpoilerLabel::naturalTextWidth() const {
+    return QFontMetrics(font()).horizontalAdvance(secret_);
 }
 
 void SpoilerLabel::reveal() {
@@ -208,15 +214,26 @@ void SpoilerLabel::paintEvent(QPaintEvent*) {
             if (alpha <= 0.01)
                 continue;
             QColor color = particleColor();
-            color.setAlphaF(alpha * 0.85);
+            // The concealed cloud must not reveal whether the secret is
+            // wider than its field. A consistent edge fade keeps that
+            // visual state independent of the secret's rendered length.
+            const qreal edgeOpacity = overflowfade::opacityAt(
+                particle.pos.x(), width(), overflowfade::Edge::Left);
+            color.setAlphaF(alpha * edgeOpacity * 0.85);
             painter.setBrush(color);
             painter.drawEllipse(particle.pos, particle.radius, particle.radius);
         }
     }
 
     if (reveal_ > 0.0 && copied_ < 1.0) {
+        const bool overflow = naturalTextWidth() > width();
         painter.setOpacity(reveal_ * (1.0 - copied_));
-        painter.setPen(textColor());
+        const QColor color = textColor();
+        painter.setPen(overflow
+                           ? QPen(QBrush(overflowfade::gradient(
+                                      width(), color, overflowfade::Edge::Left)),
+                                  1.0)
+                           : QPen(color));
         painter.drawText(rect(), Qt::AlignRight | Qt::AlignVCenter | Qt::TextSingleLine,
                          secret_);
     }

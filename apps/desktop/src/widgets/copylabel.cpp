@@ -6,10 +6,12 @@
 #include <QIcon>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPen>
 #include <QTimer>
 #include <QVariantAnimation>
 
 #include "appearancesettings.hpp"
+#include "overflowfade.hpp"
 
 namespace {
 
@@ -23,6 +25,7 @@ QColor textColor() { return appearancesettings::palette().value; }
 
 CopyLabel::CopyLabel(QWidget* parent) : QWidget(parent) {
     setCursor(Qt::PointingHandCursor);
+    setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     QFont f = font();
     f.setPixelSize(12);
     setFont(f);
@@ -82,11 +85,14 @@ void CopyLabel::copyAndFlash() {
 }
 
 QSize CopyLabel::sizeHint() const {
-    const int text = QFontMetrics(font()).horizontalAdvance(text_);
+    return {qBound(70, naturalTextWidth() + 8, 260), kHeight};
+}
+
+int CopyLabel::naturalTextWidth() const {
     constexpr int kIconSize = 13;
     constexpr int kGap = 5;
     const int iconWidth = leadingIconVisible_ ? kIconSize + kGap : 0;
-    return {qBound(70, text + iconWidth + 8, 260), kHeight};
+    return QFontMetrics(font()).horizontalAdvance(text_) + iconWidth;
 }
 
 void CopyLabel::paintEvent(QPaintEvent*) {
@@ -103,10 +109,21 @@ void CopyLabel::paintEvent(QPaintEvent*) {
             return 0;
         return width() - contentWidth;
     };
+    const bool overflow = naturalTextWidth() > width();
+    const auto textPen = [this, overflow](const QColor& color) {
+        if (!overflow)
+            return QPen(color);
+        overflowfade::Edge edge = overflowfade::Edge::Left;
+        if (contentAlignment_.testFlag(Qt::AlignHCenter))
+            edge = overflowfade::Edge::Both;
+        else if (contentAlignment_.testFlag(Qt::AlignLeft))
+            edge = overflowfade::Edge::Right;
+        return QPen(QBrush(overflowfade::gradient(width(), color, edge)), 1.0);
+    };
 
     if (copied_ < 1.0) {
         painter.setOpacity(1.0 - copied_);
-        painter.setPen(textColor());
+        painter.setPen(textPen(textColor()));
         if (leadingIconVisible_) {
             const QFontMetrics metrics(font());
             const int textWidth = metrics.horizontalAdvance(text_);

@@ -27,6 +27,7 @@ class EntryDetailView : public QScrollArea {
     Q_OBJECT
 public:
     explicit EntryDetailView(QWidget* parent = nullptr);
+    QSize sizeHint() const override;
 
     void setEntry(const nightlock::Entry* entry);
 
