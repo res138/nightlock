@@ -314,10 +314,13 @@ SidebarItemMetrics sidebarItemMetrics() {
 }
 
 EntryListItemMetrics entryListItemMetrics() {
-    if (entryListItemSize() == QLatin1String("small"))
-        return {52, 28, 13, 10};
+    const QString size = entryListItemSize();
+    if (size == QLatin1String("ultra-compact"))
+        return {38, 22, 13, 10, false};
+    if (size == QLatin1String("small"))
+        return {52, 28, 13, 10, true};
     // Pixel-for-pixel match with the original delegate.
-    return {66, 34, 14, 11};
+    return {66, 34, 14, 11, true};
 }
 
 const Palette& palette() {

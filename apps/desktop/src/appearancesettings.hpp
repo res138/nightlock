@@ -16,7 +16,8 @@ inline constexpr const char* kThemes[] = {"light", "dark", "system"};
 inline constexpr const char* kAccents[] = {"black", "blue", "green"};
 inline constexpr const char* kApplicationIcons[] = {"petal-keyhole", "flower"};
 inline constexpr const char* kSidebarItemSizes[] = {"small", "default", "large"};
-inline constexpr const char* kEntryListItemSizes[] = {"default", "small"};
+inline constexpr const char* kEntryListItemSizes[] = {
+    "default", "small", "ultra-compact"};
 
 QString theme();  // one of kThemes
 void setTheme(const QString& theme);
@@ -62,6 +63,7 @@ struct EntryListItemMetrics {
     int iconExtent;
     int nameFontPixelSize;
     int subtitleFontPixelSize;
+    bool showSubtitle;
 };
 EntryListItemMetrics entryListItemMetrics();
 

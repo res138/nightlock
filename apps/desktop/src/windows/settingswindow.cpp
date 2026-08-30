@@ -812,7 +812,7 @@ QWidget* SettingsWindow::buildAppearancePage() {
            tr("Size of folder names and the icons next to them."), sidebarItemSize);
 
     auto* entryListItemSize = new DropdownButton(
-        {tr("Default"), tr("Small")},
+        {tr("Default"), tr("Small"), tr("Ultra Compact")},
         indexIn(appearancesettings::kEntryListItemSizes,
                 appearancesettings::entryListItemSize()));
     entryListItemSize->setOnSelected([](int index) {
@@ -820,7 +820,7 @@ QWidget* SettingsWindow::buildAppearancePage() {
             QLatin1String(appearancesettings::kEntryListItemSizes[index]));
     });
     addRow(rows, tr("Entry list item size"),
-           tr("Size of entry names and the icons next to them."), entryListItemSize);
+           tr("Row density; Ultra Compact hides the login."), entryListItemSize);
 
     auto* folderIcons = new ToggleSwitch(appearancesettings::folderIcons());
     connect(folderIcons, &QAbstractButton::toggled, folderIcons,

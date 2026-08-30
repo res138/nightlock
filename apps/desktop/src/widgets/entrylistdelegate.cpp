@@ -34,15 +34,17 @@ void EntryListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
     const bool selected = option.state.testFlag(QStyle::State_Selected);
     const appearancesettings::EntryListItemMetrics metrics =
         appearancesettings::entryListItemMetrics();
-    const bool small = metrics.rowHeight < 66;
+    const bool ultraCompact = !metrics.showSubtitle;
+    const bool small = metrics.showSubtitle && metrics.rowHeight < 66;
 
     painter->fillRect(rect, appearancesettings::palette().window);
     painter->setPen(appearancesettings::palette().separator);
     painter->drawLine(rect.bottomLeft(), rect.bottomRight());
 
-    const QRect content = small ? rect.adjusted(8, 3, -8, -4)
-                                : rect.adjusted(10, 4, -10, -6);
-    const int cornerRadius = small ? 8 : 10;
+    const QRect content = ultraCompact ? rect.adjusted(6, 2, -6, -3)
+                        : small        ? rect.adjusted(8, 3, -8, -4)
+                                       : rect.adjusted(10, 4, -10, -6);
+    const int cornerRadius = ultraCompact ? 7 : small ? 8 : 10;
     if (selected) {
         painter->setPen(Qt::NoPen);
         painter->setBrush(appearancesettings::accentColor());
@@ -58,13 +60,14 @@ void EntryListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
     }
 
     const QIcon icon = index.data(Qt::DecorationRole).value<QIcon>();
-    const QRect iconRect(content.left() + (small ? 10 : 12),
+    const QRect iconRect(content.left() + (ultraCompact ? 8 : small ? 10 : 12),
                          content.center().y() - metrics.iconExtent / 2,
                          metrics.iconExtent, metrics.iconExtent);
     icon.paint(painter, iconRect);
 
-    const int textLeft = iconRect.right() + (small ? 12 : 16);
-    const int textWidth = content.right() - textLeft - (small ? 6 : 8);
+    const int textLeft = iconRect.right() + (ultraCompact ? 10 : small ? 12 : 16);
+    const int textWidth =
+        content.right() - textLeft - (ultraCompact ? 5 : small ? 6 : 8);
 
     // QFont's constructor takes points, while every surrounding metric
     // in this delegate is expressed in logical pixels. At Windows' 96 DPI,
@@ -75,8 +78,11 @@ void EntryListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
     painter->setFont(nameFont);
     painter->setPen(selected ? appearancesettings::accentTextColor()
                              : appearancesettings::palette().ink);
-    const QRect nameRect(textLeft, content.top() + (small ? 5 : 10), textWidth,
-                         small ? 18 : 20);
+    const QRect nameRect = ultraCompact
+                               ? QRect(textLeft, content.top(), textWidth,
+                                       content.height())
+                               : QRect(textLeft, content.top() + (small ? 5 : 10),
+                                       textWidth, small ? 18 : 20);
     const QString name = index.data(EntryListModel::NameRole).toString();
     const bool expired = index.data(EntryListModel::ExpiredRole).toBool();
     if (!expired) {
@@ -84,42 +90,49 @@ void EntryListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
                           QFontMetrics(nameFont).elidedText(name, Qt::ElideRight,
                                                           nameRect.width()));
     } else {
+        painter->save();
+        painter->setClipRect(nameRect);
         QFont expiredFont(fonts::resolvedFamily(fonts::Role::Primary));
         expiredFont.setPixelSize(metrics.subtitleFontPixelSize);
         expiredFont.setItalic(true);
         const QString suffix = tr("(expired)");
         const int suffixWidth = QFontMetrics(expiredFont).horizontalAdvance(suffix);
-        const int suffixGap = small ? 4 : 5;
+        const int suffixGap = ultraCompact ? 3 : small ? 4 : 5;
         const int nameWidth = qMax(0, nameRect.width() - suffixWidth - suffixGap);
         const QString visibleName =
             QFontMetrics(nameFont).elidedText(name, Qt::ElideRight, nameWidth);
         painter->drawText(QRect(nameRect.left(), nameRect.top(), nameWidth,
                                 nameRect.height()),
                           Qt::AlignLeft | Qt::AlignVCenter, visibleName);
+        const int visibleGap = visibleName.isEmpty() ? 0 : suffixGap;
         const int suffixLeft = nameRect.left() +
                                QFontMetrics(nameFont).horizontalAdvance(visibleName) +
-                               suffixGap;
+                               visibleGap;
         painter->setFont(expiredFont);
         painter->setPen(QColor(QStringLiteral("#FF2D2D")));
         painter->drawText(QRect(suffixLeft, nameRect.top(), suffixWidth,
                                 nameRect.height()),
                           Qt::AlignLeft | Qt::AlignVCenter, suffix);
+        painter->restore();
     }
 
-    QFont loginFont = option.font;
-    loginFont.setPixelSize(metrics.subtitleFontPixelSize);
-    painter->setFont(loginFont);
-    const bool strongSubtitle = index.data(EntryListModel::SubtitleStrongRole).toBool();
-    QColor selectedLogin = appearancesettings::accentTextColor();
-    if (!strongSubtitle)
-        selectedLogin.setAlpha(190);
-    painter->setPen(selected ? selectedLogin
-                             : strongSubtitle ? appearancesettings::palette().ink
-                                              : appearancesettings::palette().muted);
-    const QRect loginRect(textLeft, nameRect.bottom() + (small ? 1 : 2), textWidth,
-                          small ? 14 : 16);
-    painter->drawText(loginRect, Qt::AlignLeft | Qt::AlignVCenter,
-                      index.data(EntryListModel::SubtitleRole).toString());
+    if (metrics.showSubtitle) {
+        QFont loginFont = option.font;
+        loginFont.setPixelSize(metrics.subtitleFontPixelSize);
+        painter->setFont(loginFont);
+        const bool strongSubtitle =
+            index.data(EntryListModel::SubtitleStrongRole).toBool();
+        QColor selectedLogin = appearancesettings::accentTextColor();
+        if (!strongSubtitle)
+            selectedLogin.setAlpha(190);
+        painter->setPen(selected ? selectedLogin
+                                 : strongSubtitle ? appearancesettings::palette().ink
+                                                  : appearancesettings::palette().muted);
+        const QRect loginRect(textLeft, nameRect.bottom() + (small ? 1 : 2),
+                              textWidth, small ? 14 : 16);
+        painter->drawText(loginRect, Qt::AlignLeft | Qt::AlignVCenter,
+                          index.data(EntryListModel::SubtitleRole).toString());
+    }
 
     painter->restore();
 }
