@@ -112,6 +112,36 @@ if(NIGHTLOCK_BUILD_TESTS)
     set_tests_properties(desktop_updates PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+    qt_add_executable(nightlock-desktop-entry-detail-tests
+        tests/test_entry_detail_view.cpp
+        src/appearancesettings.cpp
+        src/entrycolors.cpp
+        src/fonts.cpp
+        src/generalsettings.cpp
+        src/graphsettings.cpp
+        src/respaths.cpp
+        src/standardicons.cpp
+        src/widgets/copylabel.cpp
+        src/widgets/entrydetailview.cpp
+        src/widgets/frostedpanel.cpp
+        src/widgets/nlmenu.cpp
+        src/widgets/overlayscrollbar.cpp
+        src/widgets/patternbackdrop.cpp
+        src/widgets/spoilerlabel.cpp
+        src/widgets/totpring.cpp
+        resources/resources.qrc
+    )
+    target_include_directories(nightlock-desktop-entry-detail-tests PRIVATE src)
+    target_compile_definitions(nightlock-desktop-entry-detail-tests PRIVATE
+        NIGHTLOCK_ICONS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
+        NIGHTLOCK_FONTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/fonts")
+    target_link_libraries(nightlock-desktop-entry-detail-tests PRIVATE
+        Qt6::Widgets Qt6::Svg Qt6::Test nightlock-core)
+
+    add_test(NAME desktop_entry_detail COMMAND nightlock-desktop-entry-detail-tests)
+    set_tests_properties(desktop_entry_detail PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
     qt_add_executable(nightlock-desktop-menu-tests
         tests/test_nlmenu.cpp
         src/appearancesettings.cpp

@@ -4,6 +4,8 @@
 #include <QDateTime>
 #include <QEvent>
 #include <QFrame>
+#include <QFontMetrics>
+#include <QGraphicsEffect>
 #include <QIcon>
 #include <QLabel>
 #include <QLinearGradient>
@@ -11,9 +13,11 @@
 #include <QPainter>
 #include <QPushButton>
 #include <QStyle>
+#include <QTextDocument>
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
+#include <QtMath>
 
 #include "appearancesettings.hpp"
 #include "entrycolors.hpp"
@@ -25,10 +29,14 @@
 
 #include "copylabel.hpp"
 #include "overlayscrollbar.hpp"
+#include "overflowfade.hpp"
 #include "qsecure.hpp"
 #include "patternbackdrop.hpp"
 #include "spoilerlabel.hpp"
 #include "totpring.hpp"
+
+#include <functional>
+#include <utility>
 
 namespace {
 
@@ -39,6 +47,17 @@ constexpr int kGripGap = 12;          // equal gap above and below the grip
 constexpr int kHeaderFadeHeight = 68;
 constexpr int kSectionGap = 14;       // one vertical rhythm between all sections
 constexpr qreal kFloatingRadius = 10;  // matches the main window corners
+
+// Keep the reference design's 360 px card width whenever the pane has
+// enough room.  Surplus width becomes symmetric breathing room, so a
+// narrowing pane spends those insets first; only below the breakpoint
+// does the card itself contract.  The final 180 px body still leaves
+// room for a field name and a useful value.
+constexpr int kPreferredBodyWidth = 360;
+constexpr int kPreferredHorizontalInset = 30;
+constexpr int kMinimumBodyWidth = 180;
+constexpr int kMinimumHorizontalInset = 12;
+constexpr int kMinimumPaneWidth = kMinimumBodyWidth + 2 * kMinimumHorizontalInset;
 
 QString formatDate(std::chrono::system_clock::time_point tp) {
     const auto secs =
@@ -121,6 +140,104 @@ protected:
     }
 };
 
+// Alpha-masks only the pixels painted by a text widget, so the fade works
+// over patterns, dark mode and per-entry card colors without guessing the
+// background. The clipped edge follows the widget's alignment: centered
+// titles lose pixels at both sides, right-aligned values at the left side.
+class OverflowFadeEffect : public QGraphicsEffect {
+public:
+    using OverflowCheck = std::function<bool(qreal)>;
+
+    OverflowFadeEffect(overflowfade::Edge edge, OverflowCheck overflows,
+                       QObject* parent)
+        : QGraphicsEffect(parent), edge_(edge), overflows_(std::move(overflows)) {
+        setProperty("overflowFadeActive", false);
+    }
+
+protected:
+    void draw(QPainter* painter) override {
+        const QRectF bounds = sourceBoundingRect(Qt::LogicalCoordinates);
+        const bool active = bounds.width() > 0 && overflows_(bounds.width());
+        if (active != active_) {
+            active_ = active;
+            setProperty("overflowFadeActive", active_);
+        }
+        if (!active_) {
+            drawSource(painter);
+            return;
+        }
+
+        QPoint offset;
+        QPixmap pixels =
+            sourcePixmap(Qt::LogicalCoordinates, &offset, QGraphicsEffect::NoPad);
+        if (pixels.isNull()) {
+            drawSource(painter);
+            return;
+        }
+
+        const QSizeF logicalSize = pixels.deviceIndependentSize();
+        const QRectF maskRect(QPointF(0, 0), logicalSize);
+        const QColor opaque(0, 0, 0, 255);
+        const QLinearGradient mask =
+            overflowfade::gradient(logicalSize.width(), opaque, edge_);
+
+        QPainter maskPainter(&pixels);
+        maskPainter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+        maskPainter.fillRect(maskRect, mask);
+        maskPainter.end();
+        painter->drawPixmap(offset, pixels);
+    }
+
+private:
+    overflowfade::Edge edge_;
+    OverflowCheck overflows_;
+    bool active_ = false;
+};
+
+int naturalLabelWidth(const QLabel* label) {
+    if (label->textFormat() == Qt::RichText) {
+        QTextDocument document;
+        document.setDocumentMargin(0);
+        document.setDefaultFont(label->font());
+        document.setHtml(label->text());
+        return qCeil(document.idealWidth());
+    }
+    return QFontMetrics(label->font()).horizontalAdvance(label->text());
+}
+
+void addOverflowFade(QWidget* widget, overflowfade::Edge edge,
+                     std::function<int()> naturalWidth) {
+    widget->setGraphicsEffect(new OverflowFadeEffect(
+        edge,
+        [naturalWidth = std::move(naturalWidth)](qreal availableWidth) {
+            return naturalWidth() > availableWidth;
+        },
+        widget));
+}
+
+// A user-defined field label must not become the detail pane's hidden
+// horizontal minimum.  QLabel's natural width still wins while space is
+// available, but the layout may clip it once the card reaches its compact
+// phase so the value side remains reachable.
+class ShrinkableFieldLabel : public QLabel {
+public:
+    using QLabel::QLabel;
+
+    QSize sizeHint() const override {
+        QSize hint = QLabel::sizeHint();
+        // Keep at least ~50 px for the value at the pane's 180 px body
+        // floor, even when a custom field name is thousands of characters.
+        hint.setWidth(qMin(hint.width(), 84));
+        return hint;
+    }
+
+    QSize minimumSizeHint() const override {
+        QSize hint = QLabel::minimumSizeHint();
+        hint.setWidth(0);
+        return hint;
+    }
+};
+
 // Bottom-most layer of the floating window: the rounded white panel
 // (the scroll area itself cannot paint outside its viewport).
 class FloatingBackdrop : public QWidget {
@@ -178,12 +295,18 @@ EntryDetailView::EntryDetailView(QWidget* parent)
     : QScrollArea(parent), entryColor_(nightlock::EntryColor::None) {
     setWindowTitle(tr("Entry Details"));
     setWidgetResizable(true);
+    setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    setMinimumWidth(kMinimumPaneWidth);
     new OverlayScrollBar(this);
 
     content_ = new QWidget;
-    auto* layout = new QVBoxLayout(content_);
+    content_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    contentLayout_ = new QVBoxLayout(content_);
+    auto* layout = contentLayout_;
     // Top room for the grip strip: the same gap above and below it.
-    layout->setContentsMargins(30, kGripGap * 2 + kGripHeight, 30, 28);
+    layout->setContentsMargins(kPreferredHorizontalInset,
+                               kGripGap * 2 + kGripHeight,
+                               kPreferredHorizontalInset, 28);
     layout->setSpacing(0);
 
     iconLabel_ = new QLabel;
@@ -196,14 +319,27 @@ EntryDetailView::EntryDetailView(QWidget* parent)
 
     titleLabel_ = new QLabel;
     titleLabel_->setObjectName(QStringLiteral("detailTitle"));
+    titleLabel_->setTextFormat(Qt::PlainText);
     titleLabel_->setAlignment(Qt::AlignHCenter);
+    titleLabel_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    titleLabel_->setMinimumWidth(0);
+    addOverflowFade(titleLabel_, overflowfade::Edge::Both,
+                    [this] { return naturalLabelWidth(titleLabel_); });
     layout->addWidget(titleLabel_);
     layout->addSpacing(8);
 
     noteLabel_ = new QLabel;
     noteLabel_->setObjectName(QStringLiteral("detailNote"));
+    noteLabel_->setTextFormat(Qt::PlainText);
     noteLabel_->setAlignment(Qt::AlignHCenter);
+    noteLabel_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    noteLabel_->setMinimumWidth(0);
+    // Let QLabel re-enable height-for-width after the horizontal policy
+    // is changed, otherwise wrapped notes keep a stale one-line height.
     noteLabel_->setWordWrap(true);
+    QSizePolicy notePolicy = noteLabel_->sizePolicy();
+    notePolicy.setHeightForWidth(true);
+    noteLabel_->setSizePolicy(notePolicy);
     layout->addWidget(noteLabel_);
     layout->addSpacing(kSectionGap);
 
@@ -217,18 +353,29 @@ EntryDetailView::EntryDetailView(QWidget* parent)
     // password (just without the spoiler).
     loginRow_.value->hide();
     loginCopy_ = new CopyLabel;
-    loginRow_.layout->addWidget(loginCopy_);
+    loginCopy_->setObjectName(QStringLiteral("loginValue"));
+    loginRow_.layout->addWidget(loginCopy_, 1);
     passwordRow_ = makeRow(fieldsLayout_, tr("Password"));
     // The password hides behind a Telegram-style particle spoiler
     // instead of asterisks.
     passwordRow_.value->hide();
     passwordSpoiler_ = new SpoilerLabel;
-    passwordRow_.layout->addWidget(passwordSpoiler_);
+    passwordSpoiler_->setObjectName(QStringLiteral("passwordValue"));
+    passwordRow_.layout->addWidget(passwordSpoiler_, 1);
     urlRow_ = makeRow(fieldsLayout_, tr("URL"));
     urlRow_.value->setTextFormat(Qt::RichText);
     urlRow_.value->setTextInteractionFlags(Qt::TextBrowserInteraction);
     urlRow_.value->setOpenExternalLinks(true);
+    // QLabel lays rich text out from the left even with AlignRight, so a
+    // clipped link continues beyond the right edge rather than the left.
+    addOverflowFade(urlRow_.value, overflowfade::Edge::Right,
+                    [value = urlRow_.value] { return naturalLabelWidth(value); });
     codeRow_ = makeRow(fieldsLayout_, tr("Code"));
+    // Unlike the other values, the TOTP value has a ring immediately
+    // beside it.  Retain the flexible gap before that pair.
+    codeRow_.layout->setStretchFactor(codeRow_.value, 0);
+    codeRow_.value->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+    codeRow_.layout->insertStretch(1, 1);
     codeRow_.layout->insertWidget(codeRow_.layout->count() - 1, new TotpRing);
     layout->addWidget(fieldsCard_);
     layout->addSpacing(kSectionGap);
@@ -396,6 +543,12 @@ EntryDetailView::EntryDetailView(QWidget* parent)
     setEntry(nullptr);
 }
 
+QSize EntryDetailView::sizeHint() const {
+    QSize hint = QScrollArea::sizeHint();
+    hint.setWidth(kPreferredBodyWidth + 2 * kPreferredHorizontalInset);
+    return hint;
+}
+
 bool EntryDetailView::event(QEvent* event) {
     const bool handled = QScrollArea::event(event);
     if (event->type() == QEvent::DevicePixelRatioChange)
@@ -405,6 +558,7 @@ bool EntryDetailView::event(QEvent* event) {
 
 void EntryDetailView::resizeEvent(QResizeEvent* event) {
     QScrollArea::resizeEvent(event);
+    updateHorizontalInsets();
     headerFade_->setGeometry(0, 0, width(), kHeaderFadeHeight);
     grip_->move((width() - grip_->width()) / 2, kGripGap);
     // Centered on the grip row, mirroring the floating traffic lights.
@@ -413,6 +567,17 @@ void EntryDetailView::resizeEvent(QResizeEvent* event) {
     generatorButton_->move(editButton_->x() - generatorButton_->width() - 4, buttonY);
     floatingBackdrop_->setGeometry(rect());
     updatePatternGeometry();
+}
+
+void EntryDetailView::updateHorizontalInsets() {
+    const int availableWidth = viewport() ? viewport()->width() : width();
+    const int horizontalInset =
+        qMax(kMinimumHorizontalInset, (availableWidth - kPreferredBodyWidth) / 2);
+    const QMargins margins = contentLayout_->contentsMargins();
+    if (margins.left() != horizontalInset || margins.right() != horizontalInset) {
+        contentLayout_->setContentsMargins(horizontalInset, margins.top(),
+                                           horizontalInset, margins.bottom());
+    }
 }
 
 // The pattern zone runs from the very top of the panel (the grip strip)
@@ -517,8 +682,11 @@ void EntryDetailView::debugSpoiler(const QString& state) {
 void EntryDetailView::refreshUrlText() {
     if (url_.isEmpty())
         return;
-    urlRow_.value->setText(QStringLiteral("<a href=\"%1\" style=\"color:%2;\">%1</a> ↗")
-                               .arg(url_, appearancesettings::palette().ink.name()));
+    const QString escapedUrl = url_.toHtmlEscaped();
+    urlRow_.value->setText(
+        QStringLiteral("<a href=\"%1\" style=\"color:%2;\">%1</a> ↗")
+            .arg(escapedUrl, appearancesettings::palette().ink.name()));
+    urlRow_.value->setToolTip(Qt::convertFromPlainText(url_));
 }
 
 void EntryDetailView::setEntry(const nightlock::Entry* entry) {
@@ -574,7 +742,7 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
             row.value->hide();
             auto* spoiler = new SpoilerLabel;
             spoiler->setSecret(toQString(field.value));
-            row.layout->addWidget(spoiler);
+            row.layout->addWidget(spoiler, 1);
         } else {
             row.value->setText(toQString(field.value));
         }
@@ -613,7 +781,7 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
                 for (SpoilerLabel* seedSpoiler : seedSpoilers_)
                     seedSpoiler->reveal();
             });
-            row.layout->addWidget(spoiler);
+            row.layout->addWidget(spoiler, 1);
             seedSpoilers_.append(spoiler);
             seedWords.append(toQString(field.value));
             seedRows_.append(row);
@@ -759,9 +927,13 @@ void EntryDetailView::applyPresetLabels(int presetValue) {
         case nightlock::EntryPreset::CryptoWallet:
             break;
     }
-    loginRow_.name->setText(login);
-    passwordRow_.name->setText(password);
-    urlRow_.name->setText(url);
+    const auto setLabel = [](QLabel* target, const QString& text) {
+        target->setText(text);
+        target->setToolTip(text);
+    };
+    setLabel(loginRow_.name, login);
+    setLabel(passwordRow_.name, password);
+    setLabel(urlRow_.name, url);
 }
 
 void EntryDetailView::clearAdditionalFields() {
@@ -793,18 +965,26 @@ EntryDetailView::FieldRow EntryDetailView::makeRow(QVBoxLayout* cardLayout,
     row.layout->setContentsMargins(2, 13, 2, 13);
     row.layout->setSpacing(8);
 
-    row.name = new QLabel(label);
+    row.name = new ShrinkableFieldLabel(label);
     row.name->setObjectName(QStringLiteral("fieldLabel"));
     row.name->setTextFormat(Qt::PlainText);
+    row.name->setToolTip(label);
+    addOverflowFade(row.name, overflowfade::Edge::Right,
+                    [name = row.name] { return naturalLabelWidth(name); });
     row.value = new QLabel;
     row.value->setObjectName(QStringLiteral("fieldValue"));
     row.value->setTextFormat(Qt::PlainText);
     row.value->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     row.value->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    // Long values must not dictate the panel's minimum width.  The value
+    // owns the flexible half of the row and clips naturally at the final
+    // minimum instead of forcing a horizontal scroll area.
+    row.value->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    addOverflowFade(row.value, overflowfade::Edge::Left,
+                    [value = row.value] { return naturalLabelWidth(value); });
 
     row.layout->addWidget(row.name);
-    row.layout->addStretch(1);
-    row.layout->addWidget(row.value);
+    row.layout->addWidget(row.value, 1);
 
     rowLayout->addWidget(content);
     row.separator = new QFrame;

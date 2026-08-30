@@ -27,6 +27,7 @@ class EntryDetailView : public QScrollArea {
     Q_OBJECT
 public:
     explicit EntryDetailView(QWidget* parent = nullptr);
+    QSize sizeHint() const override;
 
     void setEntry(const nightlock::Entry* entry);
 
@@ -83,9 +84,11 @@ private:
     void refreshCardColors();
     void refreshEntryIcon();
     void syncGeneratorVisibility();
+    void updateHorizontalInsets();
     void updatePatternGeometry();
 
     QWidget* content_;
+    QVBoxLayout* contentLayout_;
     QWidget* headerFade_;
     QWidget* grip_;
     QToolButton* generatorButton_;

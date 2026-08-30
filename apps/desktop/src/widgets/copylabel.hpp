@@ -25,6 +25,7 @@ public:
     void copyAndFlash();
 
     QSize sizeHint() const override;
+    int naturalTextWidth() const;
 
 protected:
     void paintEvent(QPaintEvent* event) override;

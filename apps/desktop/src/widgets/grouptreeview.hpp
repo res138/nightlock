@@ -12,4 +12,7 @@ public:
 
     // Briefly highlights a row (used right after a drop).
     void flashRow(const QModelIndex& index);
+
+private:
+    void syncItemSize();
 };

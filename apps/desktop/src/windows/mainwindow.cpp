@@ -87,6 +87,11 @@ constexpr int kTreeHeaderLeft = 14;
 constexpr int kReopenButtonX = 14;
 #endif
 constexpr int kHiddenLabelShift = kReopenButtonX + 28 + 4;
+// The first two panes stay at their established working widths while
+// ordinary window resizes are absorbed by the adaptive detail pane.
+// At 740 px that pane reaches its own usable minimum, so the window
+// stops before the folder tree and entry list would both be squeezed.
+constexpr int kMinimumMainWindowWidth = 740;
 
 nightlock::Group* findGroup(nightlock::Group* group, const QString& name) {
     if (QString::fromStdString(group->name()) == name)
@@ -223,6 +228,18 @@ MainWindow::MainWindow(nightlock::Group* root, QWidget* parent) : QMainWindow(pa
     splitter_->addWidget(detail_);
     splitter_->setSizes({375, 420, 460});
     setCentralWidget(splitter_);
+    setMinimumWidth(kMinimumMainWindowWidth);
+    // QSplitter consults stretch factors during its first layout too.
+    // Install the right-biased policy only after that layout and restore
+    // the resulting sizes, otherwise the detail pane would start at its
+    // minimum instead of the established 375:420:460 proportions.
+    QTimer::singleShot(0, this, [this] {
+        const QList<int> initialSizes = splitter_->sizes();
+        splitter_->setStretchFactor(0, 0);
+        splitter_->setStretchFactor(1, 0);
+        splitter_->setStretchFactor(2, 1);
+        splitter_->setSizes(initialSizes);
+    });
 
     // The ⌘-shortcuts (Ctrl on other platforms), all rebindable from
     // Settings → Hotkeys, which retargets these live QShortcuts.
@@ -1866,6 +1883,10 @@ void MainWindow::detachDetail(const QPoint& globalPos) {
     detailSplitterSizes_ = splitter_->sizes();
     const QSize paneSize = detail_->size();
     detail_->setParent(nullptr);
+    // The 740 px floor belongs to the three-pane layout.  Once the detail
+    // view floats, let the remaining tree/list splitter determine its own
+    // smaller natural minimum.
+    setMinimumWidth(0);
     detail_->setFloatingMode(true);
 #ifdef Q_OS_WIN
     // Keep Windows' accessible move, resize, minimize and close
@@ -1892,6 +1913,7 @@ void MainWindow::dockDetail() {
     detail_->setFloatingMode(false);
     splitter_->addWidget(detail_);  // rightmost pane — its original slot
     splitter_->setSizes(detailSplitterSizes_);
+    setMinimumWidth(kMinimumMainWindowWidth);
     detail_->show();
 }
 

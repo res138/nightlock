@@ -256,6 +256,73 @@ void setFolderIcons(bool shown) {
     notifier()->notify();
 }
 
+QString sidebarItemSize() {
+    const QString value = read("sidebar-item-size", "default");
+    for (const char* known : kSidebarItemSizes)
+        if (value == QLatin1String(known))
+            return value;
+    return QStringLiteral("default");
+}
+
+void setSidebarItemSize(const QString& size) {
+    QString valid = QStringLiteral("default");
+    for (const char* known : kSidebarItemSizes) {
+        if (size == QLatin1String(known)) {
+            valid = size;
+            break;
+        }
+    }
+    if (read("sidebar-item-size", "default") == valid)
+        return;
+    write("sidebar-item-size", valid);
+    // The tree's font and row height live in the application stylesheet;
+    // reinstall it before notifying the view to resize its icon and indent.
+    applyStylesheet();
+    notifier()->notifySidebarItemSize();
+}
+
+QString entryListItemSize() {
+    const QString value = read("entry-list-item-size", "default");
+    for (const char* known : kEntryListItemSizes)
+        if (value == QLatin1String(known))
+            return value;
+    return QStringLiteral("default");
+}
+
+void setEntryListItemSize(const QString& size) {
+    QString valid = QStringLiteral("default");
+    for (const char* known : kEntryListItemSizes) {
+        if (size == QLatin1String(known)) {
+            valid = size;
+            break;
+        }
+    }
+    if (read("entry-list-item-size", "default") == valid)
+        return;
+    write("entry-list-item-size", valid);
+    notifier()->notifyEntryListItemSize();
+}
+
+SidebarItemMetrics sidebarItemMetrics() {
+    const QString size = sidebarItemSize();
+    if (size == QLatin1String("small"))
+        return {14, 18, 22, 27};
+    if (size == QLatin1String("large"))
+        return {20, 26, 31, 39};
+    // Pixel-for-pixel match with the original, pre-setting tree.
+    return {17, 22, 26, 33};
+}
+
+EntryListItemMetrics entryListItemMetrics() {
+    const QString size = entryListItemSize();
+    if (size == QLatin1String("ultra-compact"))
+        return {38, 22, 13, 10, false};
+    if (size == QLatin1String("small"))
+        return {52, 28, 13, 10, true};
+    // Pixel-for-pixel match with the original delegate.
+    return {66, 34, 14, 11, true};
+}
+
 const Palette& palette() {
     static const Palette light = {
         QColor(0xFF, 0xFF, 0xFF),  // window
@@ -342,6 +409,11 @@ void applyStylesheet() {
     sheet.replace(QStringLiteral("@accent"), accent.name());
     sheet.replace(QStringLiteral("@font-secondary"),
                   fonts::resolvedFamily(fonts::Role::Secondary));
+    const SidebarItemMetrics sidebar = sidebarItemMetrics();
+    sheet.replace(QStringLiteral("@sidebar-font-size"),
+                  QString::number(sidebar.fontPixelSize) + QStringLiteral("px"));
+    sheet.replace(QStringLiteral("@sidebar-row-height"),
+                  QString::number(sidebar.rowHeight) + QStringLiteral("px"));
     qApp->setStyleSheet(sheet);
 }
 

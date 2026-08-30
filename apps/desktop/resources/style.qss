@@ -11,7 +11,7 @@ QTreeView#groupTree {
     border: none;
     outline: none;
     font-family: "@font-secondary";
-    font-size: 17px;
+    font-size: @sidebar-font-size;
     font-weight: bold;
     /* the toolbar header above clears the traffic lights; keep a bit
        of air between its border and the first row */
@@ -19,7 +19,7 @@ QTreeView#groupTree {
     show-decoration-selected: 1;
 }
 QTreeView#groupTree::item {
-    height: 26px;
+    height: @sidebar-row-height;
     border: none;
     color: @text;
     padding-left: 11px;

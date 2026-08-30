@@ -24,6 +24,8 @@ private slots:
 
     void defaultAndInvalidPreferencesFallBack();
     void preferencePersists();
+    void appearanceSizeDefaultsAndInvalidValuesFallBack();
+    void appearanceSizePreferencesPersistAndNotify();
     void catalogAssetsAreUsableAndIdsAreUnique();
     void lockedResourcesDecodeAndPetalArtworkDiffers();
     void windowsIcoAssetsCoverFractionalDpi();
@@ -94,6 +96,120 @@ void ApplicationIconTests::preferencePersists() {
     QCOMPARE(reopened.value(QStringLiteral("appearance/application-icon")).toString(),
              selectedId);
     QCOMPARE(appearancesettings::applicationIcon(), selectedId);
+}
+
+void ApplicationIconTests::appearanceSizeDefaultsAndInvalidValuesFallBack() {
+    QCOMPARE(appearancesettings::sidebarItemSize(), QStringLiteral("default"));
+    QCOMPARE(appearancesettings::entryListItemSize(), QStringLiteral("default"));
+
+    auto sidebar = appearancesettings::sidebarItemMetrics();
+    QCOMPARE(sidebar.fontPixelSize, 17);
+    QCOMPARE(sidebar.iconExtent, 22);
+    QCOMPARE(sidebar.rowHeight, 26);
+    QCOMPARE(sidebar.indentation, 33);
+
+    auto entries = appearancesettings::entryListItemMetrics();
+    QCOMPARE(entries.rowHeight, 66);
+    QCOMPARE(entries.iconExtent, 34);
+    QCOMPARE(entries.nameFontPixelSize, 14);
+    QCOMPARE(entries.subtitleFontPixelSize, 11);
+    QVERIFY(entries.showSubtitle);
+
+    QSettings settings;
+    settings.setValue(QStringLiteral("appearance/sidebar-item-size"),
+                      QStringLiteral("obsolete"));
+    settings.setValue(QStringLiteral("appearance/entry-list-item-size"),
+                      QStringLiteral("huge"));
+    QCOMPARE(appearancesettings::sidebarItemSize(), QStringLiteral("default"));
+    QCOMPARE(appearancesettings::entryListItemSize(), QStringLiteral("default"));
+    QCOMPARE(appearancesettings::sidebarItemMetrics().rowHeight, 26);
+    QCOMPARE(appearancesettings::entryListItemMetrics().rowHeight, 66);
+}
+
+void ApplicationIconTests::appearanceSizePreferencesPersistAndNotify() {
+    QSignalSpy sidebarSpy(appearancesettings::notifier(),
+                          &appearancesettings::Notifier::sidebarItemSizeChanged);
+    QSignalSpy entrySpy(appearancesettings::notifier(),
+                        &appearancesettings::Notifier::entryListItemSizeChanged);
+    QSignalSpy changedSpy(appearancesettings::notifier(),
+                          &appearancesettings::Notifier::changed);
+
+    appearancesettings::setSidebarItemSize(QStringLiteral("small"));
+    QCOMPARE(appearancesettings::sidebarItemSize(), QStringLiteral("small"));
+    auto sidebar = appearancesettings::sidebarItemMetrics();
+    QCOMPARE(sidebar.fontPixelSize, 14);
+    QCOMPARE(sidebar.iconExtent, 18);
+    QCOMPARE(sidebar.rowHeight, 22);
+    QCOMPARE(sidebar.indentation, 27);
+    QCOMPARE(sidebarSpy.count(), 1);
+    QCOMPARE(changedSpy.count(), 1);
+
+    // Re-selecting the active preset is a no-op, including its signals.
+    appearancesettings::setSidebarItemSize(QStringLiteral("small"));
+    QCOMPARE(sidebarSpy.count(), 1);
+    QCOMPARE(changedSpy.count(), 1);
+
+    appearancesettings::setSidebarItemSize(QStringLiteral("large"));
+    sidebar = appearancesettings::sidebarItemMetrics();
+    QCOMPARE(sidebar.fontPixelSize, 20);
+    QCOMPARE(sidebar.iconExtent, 26);
+    QCOMPARE(sidebar.rowHeight, 31);
+    QCOMPARE(sidebar.indentation, 39);
+    QCOMPARE(sidebarSpy.count(), 2);
+    QCOMPARE(changedSpy.count(), 2);
+
+    appearancesettings::setEntryListItemSize(QStringLiteral("small"));
+    QCOMPARE(appearancesettings::entryListItemSize(), QStringLiteral("small"));
+    auto entries = appearancesettings::entryListItemMetrics();
+    QCOMPARE(entries.rowHeight, 52);
+    QCOMPARE(entries.iconExtent, 28);
+    QCOMPARE(entries.nameFontPixelSize, 13);
+    QCOMPARE(entries.subtitleFontPixelSize, 10);
+    QVERIFY(entries.showSubtitle);
+    QCOMPARE(entrySpy.count(), 1);
+    QCOMPARE(changedSpy.count(), 3);
+
+    appearancesettings::setEntryListItemSize(QStringLiteral("small"));
+    QCOMPARE(entrySpy.count(), 1);
+    QCOMPARE(changedSpy.count(), 3);
+
+    appearancesettings::setEntryListItemSize(QStringLiteral("ultra-compact"));
+    QCOMPARE(appearancesettings::entryListItemSize(),
+             QStringLiteral("ultra-compact"));
+    entries = appearancesettings::entryListItemMetrics();
+    QCOMPARE(entries.rowHeight, 38);
+    QCOMPARE(entries.iconExtent, 22);
+    QCOMPARE(entries.nameFontPixelSize, 13);
+    QCOMPARE(entries.subtitleFontPixelSize, 10);
+    QVERIFY(!entries.showSubtitle);
+    QCOMPARE(entrySpy.count(), 2);
+    QCOMPARE(changedSpy.count(), 4);
+
+    appearancesettings::setEntryListItemSize(QStringLiteral("ultra-compact"));
+    QCOMPARE(entrySpy.count(), 2);
+    QCOMPARE(changedSpy.count(), 4);
+
+    QSettings written;
+    written.sync();
+    QCOMPARE(written.value(QStringLiteral("appearance/sidebar-item-size")).toString(),
+             QStringLiteral("large"));
+    QCOMPARE(written.value(QStringLiteral("appearance/entry-list-item-size")).toString(),
+             QStringLiteral("ultra-compact"));
+
+    // Unsupported setter values are normalized and persisted as "default".
+    appearancesettings::setSidebarItemSize(QStringLiteral("gigantic"));
+    appearancesettings::setEntryListItemSize(QStringLiteral("microscopic"));
+    QCOMPARE(QSettings()
+                 .value(QStringLiteral("appearance/sidebar-item-size"))
+                 .toString(),
+             QStringLiteral("default"));
+    QCOMPARE(QSettings()
+                 .value(QStringLiteral("appearance/entry-list-item-size"))
+                 .toString(),
+             QStringLiteral("default"));
+    QCOMPARE(sidebarSpy.count(), 3);
+    QCOMPARE(entrySpy.count(), 3);
+    QCOMPARE(changedSpy.count(), 6);
 }
 
 void ApplicationIconTests::catalogAssetsAreUsableAndIdsAreUnique() {
