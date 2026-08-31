@@ -8,7 +8,9 @@ GitHub-generated release notes are a publication aid, not a second authoritative
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- Added the Nightlock Glow application icon as an alternative in Settings → Appearance while keeping Petal Keyhole as the default.
 
 ## [1.2.7] - 2026-08-31
 

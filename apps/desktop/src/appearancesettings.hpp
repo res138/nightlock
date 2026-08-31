@@ -14,7 +14,11 @@ namespace appearancesettings {
 // Stable option ids, index-aligned with their Settings controls.
 inline constexpr const char* kThemes[] = {"light", "dark", "system"};
 inline constexpr const char* kAccents[] = {"black", "blue", "green"};
-inline constexpr const char* kApplicationIcons[] = {"petal-keyhole", "flower"};
+inline constexpr const char* kApplicationIcons[] = {
+    "petal-keyhole",
+    "flower",
+    "nightlock-glow",
+};
 inline constexpr const char* kSidebarItemSizes[] = {"small", "default", "large"};
 inline constexpr const char* kEntryListItemSizes[] = {
     "default", "small", "ultra-compact"};

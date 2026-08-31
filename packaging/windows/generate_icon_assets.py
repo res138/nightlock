@@ -94,6 +94,7 @@ def main() -> None:
         (icons / "appicon-petal-keyhole.png", resources / "nightlock.ico"),
         (icons / "appicon-petal-keyhole.png", icons / "appicon-petal-keyhole.ico"),
         (icons / "appicon-flower.png", icons / "appicon-flower.ico"),
+        (icons / "appicon-nightlock-glow.png", icons / "appicon-nightlock-glow.ico"),
     )
 
     with tempfile.TemporaryDirectory(prefix="nightlock-windows-icons-") as raw:
