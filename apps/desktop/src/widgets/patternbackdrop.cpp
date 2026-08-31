@@ -12,6 +12,9 @@
 #include <cmath>
 #include <functional>
 
+#include "iconreferences.hpp"
+#include "iconpackmanager.hpp"
+
 namespace {
 
 constexpr qreal kGlowSoftAlpha = 0.17;   // blob center alpha, "barely there"
@@ -288,8 +291,22 @@ void paintHalo(QPainter& painter, const QSizeF& size, const QVector<QColor>& pal
 }  // namespace
 
 PatternBackdrop::PatternBackdrop(QWidget* parent) : QWidget(parent) {
+    iconreferences::initialize();
     // Purely decorative: clicks fall through to whatever is above.
     setAttribute(Qt::WA_TransparentForMouseEvents);
+    connect(iconpacks::IconPackManager::instance(),
+            &iconpacks::IconPackManager::packChanged, this,
+            [this](const QString&) {
+                if (kind_ == nightlock::Pattern::None)
+                    return;
+                const QString path = iconreferences::resolveOrFallback(
+                    iconValue_, QStringLiteral(":/icons/entry.png"));
+                if (path == iconPath_)
+                    return;
+                iconPath_ = path;
+                cache_.clear();
+                update();
+            });
 }
 
 void PatternBackdrop::setEntry(const nightlock::Entry* entry) {
@@ -297,11 +314,15 @@ void PatternBackdrop::setEntry(const nightlock::Entry* entry) {
     QString iconPath;
     quint64 seed = 0;
     if (entry && kind != nightlock::Pattern::None) {
-        iconPath = entry->icon.empty() ? QStringLiteral(":/icons/entry.png")
-                                       : QString::fromStdString(entry->icon);
+        iconValue_ = QString::fromStdString(entry->icon);
+        iconPath = iconreferences::resolveOrFallback(
+            iconValue_,
+            QStringLiteral(":/icons/entry.png"));
         seed = std::hash<long long>{}(
             entry->created.time_since_epoch().count());
     }
+    if (!entry || kind == nightlock::Pattern::None)
+        iconValue_.clear();
     if (kind == kind_ && iconPath == iconPath_ && seed == seed_)
         return;
     kind_ = kind;

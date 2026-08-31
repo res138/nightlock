@@ -13,6 +13,7 @@
 #include "appearancesettings.hpp"
 #include "demovault.hpp"
 #include "fonts.hpp"
+#include "iconpackmanager.hpp"
 #include "standardicons.hpp"
 #include "updatemanager.hpp"
 #include "vaultservice.hpp"
@@ -36,6 +37,42 @@ int main(int argc, char* argv[]) {
     QApplication::setOrganizationName(QStringLiteral("Nightlock"));
     QApplication::setApplicationName(QStringLiteral("Nightlock"));
     QApplication::setApplicationVersion(QStringLiteral(NIGHTLOCK_VERSION));
+
+    // Source-tree package QA can verify the demo catalog without opening a
+    // window. Optional packs remain outside the application bundle; demo mode
+    // resolves them directly from NIGHTLOCK_ICON_PACK_SOURCE_DIR.
+    if (qEnvironmentVariableIsSet("NIGHTLOCK_EXPECT_ICON_PACKS") ||
+        qEnvironmentVariableIsSet("NIGHTLOCK_EXPECT_ICONS")) {
+        const QVector<iconpacks::Pack> packs =
+            iconpacks::IconPackManager::instance()->installedPacks();
+        int iconCount = 0;
+        for (const iconpacks::Pack& pack : packs)
+            iconCount += pack.iconCount;
+        bool validPackCount = true;
+        bool validIconCount = true;
+        const int expectedPacks =
+            qEnvironmentVariableIsSet("NIGHTLOCK_EXPECT_ICON_PACKS")
+                ? qEnvironmentVariableIntValue("NIGHTLOCK_EXPECT_ICON_PACKS",
+                                               &validPackCount)
+                : packs.size();
+        const int expectedIcons =
+            qEnvironmentVariableIsSet("NIGHTLOCK_EXPECT_ICONS")
+                ? qEnvironmentVariableIntValue("NIGHTLOCK_EXPECT_ICONS",
+                                               &validIconCount)
+                : iconCount;
+        if (!validPackCount || !validIconCount || expectedPacks != packs.size() ||
+            expectedIcons != iconCount) {
+            qCritical().noquote()
+                << "Nightlock icon catalog check failed: expected"
+                << expectedPacks << "packs /" << expectedIcons
+                << "icons, loaded" << packs.size() << "packs /"
+                << iconCount << "icons";
+            return 1;
+        }
+        qInfo().noquote() << "Nightlock icon catalog check passed:"
+                          << packs.size() << "packs /" << iconCount << "icons";
+        return 0;
+    }
 
     // Package verification uses the installed executable itself to force-load
     // the TLS backend without depending on GitHub or any other live service.
@@ -127,11 +164,6 @@ int main(int argc, char* argv[]) {
     macwindow::layoutTrafficLights(&window, 20, 23);
 #endif
 
-    // Decode the icon packs up front (background thread), so the
-    // gallery scrolls smoothly the first time it opens.
-    standardicons::preloadGalleryIcons();
-    QObject::connect(&app, &QCoreApplication::aboutToQuit,
-                     [] { standardicons::stopGalleryPreload(); });
     // A pending debounced autosave must reach the disk before exit.
     QObject::connect(&app, &QCoreApplication::aboutToQuit,
                      [service] { service->saveNow(); });

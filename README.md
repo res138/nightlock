@@ -25,6 +25,8 @@ The desktop application checks the official stable GitHub Release at startup by 
 - encrypted `.nlck` vaults using Argon2id and XChaCha20-Poly1305;
 - hierarchical groups and password entries;
 - login, password, URL, note, icon, code, timestamps, and visual pattern fields;
+- an on-demand Icons Library with one lightweight built-in pack and verified
+  PNG-only collections downloaded from the official repository;
 - cryptographically secure password generation;
 - a Qt Widgets desktop interface with search, graph, settings, lock flows, and stable-release update checks;
 - a scriptable CLI for vault creation, inspection, mutation, password changes, and generation;

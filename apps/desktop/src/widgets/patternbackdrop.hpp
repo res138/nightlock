@@ -35,6 +35,7 @@ private:
     QPixmap generate() const;
 
     nightlock::Pattern kind_ = nightlock::Pattern::None;
+    QString iconValue_;       // persisted URI/path, retained while unresolved
     QString iconPath_;        // resolved icon path (default when empty)
     quint64 seed_ = 0;        // std::hash of Entry::created
     int iconCenterY_ = 0;

@@ -36,6 +36,7 @@ private:
     QWidget* buildAppearancePage();
     QWidget* buildHotkeysPage();
     QWidget* buildGraphPage();
+    QWidget* buildIconsLibraryPage();
 
     QListWidget* nav_;
     QStackedWidget* pages_;

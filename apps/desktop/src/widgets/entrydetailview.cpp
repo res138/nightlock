@@ -24,6 +24,8 @@
 #include "expirationui.hpp"
 #include "generalsettings.hpp"
 #include "graphsettings.hpp"
+#include "iconreferences.hpp"
+#include "iconpackmanager.hpp"
 
 #include <nightlock/entry.hpp>
 
@@ -293,6 +295,7 @@ private:
 
 EntryDetailView::EntryDetailView(QWidget* parent)
     : QScrollArea(parent), entryColor_(nightlock::EntryColor::None) {
+    iconreferences::initialize();
     setWindowTitle(tr("Entry Details"));
     setWidgetResizable(true);
     setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -540,6 +543,16 @@ EntryDetailView::EntryDetailView(QWidget* parent)
     floatingBackdrop_->lower();
     floatingBackdrop_->hide();
 
+    connect(iconpacks::IconPackManager::instance(),
+            &iconpacks::IconPackManager::packChanged, this,
+            [this](const QString&) {
+                if (!content_->isVisible())
+                    return;
+                iconPath_ = iconreferences::resolveOrFallback(
+                    iconValue_, QStringLiteral(":/icons/entry.png"));
+                refreshEntryIcon();
+            });
+
     setEntry(nullptr);
 }
 
@@ -694,6 +707,7 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     editButton_->setVisible(entry != nullptr);
     syncGeneratorVisibility();
     if (!entry) {
+        iconValue_ = QString();
         iconPath_.clear();
         iconLabel_->clear();
         entryColor_ = nightlock::EntryColor::None;
@@ -704,12 +718,13 @@ void EntryDetailView::setEntry(const nightlock::Entry* entry) {
     entryColor_ = entry->color;
     refreshCardColors();
 
-    iconPath_ = entry->icon.empty() ? QStringLiteral(":/icons/entry.png")
-                                    : QString::fromStdString(entry->icon);
-    // Select the variant through QIcon, exactly like the entry list
-    // does: pack .ico files hold several sizes and color depths, and
-    // QPixmap would load only the first sub-image — often a different
-    // rendition than the one the list shows.
+    iconValue_ = QString::fromStdString(entry->icon);
+    iconPath_ = iconreferences::resolveOrFallback(
+        iconValue_,
+        QStringLiteral(":/icons/entry.png"));
+    // Select the variant through QIcon, exactly like the entry list does.
+    // Downloadable packs are PNG-only; legacy resource/file paths remain
+    // supported by iconreferences.
     refreshEntryIcon();
 
     titleLabel_->setText(QString::fromStdString(entry->name));

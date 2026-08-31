@@ -117,6 +117,7 @@ private:
     SpoilerLabel* passwordSpoiler_;
     FieldRow urlRow_;
     QString url_;  // shown link, re-colored on a theme switch
+    QString iconValue_;  // persisted URI/path, retained while unresolved
     QString iconPath_;  // re-rasterized when a window crosses DPI boundaries
     nightlock::EntryColor entryColor_;
     FieldRow codeRow_;

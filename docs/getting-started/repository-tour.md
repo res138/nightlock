@@ -35,6 +35,7 @@ graph TD
 | `apps/desktop/src/windows/` | Main desktop windows and flows | Vault service lifecycle and debug-hook classification |
 | `apps/desktop/src/widgets/` | Reusable Qt presentation widgets | Accessibility and secret-copy implications |
 | `apps/desktop/resources/` | Qt resources, icons, optional fonts | Licensing and installed resource paths |
+| `icon-packs/` | Download catalog, normalized manifests, PNG assets, and provenance | Stable IDs, hashes, source rights, and client safety limits |
 | `tests/` | doctest core coverage and CLI smoke script | Testing conventions and platform behavior |
 | `packaging/` | DMG, Inno Setup, and Debian construction | CMake install layout and release runbook |
 | `.github/workflows/` | Build and release automation | Permissions, triggers, and artifact contracts |

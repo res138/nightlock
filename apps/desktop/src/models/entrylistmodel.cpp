@@ -8,6 +8,8 @@
 
 #include <nightlock/group.hpp>
 
+#include "iconreferences.hpp"
+#include "iconpackmanager.hpp"
 #include "vaultservice.hpp"
 #include "expirationui.hpp"
 
@@ -27,7 +29,16 @@ nightlock::Entry* decodeEntry(const QMimeData* data) {
 }  // namespace
 
 EntryListModel::EntryListModel(QObject* parent)
-    : QAbstractListModel(parent), defaultIcon_(QStringLiteral(":/icons/entry.png")) {}
+    : QAbstractListModel(parent), defaultIcon_(QStringLiteral(":/icons/entry.png")) {
+    iconreferences::initialize();
+    connect(iconpacks::IconPackManager::instance(),
+            &iconpacks::IconPackManager::packChanged, this,
+            [this](const QString&) {
+                if (rowCount() > 0)
+                    emit dataChanged(index(0, 0), index(rowCount() - 1, 0),
+                                     {Qt::DecorationRole});
+            });
+}
 
 void EntryListModel::setGroup(nightlock::Group* group) {
     beginResetModel();
@@ -238,8 +249,11 @@ QVariant EntryListModel::data(const QModelIndex& index, int role) const {
     case ExpiredRole:
         return expirationui::isExpired(*e);
     case Qt::DecorationRole:
-        if (!e->icon.empty())
-            return QIcon(QString::fromStdString(e->icon));
+        if (!e->icon.empty()) {
+            return QIcon(iconreferences::resolveOrFallback(
+                QString::fromStdString(e->icon),
+                QStringLiteral(":/icons/entry.png")));
+        }
         return defaultIcon_;
     }
     return {};

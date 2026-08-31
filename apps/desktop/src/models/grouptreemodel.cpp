@@ -7,6 +7,8 @@
 #include <nightlock/group.hpp>
 
 #include "appearancesettings.hpp"
+#include "iconreferences.hpp"
+#include "iconpackmanager.hpp"
 #include "vaultservice.hpp"
 
 namespace {
@@ -28,10 +30,14 @@ GroupTreeModel::GroupTreeModel(nightlock::Group* root, QObject* parent)
     : QAbstractItemModel(parent),
       root_(root),
       folderIcon_(QStringLiteral(":/icons/folder.png")) {
+    iconreferences::initialize();
     // The Settings → Appearance "Folder icons" toggle lands here: the
     // decoration column re-resolves against the new preference.
     connect(appearancesettings::notifier(), &appearancesettings::Notifier::changed, this,
             [this] { emit layoutChanged(); });
+    connect(iconpacks::IconPackManager::instance(),
+            &iconpacks::IconPackManager::packChanged, this,
+            [this](const QString&) { emit layoutChanged(); });
 }
 
 void GroupTreeModel::setRootGroup(nightlock::Group* root) {
@@ -76,8 +82,11 @@ QVariant GroupTreeModel::data(const QModelIndex& index, int role) const {
     case Qt::DecorationRole:
         if (!appearancesettings::folderIcons())
             return {};
-        if (!g->icon().empty())
-            return QIcon(QString::fromStdString(g->icon()));
+        if (!g->icon().empty()) {
+            return QIcon(iconreferences::resolveOrFallback(
+                QString::fromStdString(g->icon()),
+                QStringLiteral(":/icons/folder.png")));
+        }
         return folderIcon_;
     }
     return {};
@@ -112,7 +121,7 @@ bool GroupTreeModel::setGroupIcon(const QModelIndex& index, const QString& path)
     auto* g = group(index);
     if (!g)
         return false;
-    g->setIcon(path.toStdString());
+    g->setIcon(iconreferences::normalizeStoredValue(path).toStdString());
     emit dataChanged(index, index, {Qt::DecorationRole});
     VaultService::instance()->markDirty();
     return true;
