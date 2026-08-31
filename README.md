@@ -1,4 +1,7 @@
-# Nightlock
+<div align="left">
+<img alt="Nightlock Appicon" src="./apps/desktop/resources/icons/appicon.png" width="112px">
+<h2> Nightlock Source Code </h2>
+</div>
 
 [![Release](https://img.shields.io/github/v/release/res138/nightlock?display_name=tag&sort=semver&label=release)](https://github.com/res138/nightlock/releases/latest)
 [![Build](https://github.com/res138/nightlock/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/res138/nightlock/actions/workflows/build.yml)
