@@ -46,6 +46,11 @@ const QVector<ApplicationIcon>& applicationIcons() {
          QStringLiteral("appicon-flower.png"),
          QStringLiteral("appicon-flower-locked.png"),
          QStringLiteral("appicon-flower.ico")},
+        {QStringLiteral("nightlock-glow"),
+         QCoreApplication::translate("standardicons", "Nightlock Glow"),
+         QStringLiteral("appicon-nightlock-glow.png"),
+         QStringLiteral("appicon-nightlock-glow-locked.png"),
+         QStringLiteral("appicon-nightlock-glow.ico")},
     };
     return icons;
 }

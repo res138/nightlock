@@ -8,6 +8,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 
+#include <algorithm>
 #include <iterator>
 
 #include "appearancesettings.hpp"
@@ -24,10 +25,11 @@ private slots:
 
     void defaultAndInvalidPreferencesFallBack();
     void preferencePersists();
+    void nightlockGlowPersistsAsAlternative();
     void appearanceSizeDefaultsAndInvalidValuesFallBack();
     void appearanceSizePreferencesPersistAndNotify();
     void catalogAssetsAreUsableAndIdsAreUnique();
-    void lockedResourcesDecodeAndPetalArtworkDiffers();
+    void lockedResourcesDecodeAndArtworkDiffers();
     void windowsIcoAssetsCoverFractionalDpi();
     void fractionalDprIconsUsePhysicalPixels();
     void pickerRendersExclusiveOptionsAndSelectsOnClick();
@@ -96,6 +98,44 @@ void ApplicationIconTests::preferencePersists() {
     QCOMPARE(reopened.value(QStringLiteral("appearance/application-icon")).toString(),
              selectedId);
     QCOMPARE(appearancesettings::applicationIcon(), selectedId);
+}
+
+void ApplicationIconTests::nightlockGlowPersistsAsAlternative() {
+    const QString alternativeId = QStringLiteral("nightlock-glow");
+    const auto& catalog = standardicons::applicationIcons();
+    const auto found = std::find_if(
+        catalog.cbegin(), catalog.cend(), [&alternativeId](const auto& choice) {
+            return choice.id == alternativeId;
+        });
+    QVERIFY2(found != catalog.cend(),
+             "Nightlock Glow is missing from the icon picker");
+    QVERIFY2(found->id != standardicons::defaultApplicationIcon().id,
+             "Nightlock Glow must remain an alternative, not the product default");
+    const QImage artwork(respaths::icon(found->resource));
+    QCOMPARE(artwork.size(), QSize(1024, 1024));
+    QVERIFY(artwork.hasAlphaChannel());
+
+    QSignalSpy iconSpy(appearancesettings::notifier(),
+                       &appearancesettings::Notifier::applicationIconChanged);
+    appearancesettings::setApplicationIcon(alternativeId);
+
+    QSettings written;
+    written.sync();
+    QCOMPARE(written.status(), QSettings::NoError);
+    QCOMPARE(appearancesettings::applicationIcon(), alternativeId);
+    QCOMPARE(written.value(QStringLiteral("appearance/application-icon")).toString(),
+             alternativeId);
+    QCOMPARE(iconSpy.count(), 1);
+
+    QSettings reopened(QSettings::IniFormat, QSettings::UserScope,
+                       QCoreApplication::organizationName(),
+                       QCoreApplication::applicationName());
+    QCOMPARE(reopened.value(QStringLiteral("appearance/application-icon")).toString(),
+             alternativeId);
+
+    appearancesettings::setApplicationIcon(alternativeId);
+    QCOMPARE(iconSpy.count(), 1);
+    QVERIFY(!standardicons::applicationIconForId(alternativeId).isNull());
 }
 
 void ApplicationIconTests::appearanceSizeDefaultsAndInvalidValuesFallBack() {
@@ -247,11 +287,7 @@ void ApplicationIconTests::catalogAssetsAreUsableAndIdsAreUnique() {
     }
 }
 
-void ApplicationIconTests::lockedResourcesDecodeAndPetalArtworkDiffers() {
-#ifdef Q_OS_WIN
-    QSKIP("Windows deliberately uses the regular multi-frame ICO while locked");
-#else
-    bool foundPetalKeyhole = false;
+void ApplicationIconTests::lockedResourcesDecodeAndArtworkDiffers() {
     for (const standardicons::ApplicationIcon& choice :
          standardicons::applicationIcons()) {
         const QString regularPath = respaths::icon(choice.resource);
@@ -260,22 +296,20 @@ void ApplicationIconTests::lockedResourcesDecodeAndPetalArtworkDiffers() {
         const QImage locked(lockedPath);
         QVERIFY2(!regular.isNull(), qPrintable(regularPath));
         QVERIFY2(!locked.isNull(), qPrintable(lockedPath));
-
-        if (choice.id != QLatin1String("petal-keyhole"))
-            continue;
-        foundPetalKeyhole = true;
         QVERIFY2(choice.lockedResource != choice.resource,
-                 "Petal Keyhole must use separate regular and locked files");
+                 qPrintable(
+                     QStringLiteral("%1 must use separate regular and locked files")
+                         .arg(choice.id)));
 
         const QImage regularPixels =
             regular.convertToFormat(QImage::Format_RGBA8888);
         const QImage lockedPixels =
             locked.convertToFormat(QImage::Format_RGBA8888);
         QVERIFY2(regularPixels != lockedPixels,
-                 "Petal Keyhole locked artwork must visibly differ from regular artwork");
+                 qPrintable(QStringLiteral(
+                                "%1 locked artwork must visibly differ from regular artwork")
+                                .arg(choice.id)));
     }
-    QVERIFY2(foundPetalKeyhole, "Petal Keyhole is missing from the application-icon catalog");
-#endif
 }
 
 void ApplicationIconTests::windowsIcoAssetsCoverFractionalDpi() {
@@ -424,6 +458,7 @@ void ApplicationIconTests::fractionalDprIconsUsePhysicalPixels() {
 void ApplicationIconTests::pickerRendersExclusiveOptionsAndSelectsOnClick() {
     const auto& catalog = standardicons::applicationIcons();
     QVERIFY2(catalog.size() > 1, "The picker needs at least two application icons");
+    const QString alternativeId = QStringLiteral("nightlock-glow");
 
     ApplicationIconPicker picker(catalog.first().id);
     picker.show();
@@ -445,7 +480,7 @@ void ApplicationIconTests::pickerRendersExclusiveOptionsAndSelectsOnClick() {
         QVERIFY(!button->accessibleName().isEmpty());
         QVERIFY(!button->toolTip().isEmpty());
         checkedCount += button->isChecked() ? 1 : 0;
-        if (id == catalog.at(1).id)
+        if (id == alternativeId)
             target = button;
     }
     QCOMPARE(renderedIds.size(), catalog.size());
@@ -457,8 +492,8 @@ void ApplicationIconTests::pickerRendersExclusiveOptionsAndSelectsOnClick() {
     QTest::mouseClick(target, Qt::LeftButton);
 
     QCOMPARE(selected.count(), 1);
-    QCOMPARE(selected.takeFirst().at(0).toString(), catalog.at(1).id);
-    QCOMPARE(picker.selectedIconId(), catalog.at(1).id);
+    QCOMPARE(selected.takeFirst().at(0).toString(), alternativeId);
+    QCOMPARE(picker.selectedIconId(), alternativeId);
     QVERIFY(target->isChecked());
 
     checkedCount = 0;
