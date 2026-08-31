@@ -68,7 +68,7 @@ Secrets in the core live in `secure::String`/`secure::Bytes`
 - The generator (`nightlock gen`, `nightlock::generatePassword`) draws
   through `randombytes_uniform` — unbiased, CSPRNG-backed.
 
-## Network access and update checks
+## Network access, update checks, and icon packs
 
 The desktop application checks Nightlock's latest stable GitHub Release after
 startup by default. The check is asynchronous and can be disabled under
@@ -97,3 +97,21 @@ code signing establish a stronger trust chain. See
 [RFC-0001](rfcs/0001-stable-release-update-checks.md), the
 [desktop update manager](../apps/desktop/src/updatemanager.cpp), and its
 [release-metadata tests](../apps/desktop/tests/test_updates.cpp).
+
+Opening **Settings → Icons Library** performs a separate, user-initiated HTTPS
+catalog request to
+`raw.githubusercontent.com/res138/nightlock/main/icon-packs/catalog.json`.
+Nightlock then downloads a selected pack's manifest and PNG files from the same
+official repository. It sends the `Nightlock-Icon-Library/1` User-Agent and no
+vault or installation data. A developer build started with `NIGHTLOCK_DEMO=1`
+does not refresh automatically; it exposes validated source-tree packs as
+read-only previews so they can be tested without entering an installer.
+
+Catalog paths are constrained to the official `icon-packs/` tree, redirects
+must remain on the same trusted origin, and every declared icon is checked for
+its exact size, SHA-256 digest, PNG signature, decodability, and bounded image
+dimensions before the staged pack is activated. Downloaded packs live in
+per-user local application data (not Windows roaming data), remain available
+offline, and can be removed from the library. See the
+[pack format and publishing rules](../icon-packs/README.md) and
+[icon-pack tests](../apps/desktop/tests/test_icon_packs.cpp).

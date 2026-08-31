@@ -12,6 +12,8 @@ qt_add_executable(nightlock-desktop
     src/generalsettings.cpp
     src/graphsettings.cpp
     src/hotkeys.cpp
+    src/iconpackmanager.cpp
+    src/iconreferences.cpp
     src/respaths.cpp
     src/standardicons.cpp
     src/touchid.hpp
@@ -46,13 +48,16 @@ qt_add_executable(nightlock-desktop
 
 target_include_directories(nightlock-desktop PRIVATE src)
 
-# The P* icon packs are loaded from disk at runtime — ~190 MB is too
-# much to embed as Qt resources. Dev builds read the source tree
-# (these definitions); installed builds carry copies inside the
-# package, which respaths prefers when they exist.
+# The source tree still contains the legacy P* material while it is curated
+# into downloadable PNG-only packs. The icon library ships one tiny Qt-resource
+# pack and downloads every optional pack into per-user local application data.
 target_compile_definitions(nightlock-desktop PRIVATE
     NIGHTLOCK_VERSION="${PROJECT_VERSION}"
     NIGHTLOCK_ICONS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
+    # Developer demo builds expose source-tree packs without embedding them in
+    # Nightlock.app. Packaged builds do not have this path on the end user's
+    # machine, so the production download-only contract remains unchanged.
+    NIGHTLOCK_ICON_PACK_SOURCE_DIR="${CMAKE_SOURCE_DIR}/icon-packs"
     # San Francisco for non-Apple platforms is side-loaded from here
     # (Apple's license keeps the files out of the repository).
     NIGHTLOCK_FONTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/fonts")
@@ -81,6 +86,8 @@ if(NIGHTLOCK_BUILD_TESTS)
         tests/test_application_icons.cpp
         src/appearancesettings.cpp
         src/fonts.cpp
+        src/iconpackmanager.cpp
+        src/iconreferences.cpp
         src/respaths.cpp
         src/standardicons.cpp
         src/widgets/applicationiconpicker.cpp
@@ -91,7 +98,7 @@ if(NIGHTLOCK_BUILD_TESTS)
         NIGHTLOCK_ICONS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
         NIGHTLOCK_FONTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/fonts")
     target_link_libraries(nightlock-desktop-icon-tests PRIVATE
-        Qt6::Widgets Qt6::Svg Qt6::Test)
+        Qt6::Widgets Qt6::Svg Qt6::Network Qt6::Test)
 
     add_test(NAME desktop_app_icons COMMAND nightlock-desktop-icon-tests)
     set_tests_properties(desktop_app_icons PROPERTIES
@@ -112,6 +119,50 @@ if(NIGHTLOCK_BUILD_TESTS)
     set_tests_properties(desktop_updates PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+    qt_add_executable(nightlock-desktop-icon-pack-tests
+        tests/test_icon_packs.cpp
+        src/iconpackmanager.cpp
+        resources/resources.qrc
+    )
+    target_include_directories(nightlock-desktop-icon-pack-tests PRIVATE src)
+    target_compile_definitions(nightlock-desktop-icon-pack-tests PRIVATE
+        NIGHTLOCK_VERSION="${PROJECT_VERSION}"
+        NIGHTLOCK_ICON_PACK_TESTING=1
+        NIGHTLOCK_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+    target_link_libraries(nightlock-desktop-icon-pack-tests PRIVATE
+        Qt6::Widgets Qt6::Network Qt6::Test)
+
+    add_test(NAME desktop_icon_packs COMMAND nightlock-desktop-icon-pack-tests)
+    set_tests_properties(desktop_icon_packs PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    qt_add_executable(nightlock-desktop-icon-reference-tests
+        tests/test_icon_references.cpp
+        src/appearancesettings.cpp
+        src/fonts.cpp
+        src/iconpackmanager.cpp
+        src/iconreferences.cpp
+        src/respaths.cpp
+        src/standardicons.cpp
+        src/widgets/frostedpanel.cpp
+        src/widgets/icongallerypopup.cpp
+        src/widgets/iconpicker.cpp
+        src/widgets/overlayscrollbar.cpp
+        resources/resources.qrc
+    )
+    target_include_directories(nightlock-desktop-icon-reference-tests PRIVATE src)
+    target_compile_definitions(nightlock-desktop-icon-reference-tests PRIVATE
+        NIGHTLOCK_VERSION="${PROJECT_VERSION}"
+        NIGHTLOCK_ICONS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
+        NIGHTLOCK_FONTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/fonts")
+    target_link_libraries(nightlock-desktop-icon-reference-tests PRIVATE
+        Qt6::Widgets Qt6::Svg Qt6::Network Qt6::Test)
+
+    add_test(NAME desktop_icon_references
+        COMMAND nightlock-desktop-icon-reference-tests)
+    set_tests_properties(desktop_icon_references PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
     qt_add_executable(nightlock-desktop-entry-detail-tests
         tests/test_entry_detail_view.cpp
         src/appearancesettings.cpp
@@ -119,6 +170,8 @@ if(NIGHTLOCK_BUILD_TESTS)
         src/fonts.cpp
         src/generalsettings.cpp
         src/graphsettings.cpp
+        src/iconpackmanager.cpp
+        src/iconreferences.cpp
         src/respaths.cpp
         src/standardicons.cpp
         src/widgets/copylabel.cpp
@@ -136,7 +189,7 @@ if(NIGHTLOCK_BUILD_TESTS)
         NIGHTLOCK_ICONS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
         NIGHTLOCK_FONTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/fonts")
     target_link_libraries(nightlock-desktop-entry-detail-tests PRIVATE
-        Qt6::Widgets Qt6::Svg Qt6::Test nightlock-core)
+        Qt6::Widgets Qt6::Svg Qt6::Network Qt6::Test nightlock-core)
 
     add_test(NAME desktop_entry_detail COMMAND nightlock-desktop-entry-detail-tests)
     set_tests_properties(desktop_entry_detail PROPERTIES
@@ -260,10 +313,19 @@ endif()
 # Windows: GUI + resources at the root, CLI in bin\ for the PATH.
 # Linux: GUI in lib/nightlock (bundled Qt lands next to it), the CLI
 #   is bin/nightlock, resources under share/nightlock.
+set(NIGHTLOCK_APPLICATION_ICON_ASSETS
+    resources/icons/appicon-petal-keyhole.png
+    resources/icons/appicon-petal-keyhole-locked.png
+    resources/icons/appicon-petal-keyhole.ico
+    resources/icons/appicon-flower.png
+    resources/icons/appicon-flower-locked.png
+    resources/icons/appicon-flower.ico)
+
 if(APPLE)
     set(NIGHTLOCK_BUNDLE_RESOURCES Nightlock.app/Contents/Resources)
     install(TARGETS nightlock-desktop BUNDLE DESTINATION .)
-    install(DIRECTORY resources/icons DESTINATION ${NIGHTLOCK_BUNDLE_RESOURCES})
+    install(FILES ${NIGHTLOCK_APPLICATION_ICON_ASSETS}
+            DESTINATION ${NIGHTLOCK_BUNDLE_RESOURCES}/icons)
     install(DIRECTORY resources/fonts DESTINATION ${NIGHTLOCK_BUNDLE_RESOURCES})
     if(TARGET nightlock-cli)
         install(PROGRAMS $<TARGET_FILE:nightlock-cli>
@@ -271,7 +333,7 @@ if(APPLE)
     endif()
 elseif(WIN32)
     install(TARGETS nightlock-desktop RUNTIME DESTINATION .)
-    install(DIRECTORY resources/icons DESTINATION .)
+    install(FILES ${NIGHTLOCK_APPLICATION_ICON_ASSETS} DESTINATION icons)
     install(DIRECTORY resources/fonts DESTINATION .)
     if(TARGET nightlock-cli)
         install(PROGRAMS $<TARGET_FILE:nightlock-cli>
@@ -279,7 +341,8 @@ elseif(WIN32)
     endif()
 else()
     install(TARGETS nightlock-desktop RUNTIME DESTINATION lib/nightlock)
-    install(DIRECTORY resources/icons DESTINATION share/nightlock)
+    install(FILES ${NIGHTLOCK_APPLICATION_ICON_ASSETS}
+            DESTINATION share/nightlock/icons)
     install(DIRECTORY resources/fonts DESTINATION share/nightlock)
     if(TARGET nightlock-cli)
         install(PROGRAMS $<TARGET_FILE:nightlock-cli>

@@ -1,0 +1,545 @@
+{
+  "schemaVersion": 1,
+  "id": "oxygen-classic",
+  "title": "Oxygen Classic",
+  "description": "A curated set of glossy classic desktop icons from KDE Oxygen Icons 6.29.0.",
+  "version": "6.29.0",
+  "author": "The Oxygen Team and KDE contributors",
+  "license": "LGPL-3.0-or-later",
+  "platforms": [
+    "linux",
+    "macos"
+  ],
+  "categories": [
+    {
+      "id": "applications",
+      "icons": [
+        {
+          "id": "accessories-calculator",
+          "title": "Accessories Calculator",
+          "file": "applications/accessories-calculator.png",
+          "sha256": "5eef59c41ebd33dddd40b3b3a11e9967549289297678669e74e89ddde36de24a",
+          "size": 2433
+        },
+        {
+          "id": "accessories-character-map",
+          "title": "Accessories Character Map",
+          "file": "applications/accessories-character-map.png",
+          "sha256": "d49419d335425384b0676129b80eac1a10bbb84270f6d771ebb1232193a4507c",
+          "size": 2235
+        },
+        {
+          "id": "accessories-dictionary",
+          "title": "Accessories Dictionary",
+          "file": "applications/accessories-dictionary.png",
+          "sha256": "739e30550caecb79c9c076eafe5d5107e7a2be7c9bc9cbbad60340774c1e3848",
+          "size": 3656
+        },
+        {
+          "id": "accessories-text-editor",
+          "title": "Accessories Text Editor",
+          "file": "applications/accessories-text-editor.png",
+          "sha256": "849349e2548b01808d26383c8f22836e7f34d7f81d69dadb05d7e24b4f7d981b",
+          "size": 10535
+        },
+        {
+          "id": "graphics-viewer-document",
+          "title": "Graphics Viewer Document",
+          "file": "applications/graphics-viewer-document.png",
+          "sha256": "b2fcf4e071e53f40adb5d3ea644d560067c058c92c9715204e282dc47ad75f4f",
+          "size": 3324
+        },
+        {
+          "id": "help-browser",
+          "title": "Help Browser",
+          "file": "applications/help-browser.png",
+          "sha256": "b75e9c30fb82029a60b4d42d3fddf7d22151fe420b9f487bc4082650b254be90",
+          "size": 4661
+        },
+        {
+          "id": "internet-mail",
+          "title": "Internet Mail",
+          "file": "applications/internet-mail.png",
+          "sha256": "137bb8453efcc02100ea8ff7c06023615643b2cd7b58882eb5a51e95c6c8e7c4",
+          "size": 4100
+        },
+        {
+          "id": "internet-web-browser",
+          "title": "Internet Web Browser",
+          "file": "applications/internet-web-browser.png",
+          "sha256": "c3cceabaced27590b1f1ae3dfcdf2301efb59ea2d9806e39e91f31a585c23bee",
+          "size": 2925
+        },
+        {
+          "id": "office-calendar",
+          "title": "Office Calendar",
+          "file": "applications/office-calendar.png",
+          "sha256": "778c28b86c4c07f20ef78d310664bf4ff72bc0d958dc030f0059e8e4b37ea7dd",
+          "size": 1700
+        },
+        {
+          "id": "utilities-terminal",
+          "title": "Utilities Terminal",
+          "file": "applications/utilities-terminal.png",
+          "sha256": "b41da210cca16b93b0ff982e77480c595fcbdeb2180bebbf1362e421b0c47bb2",
+          "size": 1664
+        }
+      ]
+    },
+    {
+      "id": "actions",
+      "icons": [
+        {
+          "id": "bookmark-new",
+          "title": "Bookmark New",
+          "file": "actions/bookmark-new.png",
+          "sha256": "357fd77e42c45d6e09020f9665adabd25b9d513ce24ff425e0290067ffb8780d",
+          "size": 2903
+        },
+        {
+          "id": "document-new",
+          "title": "Document New",
+          "file": "actions/document-new.png",
+          "sha256": "ed60e9c001eea26d1d5fa7d6353ba6b5edf56f971e52c47502a21928ca5e1756",
+          "size": 2461
+        },
+        {
+          "id": "document-open",
+          "title": "Document Open",
+          "file": "actions/document-open.png",
+          "sha256": "9a81ff00425b7c184474102165d57476fc9db2e955880d23e126deaf72edda1b",
+          "size": 2798
+        },
+        {
+          "id": "document-print",
+          "title": "Document Print",
+          "file": "actions/document-print.png",
+          "sha256": "2a0fba251db2d7cf0b5fed0454adbe93644dd90a275369c71e735e185eefae38",
+          "size": 1991
+        },
+        {
+          "id": "document-save",
+          "title": "Document Save",
+          "file": "actions/document-save.png",
+          "sha256": "826fbe23c3c037e600ad668dcf6e4763cb1a49c0175b10927a322abc6c022920",
+          "size": 2122
+        },
+        {
+          "id": "edit-copy",
+          "title": "Edit Copy",
+          "file": "actions/edit-copy.png",
+          "sha256": "f012339189d8b733f21868ee5ca3b06344c68bf2400f07fdddea96105296ae51",
+          "size": 1380
+        },
+        {
+          "id": "edit-cut",
+          "title": "Edit Cut",
+          "file": "actions/edit-cut.png",
+          "sha256": "871be50d9a33ee2f7c06f78a0dac78c4fd2fc854785f7470c1907d3a5c851cd2",
+          "size": 1666
+        },
+        {
+          "id": "edit-paste",
+          "title": "Edit Paste",
+          "file": "actions/edit-paste.png",
+          "sha256": "d1e379142d8c9d8c05d1a82c1d22ab365f77ab0b486e0aa5b2496641bc14c5e3",
+          "size": 2028
+        },
+        {
+          "id": "system-lock-screen",
+          "title": "System Lock Screen",
+          "file": "actions/system-lock-screen.png",
+          "sha256": "382fd1e8e5bd35d88e53e585fd768939dab3ee44c74400d6399f3a79014ca2b6",
+          "size": 2914
+        },
+        {
+          "id": "system-search",
+          "title": "System Search",
+          "file": "actions/system-search.png",
+          "sha256": "dc256824cc005be5e60479db200fec8972d033035dbb66b0347adbcba685af38",
+          "size": 4280
+        }
+      ]
+    },
+    {
+      "id": "folders-places",
+      "icons": [
+        {
+          "id": "folder-documents",
+          "title": "Folder Documents",
+          "file": "folders-places/folder-documents.png",
+          "sha256": "22fea480db94ce85cf08f035ae408cf9f5e9f6e8a6b24a185ba4756756934396",
+          "size": 2193
+        },
+        {
+          "id": "folder-download",
+          "title": "Folder Download",
+          "file": "folders-places/folder-download.png",
+          "sha256": "7ae7e4431681ffe82e12c4adfb89a95197ce9e8b527e539d3d4a115f6d261054",
+          "size": 3282
+        },
+        {
+          "id": "folder-music",
+          "title": "Folder Music",
+          "file": "folders-places/folder-music.png",
+          "sha256": "c0ba8935f594ee2d7403779758c2b764e65ac981ab1be6afd892bb367d1cbc69",
+          "size": 2883
+        },
+        {
+          "id": "folder-pictures",
+          "title": "Folder Pictures",
+          "file": "folders-places/folder-pictures.png",
+          "sha256": "125e2cdba837106930ecd76a2c30f2200107f9a4ccdbe1eaf52a4201e341e413",
+          "size": 2561
+        },
+        {
+          "id": "folder-publicshare",
+          "title": "Folder Publicshare",
+          "file": "folders-places/folder-publicshare.png",
+          "sha256": "663e4f13962e6e1e4862c3cb4e2d5866ef4ea38ab0eb47e21612b1392173c691",
+          "size": 4043
+        },
+        {
+          "id": "folder-videos",
+          "title": "Folder Videos",
+          "file": "folders-places/folder-videos.png",
+          "sha256": "921017b2c7761d987ecebd01ffad503c75c1eecad777f7050e7ab41d6f49f8de",
+          "size": 4113
+        },
+        {
+          "id": "folder",
+          "title": "Folder",
+          "file": "folders-places/folder.png",
+          "sha256": "7064550bec810efa839ab7a8df8d5313de7d8096bf0e8350171ed2f3eb96c384",
+          "size": 2169
+        },
+        {
+          "id": "network-server",
+          "title": "Network Server",
+          "file": "folders-places/network-server.png",
+          "sha256": "ce2d405672d43f8c2a6fe56e0484da5c0174011d9890508aa802d010320b6b6b",
+          "size": 1648
+        },
+        {
+          "id": "user-home",
+          "title": "User Home",
+          "file": "folders-places/user-home.png",
+          "sha256": "0012c65ca65a32c71c117b6f9a5c29025ce8d49dab3b403e786123e0d282786c",
+          "size": 2926
+        },
+        {
+          "id": "user-trash",
+          "title": "User Trash",
+          "file": "folders-places/user-trash.png",
+          "sha256": "e658fd1ae27b7933c1ddaf353931326b16d632d8dce11f0223bb0fcb3fe2e06c",
+          "size": 2542
+        }
+      ]
+    },
+    {
+      "id": "devices-volumes",
+      "icons": [
+        {
+          "id": "audio-headphones",
+          "title": "Audio Headphones",
+          "file": "devices-volumes/audio-headphones.png",
+          "sha256": "b256f99f94c49a01d0c212acd3f4ccdbce671d1b4d85248de9f278a7ed425eb2",
+          "size": 2085
+        },
+        {
+          "id": "audio-input-microphone",
+          "title": "Audio Input Microphone",
+          "file": "devices-volumes/audio-input-microphone.png",
+          "sha256": "dba6e969d47394ba893d1e1efc96a5acccdbf6f8c71d5879aa1d0fe6b7a2b744",
+          "size": 3322
+        },
+        {
+          "id": "camera-photo",
+          "title": "Camera Photo",
+          "file": "devices-volumes/camera-photo.png",
+          "sha256": "f53ad90d33dccb862a2d3050fd277fa18ab9aaf7c98efcbeed271991de29e754",
+          "size": 2075
+        },
+        {
+          "id": "computer",
+          "title": "Computer",
+          "file": "devices-volumes/computer.png",
+          "sha256": "48b8a97dfe70ef65dce78af0ecde7c3f7f0ec20a690d2bf68629f15a2a74b02e",
+          "size": 2717
+        },
+        {
+          "id": "drive-harddisk",
+          "title": "Drive Harddisk",
+          "file": "devices-volumes/drive-harddisk.png",
+          "sha256": "ad1e3cefb9a12eb8335b65d47828b738ede590fcbd9ebd0f939ee65c52c7a363",
+          "size": 2336
+        },
+        {
+          "id": "input-keyboard",
+          "title": "Input Keyboard",
+          "file": "devices-volumes/input-keyboard.png",
+          "sha256": "b01ec50a4358663ad3eca00dbdd98c089f1f86b566eb754881da25a5bab3ec2b",
+          "size": 1619
+        },
+        {
+          "id": "input-mouse",
+          "title": "Input Mouse",
+          "file": "devices-volumes/input-mouse.png",
+          "sha256": "75713d71b457a17d27d8b1568f87fa2f5af78ff47c1c10c3d81e56a86d70bffa",
+          "size": 2417
+        },
+        {
+          "id": "media-optical",
+          "title": "Media Optical",
+          "file": "devices-volumes/media-optical.png",
+          "sha256": "53749e6e7ad9a28f17e810575647b9826cb78cc0f292aff270436b2589e287fc",
+          "size": 3739
+        },
+        {
+          "id": "phone",
+          "title": "Phone",
+          "file": "devices-volumes/phone.png",
+          "sha256": "f7a8b4fcfe38d6ccab3aabeb6aa2fe3a00ecb567d995c1d68dce4312df176fc7",
+          "size": 2471
+        },
+        {
+          "id": "printer",
+          "title": "Printer",
+          "file": "devices-volumes/printer.png",
+          "sha256": "362ba1ea94d8a0b05c6e987300a753b8d27062ebee8a5e12c1a7ced9a45c0973",
+          "size": 2209
+        }
+      ]
+    },
+    {
+      "id": "documents-mimetypes",
+      "icons": [
+        {
+          "id": "application-gzip",
+          "title": "Application Gzip",
+          "file": "documents-mimetypes/application-gzip.png",
+          "sha256": "9c98c409558746e6cd7f2220642d9c3ae7b0105b182a5a80fa67e4f0b78535a0",
+          "size": 3317
+        },
+        {
+          "id": "application-json",
+          "title": "Application Json",
+          "file": "documents-mimetypes/application-json.png",
+          "sha256": "cbd74ee534ab6c5540066e8f6f7ad4e589ca2f6af146e7fac1f28352237e7918",
+          "size": 2875
+        },
+        {
+          "id": "application-x-archive",
+          "title": "Application X Archive",
+          "file": "documents-mimetypes/application-x-archive.png",
+          "sha256": "985f4e6ccee998c88a45eff75d9daa051f4dca45a5d82f0a84f9972271f99419",
+          "size": 2790
+        },
+        {
+          "id": "application-x-executable",
+          "title": "Application X Executable",
+          "file": "documents-mimetypes/application-x-executable.png",
+          "sha256": "c0b79a316c4a652f4a1fdcb292937d9ff22a743f73831bb913b03e42a5f2e46f",
+          "size": 3076
+        },
+        {
+          "id": "audio-x-generic",
+          "title": "Audio X Generic",
+          "file": "documents-mimetypes/audio-x-generic.png",
+          "sha256": "39450dbbc467bb2e1e2ef2bd8a04a9351693fb9cf3dfd96b6a4494772fa73ee0",
+          "size": 3361
+        },
+        {
+          "id": "font-ttf",
+          "title": "Font Ttf",
+          "file": "documents-mimetypes/font-ttf.png",
+          "sha256": "ae5ed036d24834ace614a07d8b68758f4ed96710e4e1acc22bc04cb12a5d4be9",
+          "size": 2664
+        },
+        {
+          "id": "image-x-generic",
+          "title": "Image X Generic",
+          "file": "documents-mimetypes/image-x-generic.png",
+          "sha256": "56fa05bfd2a60c14dd6391f31fc19462858f077903e11447827bc81b9528a135",
+          "size": 3477
+        },
+        {
+          "id": "package-x-generic",
+          "title": "Package X Generic",
+          "file": "documents-mimetypes/package-x-generic.png",
+          "sha256": "985f4e6ccee998c88a45eff75d9daa051f4dca45a5d82f0a84f9972271f99419",
+          "size": 2790
+        },
+        {
+          "id": "text-x-generic",
+          "title": "Text X Generic",
+          "file": "documents-mimetypes/text-x-generic.png",
+          "sha256": "57af7bb3f05540f8669de8c72f27b2b4e3edf9eb25ffeba72d76e8ed07f09f16",
+          "size": 2427
+        },
+        {
+          "id": "video-x-generic",
+          "title": "Video X Generic",
+          "file": "documents-mimetypes/video-x-generic.png",
+          "sha256": "e5e93af48db3f1c0f7eeacefb8cdf62dafe573066b6b5c74d296661ae8d3d2c9",
+          "size": 3648
+        }
+      ]
+    },
+    {
+      "id": "alerts-badges",
+      "icons": [
+        {
+          "id": "dialog-error",
+          "title": "Dialog Error",
+          "file": "alerts-badges/dialog-error.png",
+          "sha256": "1ee83a3b643337439729599f075debe198ed9f2e354bc6f70c35c2c93ed1d63d",
+          "size": 2339
+        },
+        {
+          "id": "dialog-information",
+          "title": "Dialog Information",
+          "file": "alerts-badges/dialog-information.png",
+          "sha256": "b0a65f2a86e2dbaac40b96c227bed60c0f73d5f35e7f9868722f0aa813433b0a",
+          "size": 2742
+        },
+        {
+          "id": "dialog-password",
+          "title": "Dialog Password",
+          "file": "alerts-badges/dialog-password.png",
+          "sha256": "bdb8f9e723066bf8912797d776d14aaedad96473169b62fc087aae205bafceb5",
+          "size": 2696
+        },
+        {
+          "id": "dialog-warning",
+          "title": "Dialog Warning",
+          "file": "alerts-badges/dialog-warning.png",
+          "sha256": "326c5c41912e631133c4bb6a3464c9903eb5b1c52965202cc63352529591dd04",
+          "size": 2312
+        },
+        {
+          "id": "image-missing",
+          "title": "Image Missing",
+          "file": "alerts-badges/image-missing.png",
+          "sha256": "79b3311ec46f68199c89bf99c9bfc25ca92f3f066a9482c45c1bb1d6d494db89",
+          "size": 2651
+        },
+        {
+          "id": "security-high",
+          "title": "Security High",
+          "file": "alerts-badges/security-high.png",
+          "sha256": "56e4d7f07aec8d9b934d89b18c12bdd3616b32283ceab03c8f49d674733754b5",
+          "size": 2976
+        },
+        {
+          "id": "security-low",
+          "title": "Security Low",
+          "file": "alerts-badges/security-low.png",
+          "sha256": "5fe531ca650b1db8cecbb0ae4f1973dc635bf985f27ef39a9f9bba9f4243af1f",
+          "size": 3051
+        },
+        {
+          "id": "security-medium",
+          "title": "Security Medium",
+          "file": "alerts-badges/security-medium.png",
+          "sha256": "42321714d59b033489c34e32358d9c6fa3d1a56de5bb08e37d86accf4fca05cb",
+          "size": 2892
+        }
+      ]
+    },
+    {
+      "id": "settings-categories",
+      "icons": [
+        {
+          "id": "applications-accessories",
+          "title": "Applications Accessories",
+          "file": "settings-categories/applications-accessories.png",
+          "sha256": "2689d55d81dc61beac06170316f728779344bea3f38ac49acff582c40c72d82e",
+          "size": 2829
+        },
+        {
+          "id": "applications-development",
+          "title": "Applications Development",
+          "file": "settings-categories/applications-development.png",
+          "sha256": "4ea6772810c9e60f8fcc474be2d7cfd66d959e82e248ad707fd6897f0f4f5972",
+          "size": 2696
+        },
+        {
+          "id": "applications-games",
+          "title": "Applications Games",
+          "file": "settings-categories/applications-games.png",
+          "sha256": "ca9174e5a5c7985f3dc02067e0d18ec51052faee5f76b17f50bdd709e86ff1a0",
+          "size": 2984
+        },
+        {
+          "id": "applications-graphics",
+          "title": "Applications Graphics",
+          "file": "settings-categories/applications-graphics.png",
+          "sha256": "80a909297343e8754a38be0540f5e7f352a71725f20831397bc2fbbd9655e23e",
+          "size": 5323
+        },
+        {
+          "id": "applications-internet",
+          "title": "Applications Internet",
+          "file": "settings-categories/applications-internet.png",
+          "sha256": "b0b748e1cb8f589c07a1c07fed6de0f3c73c420db0fd6becdfa3c142821ba7bc",
+          "size": 5158
+        },
+        {
+          "id": "applications-multimedia",
+          "title": "Applications Multimedia",
+          "file": "settings-categories/applications-multimedia.png",
+          "sha256": "4f42ed62fb135753ebe914a5ae11999598b8bf6404f294cf084bf0726179e9f9",
+          "size": 3667
+        },
+        {
+          "id": "applications-office",
+          "title": "Applications Office",
+          "file": "settings-categories/applications-office.png",
+          "sha256": "2e756ed9e3f71030c35ade990111101eebf5b9fdb823144ad313c40e0a8fcf4d",
+          "size": 3771
+        }
+      ]
+    },
+    {
+      "id": "emblems",
+      "icons": [
+        {
+          "id": "emblem-favorite",
+          "title": "Emblem Favorite",
+          "file": "emblems/emblem-favorite.png",
+          "sha256": "357eb19a51fb61bb56af64964205a47d7701d901aa2006c9519f219bb158a176",
+          "size": 10890
+        },
+        {
+          "id": "emblem-important",
+          "title": "Emblem Important",
+          "file": "emblems/emblem-important.png",
+          "sha256": "aadeadd60e84398b41dad9642ef7be2a78aebb093419a32654ca13874daa203d",
+          "size": 3780
+        },
+        {
+          "id": "emblem-mounted",
+          "title": "Emblem Mounted",
+          "file": "emblems/emblem-mounted.png",
+          "sha256": "e5f5daa27408e498cf3e3cd3567d0408b24a1746d0474c392c67647b6c596005",
+          "size": 1432
+        },
+        {
+          "id": "emblem-new",
+          "title": "Emblem New",
+          "file": "emblems/emblem-new.png",
+          "sha256": "1b86cc1d2bd033828057ebbd2b7a34c7a6f6e1203841d9b8f76ff1722a151db0",
+          "size": 4030
+        },
+        {
+          "id": "emblem-symbolic-link",
+          "title": "Emblem Symbolic Link",
+          "file": "emblems/emblem-symbolic-link.png",
+          "sha256": "efe1358537f99e321f90b4306f4460313fcb1b3ad4a656c53ad0e8d3ee01ebe2",
+          "size": 1440
+        }
+      ]
+    }
+  ]
+}

@@ -499,6 +499,101 @@ QLabel#settingsRowDesc {
     font-size: 12px;
     color: @text-muted;
 }
+QFrame#iconLibraryHeader,
+QFrame#iconPackCard,
+QFrame#iconLibraryEmptyState {
+    background: @bg-card;
+    border: 1px solid @border-soft;
+    border-radius: 9px;
+}
+QLabel#iconLibraryTitle {
+    font-family: "@font-secondary";
+    font-size: 19px;
+    font-weight: bold;
+    color: @text-strong;
+}
+QLabel#iconLibraryIntro,
+QLabel#iconLibraryEmptyText {
+    font-size: 12px;
+    color: @text-muted;
+}
+QLabel#iconLibraryStatus {
+    font-size: 11px;
+    color: @text-faint;
+}
+QLabel#iconLibraryStatus[state="error"],
+QLabel#iconPackError {
+    color: #D2605E;
+}
+QLabel#iconLibraryEmptyTitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: @text;
+}
+QLabel#iconPackTitle {
+    font-family: "@font-secondary";
+    font-size: 15px;
+    font-weight: bold;
+    color: @text-strong;
+}
+QLabel#iconPackMetadata {
+    font-size: 11px;
+    color: @text-faint;
+}
+QLabel#iconPackDescription {
+    font-size: 12px;
+    color: @text-muted;
+}
+QLabel#iconPackError {
+    font-size: 11px;
+}
+QLabel#iconPackStateBadge {
+    background: @hover-tint;
+    border: 1px solid @border-soft;
+    border-radius: 8px;
+    padding: 3px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    color: @text-muted;
+}
+QLabel#iconPackStateBadge[state="built-in"],
+QLabel#iconPackStateBadge[state="preview"],
+QLabel#iconPackStateBadge[state="installed"] {
+    background: @hover-strong;
+    color: @text;
+}
+QLabel#iconPackStateBadge[state="failed"] {
+    color: #D2605E;
+}
+QPushButton#iconLibraryRefreshButton,
+QPushButton#iconPackActionButton {
+    background: @bg-input;
+    border: 1px solid @border-strong;
+    border-radius: 7px;
+    padding: 6px 11px;
+    font-size: 12px;
+    font-weight: 600;
+    color: @text;
+}
+QPushButton#iconLibraryRefreshButton:hover,
+QPushButton#iconPackActionButton:hover {
+    background: @hover-strong;
+}
+QPushButton#iconLibraryRefreshButton:disabled,
+QPushButton#iconPackActionButton:disabled {
+    background: transparent;
+    border-color: @border-soft;
+    color: @text-faint;
+}
+QProgressBar#iconPackDownloadProgress {
+    background: @hover-tint;
+    border: none;
+    border-radius: 3px;
+}
+QProgressBar#iconPackDownloadProgress::chunk {
+    background: @accent;
+    border-radius: 3px;
+}
 QPushButton#settingsKeycap {
     background: @hover-tint;
     border: 1px solid @border-strong;

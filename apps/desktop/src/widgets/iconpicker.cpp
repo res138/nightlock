@@ -1,12 +1,13 @@
 #include "iconpicker.hpp"
 
+#include <QAbstractButton>
 #include <QButtonGroup>
-#include <QFile>
-#include <QFileInfo>
 #include <QGridLayout>
 #include <QIcon>
 #include <QToolButton>
 
+#include "iconreferences.hpp"
+#include "iconpackmanager.hpp"
 #include "standardicons.hpp"
 
 namespace {
@@ -29,6 +30,7 @@ QToolButton* makeIconButton() {
 
 IconPicker::IconPicker(QWidget* parent)
     : QWidget(parent), buttons_(new QButtonGroup(this)) {
+    iconreferences::initialize();
     buttons_->setExclusive(true);
 
     grid_ = new QGridLayout(this);
@@ -44,12 +46,13 @@ IconPicker::IconPicker(QWidget* parent)
 
     // The user's fourteen most recent gallery picks. Together with
     // the default icon, this keeps the main picker at 15 choices.
-    for (const QString& path : standardicons::recentIconPaths()) {
+    for (const QString& value : standardicons::recentIconPaths()) {
         auto* button = makeIconButton();
-        button->setIcon(QIcon(path));
-        button->setToolTip(QFileInfo(path).completeBaseName());
+        button->setIcon(QIcon(iconreferences::resolveOrFallback(
+            value, fallback.resource)));
+        button->setToolTip(iconreferences::displayTitle(value));
         buttons_->addButton(button, static_cast<int>(values_.size()));
-        values_ << path;
+        values_ << value;
     }
 
     plusButton_ = new QToolButton;
@@ -58,6 +61,9 @@ IconPicker::IconPicker(QWidget* parent)
     plusButton_->setText(QStringLiteral("+"));
     plusButton_->setToolTip(tr("Choose from icon packs…"));
     connect(plusButton_, &QToolButton::clicked, this, &IconPicker::addIconRequested);
+    connect(iconpacks::IconPackManager::instance(),
+            &iconpacks::IconPackManager::packChanged, this,
+            [this](const QString&) { refreshIcons(); });
 
     grid_->setColumnStretch(kColumns, 1);  // keep the grid left-aligned
     relayout();
@@ -75,30 +81,56 @@ QString IconPicker::selectedIconValue() const {
 }
 
 void IconPicker::setSelectedIconValue(const QString& value) {
-    if (!value.isEmpty() && !QFile::exists(value)) {
-        buttons_->button(0)->setChecked(true);
-        return;
-    }
-    const int id = static_cast<int>(values_.indexOf(value));
+    const QString normalized = iconreferences::normalizeStoredValue(value);
+    // Unresolved values are intentionally retained: accepting an edit dialog
+    // must not erase either a portable reference awaiting pack reinstall or a
+    // legacy P1-P7 path that a future published pack may migrate.
+    const int id = static_cast<int>(values_.indexOf(normalized));
     if (id >= 0) {
         buttons_->button(id)->setChecked(true);
         return;
     }
-    setCustomIcon(value);
+    setCustomIcon(normalized);
 }
 
-void IconPicker::setCustomIcon(const QString& path) {
-    if (path.isEmpty())
+void IconPicker::setCustomIcon(const QString& value) {
+    const QString normalized = iconreferences::normalizeStoredValue(value);
+    if (normalized.isEmpty())
         return;
-    customPath_ = path;
+    customPath_ = normalized;
     if (!customButton_) {
         customButton_ = makeIconButton();
         buttons_->addButton(customButton_, kCustomId);
         relayout();
     }
-    customButton_->setIcon(QIcon(path));
-    customButton_->setToolTip(QFileInfo(path).completeBaseName());
+    const auto& fallback = standardicons::defaultEntryIcon();
+    const QString resolved = iconreferences::resolve(normalized);
+    customButton_->setIcon(
+        QIcon(resolved.isEmpty() ? fallback.resource : resolved));
+    QString tooltip = iconreferences::displayTitle(normalized);
+    if (resolved.isEmpty())
+        tooltip += tr(" (icon is unavailable)");
+    customButton_->setToolTip(tooltip);
     customButton_->setChecked(true);
+}
+
+void IconPicker::refreshIcons() {
+    const auto& fallback = standardicons::defaultEntryIcon();
+    for (int id = 1; id < values_.size(); ++id) {
+        if (QAbstractButton* button = buttons_->button(id)) {
+            button->setIcon(QIcon(iconreferences::resolveOrFallback(
+                values_[id], fallback.resource)));
+            button->setToolTip(iconreferences::displayTitle(values_[id]));
+        }
+    }
+    if (!customButton_ || customPath_.isEmpty())
+        return;
+    const QString resolved = iconreferences::resolve(customPath_);
+    customButton_->setIcon(QIcon(resolved.isEmpty() ? fallback.resource : resolved));
+    QString tooltip = iconreferences::displayTitle(customPath_);
+    if (resolved.isEmpty())
+        tooltip += tr(" (icon is unavailable)");
+    customButton_->setToolTip(tooltip);
 }
 
 void IconPicker::relayout() {

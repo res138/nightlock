@@ -1,7 +1,6 @@
 #pragma once
 
 #include <QIcon>
-#include <QImage>
 #include <QString>
 #include <QStringList>
 #include <QVector>
@@ -52,24 +51,9 @@ QString idForEntryIcon(const QString& icon);
 // for the default icon, the resource path otherwise.
 QString entryIconForId(const QString& id);
 
-// All icons of the bundled "P*" packs (resources/icons/P1, P2, …)
-// merged into one flat list of file paths, pack by pack. The packs
-// live on disk rather than in the Qt resource system — ~190 MB is too
-// much to embed into the binary.
-QStringList galleryIconPaths();
-
-// Starts decoding every pack icon on a background thread, so the
-// gallery scrolls without hitching on first open.
-void preloadGalleryIcons();
-// Stops and joins the preload thread; call before the app shuts down.
-void stopGalleryPreload();
-// Pre-decoded native-size variants for a pack icon; empty if not (yet)
-// cached. In particular, .ico files retain their distinct 16/24/32/48/etc.
-// frames so QIcon can choose for the current monitor's device-pixel ratio.
-QVector<QImage> cachedGalleryImages(const QString& path);
-
 // The last icons the user picked (most recent first, up to 14),
-// persisted across runs. Missing files are pruned on read.
+// persisted across runs as portable references. Legacy paths are migrated
+// when their installed-pack counterpart can be identified.
 QStringList recentIconPaths();
 void addRecentIconPath(const QString& path);
 

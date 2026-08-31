@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "packs": [
+    {
+      "id": "tango-classic",
+      "title": "Tango Classic",
+      "description": "The complete 215-icon Tango 0.8.90 desktop collection in its original 32 px PNG form.",
+      "version": "0.8.90",
+      "author": "Tango Desktop Project contributors",
+      "license": "Public Domain",
+      "platforms": [
+        "linux",
+        "macos"
+      ],
+      "iconCount": 215,
+      "payloadBytes": 346797,
+      "manifest": "packs/tango-classic/manifest.json"
+    },
+    {
+      "id": "la-capitaine",
+      "title": "La Capitaine",
+      "description": "A curated macOS-inspired desktop collection from La Capitaine v0.6.2.",
+      "version": "0.6.2",
+      "author": "Keefer Rourke and La Capitaine contributors",
+      "license": "GPL-3.0-or-later",
+      "platforms": [
+        "linux",
+        "macos"
+      ],
+      "iconCount": 72,
+      "payloadBytes": 645880,
+      "manifest": "packs/la-capitaine/manifest.json"
+    },
+    {
+      "id": "gnome-legacy-3-12",
+      "title": "GNOME Legacy 3.12",
+      "description": "A curated set of classic GNOME desktop icons from GNOME Icon Theme 3.12.0.",
+      "version": "3.12.0",
+      "author": "GNOME Project contributors",
+      "license": "LGPL-3.0-only OR CC-BY-SA-3.0",
+      "platforms": [
+        "linux",
+        "macos"
+      ],
+      "iconCount": 64,
+      "payloadBytes": 176997,
+      "manifest": "packs/gnome-legacy-3-12/manifest.json"
+    },
+    {
+      "id": "breeze-modern",
+      "title": "Breeze Modern",
+      "description": "A curated set of crisp modern desktop icons from KDE Breeze Icons 6.29.0.",
+      "version": "6.29.0",
+      "author": "KDE Community contributors",
+      "license": "LGPL-3.0-or-later",
+      "platforms": [
+        "linux",
+        "macos"
+      ],
+      "iconCount": 64,
+      "payloadBytes": 185290,
+      "manifest": "packs/breeze-modern/manifest.json"
+    },
+    {
+      "id": "platinum-community",
+      "title": "Platinum Community",
+      "description": "A 39-icon community recreation of classic Platinum-era desktop symbols, rendered from openly licensed pixel maps.",
+      "version": "2.6.0",
+      "author": "Liiift Studio and Michael Feeney",
+      "license": "MIT AND CC-BY-4.0",
+      "platforms": [
+        "macos"
+      ],
+      "iconCount": 39,
+      "payloadBytes": 36451,
+      "manifest": "packs/platinum-community/manifest.json"
+    },
+    {
+      "id": "whitesur-modern",
+      "title": "WhiteSur Modern",
+      "description": "A curated modern macOS-inspired desktop collection from WhiteSur 2026-08-11.",
+      "version": "2026.8.11",
+      "author": "Vince Liuice",
+      "license": "GPL-3.0-only",
+      "platforms": [
+        "linux",
+        "macos"
+      ],
+      "iconCount": 78,
+      "payloadBytes": 1105787,
+      "manifest": "packs/whitesur-modern/manifest.json"
+    },
+    {
+      "id": "papirus-modern",
+      "title": "Papirus Modern",
+      "description": "A curated set of colorful generic Linux desktop icons from Papirus 20250501.",
+      "version": "2025.5.1",
+      "author": "Papirus Development Team contributors",
+      "license": "GPL-3.0-only",
+      "platforms": [
+        "linux"
+      ],
+      "iconCount": 96,
+      "payloadBytes": 237223,
+      "manifest": "packs/papirus-modern/manifest.json"
+    },
+    {
+      "id": "oxygen-classic",
+      "title": "Oxygen Classic",
+      "description": "A curated set of glossy classic desktop icons from KDE Oxygen Icons 6.29.0.",
+      "version": "6.29.0",
+      "author": "The Oxygen Team and KDE contributors",
+      "license": "LGPL-3.0-or-later",
+      "platforms": [
+        "linux",
+        "macos"
+      ],
+      "iconCount": 70,
+      "payloadBytes": 215210,
+      "manifest": "packs/oxygen-classic/manifest.json"
+    },
+    {
+      "id": "adwaita-modern",
+      "title": "Adwaita Modern",
+      "description": "A curated set of current GNOME system and UI icons from Adwaita Icon Theme 50.0.",
+      "version": "50.0.0",
+      "author": "GNOME Project contributors",
+      "license": "LGPL-3.0-only OR CC-BY-SA-3.0",
+      "platforms": [
+        "linux",
+        "macos"
+      ],
+      "iconCount": 70,
+      "payloadBytes": 241717,
+      "manifest": "packs/adwaita-modern/manifest.json"
+    }
+  ]
+}

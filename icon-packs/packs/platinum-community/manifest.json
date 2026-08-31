@@ -1,0 +1,337 @@
+{
+  "schemaVersion": 1,
+  "id": "platinum-community",
+  "title": "Platinum Community",
+  "description": "A 39-icon community recreation of classic Platinum-era desktop symbols, rendered from openly licensed pixel maps.",
+  "version": "2.6.0",
+  "author": "Liiift Studio and Michael Feeney",
+  "license": "MIT AND CC-BY-4.0",
+  "platforms": [
+    "macos"
+  ],
+  "categories": [
+    {
+      "id": "applications",
+      "icons": [
+        {
+          "id": "calendar",
+          "title": "Calendar",
+          "file": "applications/calendar.png",
+          "sha256": "c0f0ce3b66fb6443e653cc72e81cccbd4b7fa3ef7ce10b491d37241f2c1bf28a",
+          "size": 1038
+        }
+      ]
+    },
+    {
+      "id": "actions",
+      "icons": [
+        {
+          "id": "close",
+          "title": "Close",
+          "file": "actions/close.png",
+          "sha256": "59b3efccc335e645867d5c2fe4bee65eae421f20d29310972406508ec3a71311",
+          "size": 1042
+        },
+        {
+          "id": "copy",
+          "title": "Copy",
+          "file": "actions/copy.png",
+          "sha256": "c1fa1850cdbc7fc667ba04be887f41fdc2c0fada7544918769ed4e9c09bbe8fe",
+          "size": 1010
+        },
+        {
+          "id": "download",
+          "title": "Download",
+          "file": "actions/download.png",
+          "sha256": "e2de6560823baea6a8fe31d6641b750f0355a3b8cf656b4e6db08e00f0ee40a4",
+          "size": 934
+        },
+        {
+          "id": "link",
+          "title": "Link",
+          "file": "actions/link.png",
+          "sha256": "377bc22e274387d27eda375fb7f98a6c40e4b96be9297a20ea55f34f6e61f99f",
+          "size": 1003
+        },
+        {
+          "id": "mail",
+          "title": "Mail",
+          "file": "actions/mail.png",
+          "sha256": "fe9127a4d9547e5175886acfa5ea6a842f8f4c4c881d6e0c965064d3c2d63943",
+          "size": 962
+        },
+        {
+          "id": "pause",
+          "title": "Pause",
+          "file": "actions/pause.png",
+          "sha256": "b176f08834a76213a3edf267e5b0a0351a88305ab7faacf5866fbaa933ef05e4",
+          "size": 1037
+        },
+        {
+          "id": "play",
+          "title": "Play",
+          "file": "actions/play.png",
+          "sha256": "a9d29d5590e169068806ebd24908de99993adf8341aacb73cebf247b2a1219fa",
+          "size": 765
+        },
+        {
+          "id": "print",
+          "title": "Print",
+          "file": "actions/print.png",
+          "sha256": "f01e5937672adefcb89c3103e3e202641f3d5c814a04239f04dcf2a16088f646",
+          "size": 977
+        },
+        {
+          "id": "search",
+          "title": "Search",
+          "file": "actions/search.png",
+          "sha256": "d68c591659656c0e5cfc02efee55df5cdda887873b28c8070f9771a7ed275bec",
+          "size": 1001
+        },
+        {
+          "id": "stop",
+          "title": "Stop",
+          "file": "actions/stop.png",
+          "sha256": "665acdf6dbd1baf7413d48f10c24f84ba13804b020898420eec1f0e40e1d9221",
+          "size": 803
+        },
+        {
+          "id": "trash",
+          "title": "Trash",
+          "file": "actions/trash.png",
+          "sha256": "9185637b2ee266dea067ad00898323e8455e381d72586e44577ef6c8f940cddb",
+          "size": 1074
+        }
+      ]
+    },
+    {
+      "id": "folders-places",
+      "icons": [
+        {
+          "id": "folder-open",
+          "title": "Folder Open",
+          "file": "folders-places/folder-open.png",
+          "sha256": "6d6ac29a00ad92786907ad82ba351eccd74568e202f1eedd858b32fab3150eea",
+          "size": 883
+        },
+        {
+          "id": "folder",
+          "title": "Folder",
+          "file": "folders-places/folder.png",
+          "sha256": "469c3ee9ff23b2581a66996ea657af534cb680b6adc9ddd2341b3f27b999302b",
+          "size": 791
+        },
+        {
+          "id": "home",
+          "title": "Home",
+          "file": "folders-places/home.png",
+          "sha256": "e68e95ae011fdcf0cd6f91cb11478ea5034aad1669fb080830a908d35e39e059",
+          "size": 1011
+        }
+      ]
+    },
+    {
+      "id": "devices-volumes",
+      "icons": [
+        {
+          "id": "floppy-disk",
+          "title": "Floppy Disk",
+          "file": "devices-volumes/floppy-disk.png",
+          "sha256": "14224ddacf42a38f0124140d9a14907b9ab94483ec7499224fc38d992024871a",
+          "size": 1221
+        },
+        {
+          "id": "hard-drive",
+          "title": "Hard Drive",
+          "file": "devices-volumes/hard-drive.png",
+          "sha256": "a36fe894d6e60560fbad1799f8f4a1e2d8a91637422a950cdf068679ae848ec9",
+          "size": 843
+        }
+      ]
+    },
+    {
+      "id": "documents-mimetypes",
+      "icons": [
+        {
+          "id": "application",
+          "title": "Application",
+          "file": "documents-mimetypes/application.png",
+          "sha256": "26ed9045373c0a626c905ac7ca0b5e04de8fe4168b91e754c24df5b96da8ade4",
+          "size": 887
+        },
+        {
+          "id": "document",
+          "title": "Document",
+          "file": "documents-mimetypes/document.png",
+          "sha256": "0508544afe1cd8987f6faee114659b73ca1b37a0a586d8c4cd8bf9113118149c",
+          "size": 1096
+        },
+        {
+          "id": "image",
+          "title": "Image",
+          "file": "documents-mimetypes/image.png",
+          "sha256": "b798912faefa5bda5fdd6d7a8e954778d708c5bbc7ab758efe5fa290f7746f87",
+          "size": 1159
+        },
+        {
+          "id": "music",
+          "title": "Music",
+          "file": "documents-mimetypes/music.png",
+          "sha256": "1fe7b604a30c5c93644b4c2d47e3926b44dd234a577d94a9682dfba27977f327",
+          "size": 960
+        }
+      ]
+    },
+    {
+      "id": "users-accounts",
+      "icons": [
+        {
+          "id": "user",
+          "title": "User",
+          "file": "users-accounts/user.png",
+          "sha256": "c4dccc8b85d25b8810e6a888ce2b2358e20805fcb7b570031e0c119f05a7d2cd",
+          "size": 895
+        }
+      ]
+    },
+    {
+      "id": "status-menu",
+      "icons": [
+        {
+          "id": "volume-muted",
+          "title": "Volume Muted",
+          "file": "status-menu/volume-muted.png",
+          "sha256": "efd4ad43215d33f9da268d6390780c954739c4bff180136c1488a7126a5e65a1",
+          "size": 836
+        },
+        {
+          "id": "volume",
+          "title": "Volume",
+          "file": "status-menu/volume.png",
+          "sha256": "e931192a62ca8038db2e1e36774940cf063d40d4f474cd0788633c4e14675de1",
+          "size": 927
+        }
+      ]
+    },
+    {
+      "id": "alerts-badges",
+      "icons": [
+        {
+          "id": "error",
+          "title": "Error",
+          "file": "alerts-badges/error.png",
+          "sha256": "9cf915ca96217a9f8971c9b75a284ab65fc384ac404118789dd5278241228c02",
+          "size": 1229
+        },
+        {
+          "id": "information",
+          "title": "Information",
+          "file": "alerts-badges/information.png",
+          "sha256": "d1c4faea1bd0ff11e6276b3f15f8f5f6d58795d60b9a8afb84555c9798ed4047",
+          "size": 1186
+        },
+        {
+          "id": "question",
+          "title": "Question",
+          "file": "alerts-badges/question.png",
+          "sha256": "af47bab16b2da523a2c982f461591fb8f00f2b5ecf80febac2cb6de7e7c1f350",
+          "size": 1184
+        },
+        {
+          "id": "warning",
+          "title": "Warning",
+          "file": "alerts-badges/warning.png",
+          "sha256": "6402569db4ed320083944615e7708dd123ebb85610de311eec758654f87a08cd",
+          "size": 1091
+        }
+      ]
+    },
+    {
+      "id": "emblems",
+      "icons": [
+        {
+          "id": "checked",
+          "title": "Checked",
+          "file": "emblems/checked.png",
+          "sha256": "eca56c79712161bcc1968ee94e578bd240bd9d802e5c6d4bdf18582534a17ec0",
+          "size": 699
+        },
+        {
+          "id": "locked",
+          "title": "Locked",
+          "file": "emblems/locked.png",
+          "sha256": "e941a92d8f7e799523a6de901705d4e4767d36f3eec694155f481d3633f2867d",
+          "size": 1072
+        }
+      ]
+    },
+    {
+      "id": "ui-symbols",
+      "icons": [
+        {
+          "id": "arrow-down",
+          "title": "Arrow Down",
+          "file": "ui-symbols/arrow-down.png",
+          "sha256": "bfed3c2ef3727aa3e0ea3b0cc553b1e907fe0b44e694c56d259ec6c59b1300cf",
+          "size": 639
+        },
+        {
+          "id": "arrow-left",
+          "title": "Arrow Left",
+          "file": "ui-symbols/arrow-left.png",
+          "sha256": "4aae7ac1c7e100f8681b5839fe7050b92255d0d278bbb0d55079ccfd35c6edc7",
+          "size": 802
+        },
+        {
+          "id": "arrow-right",
+          "title": "Arrow Right",
+          "file": "ui-symbols/arrow-right.png",
+          "sha256": "5de6d1b08a1fc796b86807730ffa880a2dcf8d2c50378f3a90ddc28652d9d1c8",
+          "size": 812
+        },
+        {
+          "id": "arrow-up",
+          "title": "Arrow Up",
+          "file": "ui-symbols/arrow-up.png",
+          "sha256": "edb97f4b3dfa05a2f1a053fa0e0faf86294bdf46865708e575df11ff84e82170",
+          "size": 628
+        },
+        {
+          "id": "chevron-down",
+          "title": "Chevron Down",
+          "file": "ui-symbols/chevron-down.png",
+          "sha256": "b5cbcf27e68a96c94d0647d18706bd20b68db53a028da149b00ffef35c59c0d8",
+          "size": 548
+        },
+        {
+          "id": "chevron-right",
+          "title": "Chevron Right",
+          "file": "ui-symbols/chevron-right.png",
+          "sha256": "43c0194662394994ace6d02c2f296c7a5bb4c2630dc4de0682e0ae2c84763670",
+          "size": 642
+        },
+        {
+          "id": "divider",
+          "title": "Divider",
+          "file": "ui-symbols/divider.png",
+          "sha256": "f9659a371419260a8562ec4414c38b9a81a63556a9e8c183db572f2f40ee0c3b",
+          "size": 1132
+        },
+        {
+          "id": "grabber",
+          "title": "Grabber",
+          "file": "ui-symbols/grabber.png",
+          "sha256": "22aec684e4e0d0d9fb4fb2a578af56c3f0348b935a5633c2d6ab6d8dc656d14b",
+          "size": 981
+        },
+        {
+          "id": "resize-handle",
+          "title": "Resize Handle",
+          "file": "ui-symbols/resize-handle.png",
+          "sha256": "a21e041d6e029e03a8b8e4274136932188f56604336af33babc2840c543b605e",
+          "size": 651
+        }
+      ]
+    }
+  ]
+}

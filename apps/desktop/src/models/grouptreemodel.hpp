@@ -28,7 +28,8 @@ public:
 
     // Appends a sub-folder under `parent` and returns its index.
     QModelIndex addGroup(const QModelIndex& parent, const QString& name);
-    // Sets the folder's icon (resource or file path; empty = default).
+    // Sets the folder's portable icon reference (legacy paths are accepted;
+    // empty = default).
     bool setGroupIcon(const QModelIndex& index, const QString& path);
     // Deletes the folder (with its subtree); the root cannot be removed.
     bool removeGroup(const QModelIndex& index);

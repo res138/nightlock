@@ -6,6 +6,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
+#include <QHash>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QKeyEvent>
@@ -13,8 +14,10 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QLocale>
 #include <QMessageBox>
 #include <QPainter>
+#include <QProgressBar>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSignalBlocker>
@@ -25,12 +28,14 @@
 
 #include <algorithm>
 #include <iterator>
+#include <utility>
 
 #include "appearancesettings.hpp"
 #include "fonts.hpp"
 #include "generalsettings.hpp"
 #include "graphsettings.hpp"
 #include "hotkeys.hpp"
+#include "iconpackmanager.hpp"
 #include "touchid.hpp"
 #include "updatemanager.hpp"
 #include "vaultservice.hpp"
@@ -330,6 +335,488 @@ void finishCard(QVBoxLayout* rows) {
         row->setProperty("last", true);
 }
 
+QString platformTitle(const QString& platform) {
+    if (platform == QLatin1String("windows"))
+        return SettingsWindow::tr("Windows");
+    if (platform == QLatin1String("macos"))
+        return SettingsWindow::tr("macOS");
+    if (platform == QLatin1String("linux"))
+        return SettingsWindow::tr("Linux");
+    if (platform == QLatin1String("cross-platform"))
+        return SettingsWindow::tr("All platforms");
+    return platform;
+}
+
+QString byteCount(qint64 bytes) {
+    if (bytes <= 0)
+        return {};
+    return QLocale().formattedDataSize(bytes);
+}
+
+class IconPackCard final : public QFrame {
+public:
+    explicit IconPackCard(iconpacks::IconPackManager* manager,
+                          const iconpacks::Pack& pack, QWidget* parent = nullptr)
+        : QFrame(parent), manager_(manager), pack_(pack) {
+        setObjectName(QStringLiteral("iconPackCard"));
+        setAttribute(Qt::WA_StyledBackground, true);
+
+        auto* outer = new QVBoxLayout(this);
+        outer->setContentsMargins(16, 14, 16, 14);
+        outer->setSpacing(10);
+
+        auto* header = new QHBoxLayout;
+        header->setContentsMargins(0, 0, 0, 0);
+        header->setSpacing(16);
+
+        auto* copy = new QVBoxLayout;
+        copy->setContentsMargins(0, 0, 0, 0);
+        copy->setSpacing(4);
+        title_ = new QLabel;
+        title_->setObjectName(QStringLiteral("iconPackTitle"));
+        title_->setTextFormat(Qt::PlainText);
+        metadata_ = new QLabel;
+        metadata_->setObjectName(QStringLiteral("iconPackMetadata"));
+        metadata_->setTextFormat(Qt::PlainText);
+        metadata_->setWordWrap(true);
+        description_ = new QLabel;
+        description_->setObjectName(QStringLiteral("iconPackDescription"));
+        description_->setTextFormat(Qt::PlainText);
+        description_->setWordWrap(true);
+        copy->addWidget(title_);
+        copy->addWidget(metadata_);
+        copy->addWidget(description_);
+        header->addLayout(copy, 1);
+
+        auto* actions = new QVBoxLayout;
+        actions->setContentsMargins(0, 0, 0, 0);
+        actions->setSpacing(7);
+        actions->setAlignment(Qt::AlignRight | Qt::AlignTop);
+        state_ = new QLabel;
+        state_->setObjectName(QStringLiteral("iconPackStateBadge"));
+        state_->setAlignment(Qt::AlignCenter);
+        action_ = new QPushButton;
+        action_->setObjectName(QStringLiteral("iconPackActionButton"));
+        action_->setCursor(Qt::PointingHandCursor);
+        action_->setMinimumWidth(88);
+        actions->addWidget(state_, 0, Qt::AlignRight);
+        actions->addWidget(action_, 0, Qt::AlignRight);
+        header->addLayout(actions);
+        outer->addLayout(header);
+
+        progress_ = new QProgressBar;
+        progress_->setObjectName(QStringLiteral("iconPackDownloadProgress"));
+        progress_->setTextVisible(false);
+        progress_->setFixedHeight(7);
+        outer->addWidget(progress_);
+
+        error_ = new QLabel;
+        error_->setObjectName(QStringLiteral("iconPackError"));
+        error_->setTextFormat(Qt::PlainText);
+        error_->setWordWrap(true);
+        outer->addWidget(error_);
+
+        connect(action_, &QPushButton::clicked, this, [this] {
+            switch (pack_.state) {
+            case iconpacks::State::Available:
+            case iconpacks::State::Failed:
+                manager_->install(pack_.id);
+                break;
+            case iconpacks::State::Installed: {
+                QMessageBox confirmation(
+                    QMessageBox::Question, tr("Remove icon pack?"),
+                    tr("Remove %1? Entries and folders that use this pack will "
+                       "temporarily use their default icon until the pack is installed "
+                       "again.")
+                        .arg(pack_.title),
+                    QMessageBox::NoButton, this);
+                confirmation.setTextFormat(Qt::PlainText);
+                auto* remove = confirmation.addButton(tr("Remove"),
+                                                       QMessageBox::DestructiveRole);
+                confirmation.addButton(QMessageBox::Cancel);
+                confirmation.setDefaultButton(QMessageBox::Cancel);
+                confirmation.exec();
+                if (confirmation.clickedButton() == remove &&
+                    !manager_->remove(pack_.id)) {
+                    QMessageBox warning(
+                        QMessageBox::Warning, tr("Could not remove icon pack"),
+                        tr("%1 is still installed because its files could not be deleted. "
+                           "Check file permissions and try again.")
+                            .arg(pack_.title),
+                        QMessageBox::Ok, this);
+                    warning.setTextFormat(Qt::PlainText);
+                    warning.exec();
+                }
+                break;
+            }
+            case iconpacks::State::Downloading:
+            case iconpacks::State::BuiltIn:
+            case iconpacks::State::Preview:
+                break;
+            }
+        });
+
+        updatePack(pack);
+    }
+
+    QString packId() const { return pack_.id; }
+
+    void updatePack(const iconpacks::Pack& pack) {
+        pack_ = pack;
+        setProperty("packId", pack.id);
+        setAccessibleName(tr("%1 icon pack").arg(pack.title));
+
+        title_->setText(pack.title);
+
+        QStringList platforms;
+        for (const QString& platform : pack.platforms)
+            platforms.append(platformTitle(platform));
+
+        QStringList metadata;
+        if (!platforms.isEmpty())
+            metadata.append(platforms.join(QStringLiteral(" / ")));
+        if (!pack.version.isEmpty())
+            metadata.append(tr("Version %1").arg(pack.version));
+        if (!pack.license.isEmpty())
+            metadata.append(tr("License: %1").arg(pack.license));
+        if (!pack.author.isEmpty())
+            metadata.append(tr("By %1").arg(pack.author));
+        if (pack.iconCount > 0) {
+            metadata.append(pack.iconCount == 1
+                                ? tr("1 icon")
+                                : tr("%1 icons").arg(pack.iconCount));
+        }
+        if (pack.totalBytes > 0)
+            metadata.append(byteCount(pack.totalBytes));
+        if (!pack.categories.isEmpty()) {
+            metadata.append(pack.categories.size() == 1
+                                ? tr("1 category")
+                                : tr("%1 categories").arg(pack.categories.size()));
+        }
+        metadata_->setText(metadata.join(QStringLiteral("  ·  ")));
+
+        description_->setText(pack.description.isEmpty()
+                                  ? tr("No description is available for this pack.")
+                                  : pack.description);
+
+        QString stateKey;
+        QString stateText;
+        QString actionText;
+        QString actionKey = QStringLiteral("primary");
+        bool actionEnabled = true;
+        switch (pack.state) {
+        case iconpacks::State::BuiltIn:
+            stateKey = QStringLiteral("built-in");
+            stateText = tr("Built in");
+            actionText = tr("Included");
+            actionEnabled = false;
+            break;
+        case iconpacks::State::Preview:
+            stateKey = QStringLiteral("preview");
+            stateText = tr("Source preview");
+            actionText = tr("Development");
+            actionEnabled = false;
+            break;
+        case iconpacks::State::Installed:
+            stateKey = QStringLiteral("installed");
+            stateText = tr("Installed");
+            actionText = tr("Remove");
+            actionKey = QStringLiteral("remove");
+            break;
+        case iconpacks::State::Available:
+            stateKey = QStringLiteral("available");
+            stateText = tr("Available");
+            actionText = tr("Download");
+            break;
+        case iconpacks::State::Downloading:
+            stateKey = QStringLiteral("downloading");
+            stateText = tr("Downloading");
+            actionText = tr("Downloading…");
+            actionEnabled = false;
+            break;
+        case iconpacks::State::Failed:
+            stateKey = QStringLiteral("failed");
+            stateText = tr("Failed");
+            actionText = tr("Retry");
+            break;
+        }
+
+        setProperty("state", stateKey);
+        state_->setProperty("state", stateKey);
+        action_->setProperty("action", actionKey);
+        state_->setText(stateText);
+        state_->setAccessibleName(tr("Status: %1").arg(stateText));
+        action_->setText(actionText);
+        actionEnabled = actionEnabled && !libraryBusy_;
+        action_->setEnabled(actionEnabled);
+        action_->setCursor(actionEnabled ? Qt::PointingHandCursor : Qt::ArrowCursor);
+        action_->setAccessibleName(tr("%1: %2").arg(actionText, pack.title));
+
+        const bool downloading = pack.state == iconpacks::State::Downloading;
+        progress_->setVisible(downloading);
+        updateProgress(pack.receivedBytes, pack.totalBytes);
+
+        const bool failed = pack.state == iconpacks::State::Failed;
+        error_->setVisible(failed);
+        error_->setText(pack.error.isEmpty()
+                            ? tr("The icon pack could not be downloaded. Try again.")
+                            : pack.error);
+
+        const QList<QWidget*> restyled = {this, state_, action_};
+        for (QWidget* widget : restyled) {
+            widget->style()->unpolish(widget);
+            widget->style()->polish(widget);
+        }
+    }
+
+    void updateProgress(qint64 received, qint64 total) {
+        if (pack_.state != iconpacks::State::Downloading)
+            return;
+        pack_.receivedBytes = received;
+        pack_.totalBytes = total;
+        if (total <= 0) {
+            progress_->setRange(0, 0);
+            progress_->setAccessibleDescription(tr("Download size is not yet known."));
+            return;
+        }
+        progress_->setRange(0, 1000);
+        progress_->setValue(static_cast<int>(qBound<qint64>(qint64{0},
+                                                            received * 1000 / total,
+                                                            qint64{1000})));
+        progress_->setFormat(QStringLiteral("%p%"));
+        progress_->setAccessibleName(tr("Download progress for %1").arg(pack_.title));
+        progress_->setAccessibleDescription(
+            tr("%1 of %2").arg(byteCount(received), byteCount(total)));
+    }
+
+    void setLibraryBusy(bool busy) {
+        if (libraryBusy_ == busy)
+            return;
+        libraryBusy_ = busy;
+        updatePack(pack_);
+    }
+
+private:
+    iconpacks::IconPackManager* manager_;
+    iconpacks::Pack pack_;
+    QLabel* title_;
+    QLabel* metadata_;
+    QLabel* description_;
+    QLabel* state_;
+    QPushButton* action_;
+    QProgressBar* progress_;
+    QLabel* error_;
+    bool libraryBusy_ = false;
+};
+
+class IconLibraryPage final : public QWidget {
+public:
+    explicit IconLibraryPage(QWidget* parent = nullptr)
+        : QWidget(parent), manager_(iconpacks::IconPackManager::instance()) {
+        setObjectName(QStringLiteral("iconLibraryPage"));
+        setAccessibleName(tr("Icons Library"));
+        setAccessibleDescription(
+            tr("Download and remove optional icon packs from the official Nightlock library."));
+
+        auto* column = new QVBoxLayout(this);
+        column->setContentsMargins(28, 24, 28, 28);
+        column->setSpacing(14);
+
+        auto* intro = new QFrame;
+        intro->setObjectName(QStringLiteral("iconLibraryHeader"));
+        intro->setAttribute(Qt::WA_StyledBackground, true);
+        auto* introLayout = new QHBoxLayout(intro);
+        introLayout->setContentsMargins(16, 15, 16, 15);
+        introLayout->setSpacing(18);
+        auto* introCopy = new QVBoxLayout;
+        introCopy->setContentsMargins(0, 0, 0, 0);
+        introCopy->setSpacing(5);
+        auto* title = new QLabel(tr("Icons Library"));
+        title->setObjectName(QStringLiteral("iconLibraryTitle"));
+        auto* description = new QLabel(
+            tr("Nightlock includes one lightweight icon pack. Download only the optional "
+               "Linux, macOS, or Windows collections you want from the official repository."));
+        description->setObjectName(QStringLiteral("iconLibraryIntro"));
+        description->setWordWrap(true);
+        status_ = new QLabel;
+        status_->setObjectName(QStringLiteral("iconLibraryStatus"));
+        status_->setTextFormat(Qt::PlainText);
+        status_->setWordWrap(true);
+        status_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        introCopy->addWidget(title);
+        introCopy->addWidget(description);
+        introCopy->addWidget(status_);
+        introLayout->addLayout(introCopy, 1);
+        refresh_ = new QPushButton(tr("Refresh"));
+        refresh_->setObjectName(QStringLiteral("iconLibraryRefreshButton"));
+        refresh_->setCursor(Qt::PointingHandCursor);
+        refresh_->setAccessibleName(tr("Refresh icon pack catalog"));
+        introLayout->addWidget(refresh_, 0, Qt::AlignTop);
+        column->addWidget(intro);
+
+        auto* sectionTitle = new QLabel(tr("ICON PACKS"));
+        sectionTitle->setObjectName(QStringLiteral("settingsSectionTitle"));
+        sectionTitle->setContentsMargins(6, 0, 0, 0);
+        column->addWidget(sectionTitle);
+
+        list_ = new QVBoxLayout;
+        list_->setContentsMargins(0, 0, 0, 0);
+        list_->setSpacing(10);
+        column->addLayout(list_);
+        column->addStretch(1);
+
+        connect(refresh_, &QPushButton::clicked, this, [this] { requestRefresh(); });
+        // Installing/removing emits from the button's click handler. Queue the
+        // structural rebuild so the card that owns that button is not deleted
+        // while Qt is still dispatching its mouse event.
+        connect(manager_, &iconpacks::IconPackManager::catalogChanged, this,
+                [this] { rebuild(); }, Qt::QueuedConnection);
+        connect(manager_, &iconpacks::IconPackManager::packChanged, this,
+                [this](const QString& id) { updatePack(id); });
+        connect(manager_, &iconpacks::IconPackManager::progressChanged, this,
+                [this](const QString& id, qint64 received, qint64 total) {
+                    if (IconPackCard* card = cards_.value(id, nullptr))
+                        card->updateProgress(received, total);
+                });
+        connect(manager_, &iconpacks::IconPackManager::refreshingChanged, this,
+                [this](bool) { refreshStatus(); });
+        connect(manager_, &iconpacks::IconPackManager::catalogErrorChanged, this,
+                [this](const QString&) { refreshStatus(); });
+
+        rebuild();
+    }
+
+    void refreshOnce() {
+        if (firstVisitHandled_)
+            return;
+        firstVisitHandled_ = true;
+        // Demo screenshots must stay deterministic and offline. The manual
+        // Refresh button remains available when someone wants to exercise it.
+        if (!qEnvironmentVariableIsSet("NIGHTLOCK_DEMO"))
+            requestRefresh();
+    }
+
+private:
+    void requestRefresh() {
+        if (manager_->isRefreshing())
+            return;
+        manager_->refreshCatalog();
+        refreshStatus();
+    }
+
+    void rebuild() {
+        while (QLayoutItem* item = list_->takeAt(0)) {
+            delete item->widget();
+            delete item;
+        }
+        cards_.clear();
+
+        const QVector<iconpacks::Pack> packs = manager_->packs();
+        if (packs.isEmpty()) {
+            auto* empty = new QFrame;
+            empty->setObjectName(QStringLiteral("iconLibraryEmptyState"));
+            empty->setAttribute(Qt::WA_StyledBackground, true);
+            auto* emptyLayout = new QVBoxLayout(empty);
+            emptyLayout->setContentsMargins(18, 22, 18, 22);
+            emptyLayout->setSpacing(5);
+            auto* emptyTitle = new QLabel(tr("No icon packs found"));
+            emptyTitle->setObjectName(QStringLiteral("iconLibraryEmptyTitle"));
+            emptyTitle->setAlignment(Qt::AlignCenter);
+            auto* emptyText = new QLabel(
+                tr("Check your connection, then refresh the official Nightlock catalog."));
+            emptyText->setObjectName(QStringLiteral("iconLibraryEmptyText"));
+            emptyText->setWordWrap(true);
+            emptyText->setAlignment(Qt::AlignCenter);
+            emptyLayout->addWidget(emptyTitle);
+            emptyLayout->addWidget(emptyText);
+            list_->addWidget(empty);
+        } else {
+            for (const iconpacks::Pack& pack : packs) {
+                auto* card = new IconPackCard(manager_, pack);
+                cards_.insert(pack.id, card);
+                list_->addWidget(card);
+            }
+        }
+        refreshStatus();
+    }
+
+    void updatePack(const QString& id) {
+        const std::optional<iconpacks::Pack> pack = manager_->pack(id);
+        if (!pack) {
+            rebuild();
+            return;
+        }
+        if (IconPackCard* card = cards_.value(id, nullptr))
+            card->updatePack(*pack);
+        else
+            rebuild();
+        refreshStatus();
+    }
+
+    void refreshStatus() {
+        const bool refreshing = manager_->isRefreshing();
+        const QVector<iconpacks::Pack> packs = manager_->packs();
+        const bool downloading = std::any_of(
+            packs.cbegin(), packs.cend(), [](const iconpacks::Pack& pack) {
+                return pack.state == iconpacks::State::Downloading;
+            });
+        const bool busy = refreshing || downloading;
+        refresh_->setEnabled(!busy);
+        refresh_->setText(refreshing ? tr("Refreshing…")
+                                     : downloading ? tr("Downloading…")
+                                                   : tr("Refresh"));
+        refresh_->setCursor(busy ? Qt::ArrowCursor : Qt::PointingHandCursor);
+        for (IconPackCard* card : std::as_const(cards_))
+            card->setLibraryBusy(busy);
+
+        QString state;
+        QString text;
+        if (refreshing) {
+            state = QStringLiteral("refreshing");
+            text = tr("Checking github.com/res138/nightlock for icon packs…");
+        } else if (!manager_->catalogError().isEmpty()) {
+            state = QStringLiteral("error");
+            text = tr("Online library unavailable: %1 Installed packs remain ready to use.")
+                       .arg(manager_->catalogError());
+        } else {
+            int ready = 0;
+            int downloadable = 0;
+            for (const iconpacks::Pack& pack : packs) {
+                if (pack.state == iconpacks::State::BuiltIn ||
+                    pack.state == iconpacks::State::Installed ||
+                    pack.state == iconpacks::State::Preview)
+                    ++ready;
+                if (pack.state == iconpacks::State::Available ||
+                    pack.state == iconpacks::State::Failed)
+                    ++downloadable;
+            }
+            state = packs.isEmpty() ? QStringLiteral("empty") : QStringLiteral("ready");
+            if (packs.isEmpty())
+                text = tr("The online catalog is empty. Refresh to try again.");
+            else if (downloadable == 0)
+                text = ready == 1
+                           ? tr("1 icon pack ready to use.")
+                           : tr("%1 icon packs ready to use.").arg(ready);
+            else
+                text = tr("%1 icon packs · %2 ready to use")
+                           .arg(packs.size())
+                           .arg(ready);
+        }
+        status_->setProperty("state", state);
+        status_->setText(text);
+        status_->setAccessibleName(tr("Icon library status: %1").arg(text));
+        status_->style()->unpolish(status_);
+        status_->style()->polish(status_);
+    }
+
+    iconpacks::IconPackManager* manager_;
+    QLabel* status_;
+    QPushButton* refresh_;
+    QVBoxLayout* list_;
+    QHash<QString, IconPackCard*> cards_;
+    bool firstVisitHandled_ = false;
+};
+
 }  // namespace
 
 SettingsWindow::SettingsWindow(QWidget* parent) : QWidget(parent) {
@@ -364,7 +851,22 @@ SettingsWindow::SettingsWindow(QWidget* parent) : QWidget(parent) {
     addCategory(QStringLiteral("command"), tr("Hotkeys"), buildHotkeysPage());
     addCategory(QStringLiteral("graph"), tr("NetGraph"), buildGraphPage());
 
+    // Keep every established category index stable. Icons Library is appended
+    // and starts its first catalog refresh lazily, only when the user opens it.
+    const int iconsLibraryIndex = nav_->count();
+    auto* iconsLibraryPage = static_cast<IconLibraryPage*>(buildIconsLibraryPage());
+    addCategory(QStringLiteral("image"), tr("Icons Library"), iconsLibraryPage);
+    nav_->item(iconsLibraryIndex)
+        ->setData(Qt::UserRole, QStringLiteral("icons-library"));
+    nav_->item(iconsLibraryIndex)
+        ->setToolTip(tr("Download and manage optional icon packs"));
+
     connect(nav_, &QListWidget::currentRowChanged, pages_, &QStackedWidget::setCurrentIndex);
+    connect(nav_, &QListWidget::currentRowChanged, iconsLibraryPage,
+            [iconsLibraryPage, iconsLibraryIndex](int row) {
+                if (row == iconsLibraryIndex)
+                    iconsLibraryPage->refreshOnce();
+            });
     nav_->setCurrentRow(0);
 
     auto* layout = new QHBoxLayout(this);
@@ -946,4 +1448,8 @@ QWidget* SettingsWindow::buildGraphPage() {
     column->addWidget(card);
     column->addStretch(1);
     return page;
+}
+
+QWidget* SettingsWindow::buildIconsLibraryPage() {
+    return new IconLibraryPage;
 }

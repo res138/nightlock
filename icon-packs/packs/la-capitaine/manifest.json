@@ -1,0 +1,549 @@
+{
+  "schemaVersion": 1,
+  "id": "la-capitaine",
+  "title": "La Capitaine",
+  "description": "A curated macOS-inspired desktop collection from La Capitaine v0.6.2.",
+  "version": "0.6.2",
+  "author": "Keefer Rourke and La Capitaine contributors",
+  "license": "GPL-3.0-or-later",
+  "platforms": [
+    "linux",
+    "macos"
+  ],
+  "categories": [
+    {
+      "id": "actions",
+      "icons": [
+        {
+          "id": "document-new",
+          "title": "New Document",
+          "file": "actions/document-new.png",
+          "sha256": "91bc26567ce72a762483f7945109226f463ad5a01cc596b62c2c88b9b90e5588",
+          "size": 1726
+        },
+        {
+          "id": "document-open",
+          "title": "Open Document",
+          "file": "actions/document-open.png",
+          "sha256": "fc12b2af03c5d06743266c2705d5e03ee138e1aff2b374301c47ebf408f82449",
+          "size": 1497
+        },
+        {
+          "id": "document-save",
+          "title": "Save Document",
+          "file": "actions/document-save.png",
+          "sha256": "d9cbb1cb2d2a78e9a5a0d139f7bb27a2a71e418fe2e9fb2cf33ee6817482b873",
+          "size": 2031
+        },
+        {
+          "id": "document-print",
+          "title": "Print Document",
+          "file": "actions/document-print.png",
+          "sha256": "9fa12b5983513ea8859b870cb4c14c31738fadb433fa04ca8c57d74658423351",
+          "size": 3390
+        },
+        {
+          "id": "document-export",
+          "title": "Export Document",
+          "file": "actions/document-export.png",
+          "sha256": "5cec9babf96efda795da3e333ea04a8d5d668394ada1b7746476d5b671fcff35",
+          "size": 7274
+        },
+        {
+          "id": "edit-cut",
+          "title": "Cut",
+          "file": "actions/edit-cut.png",
+          "sha256": "e86e42e9f41635f624f05abb54aea6bb399426afc75c20746eae67356b9ea189",
+          "size": 10403
+        },
+        {
+          "id": "edit-delete",
+          "title": "Delete",
+          "file": "actions/edit-delete.png",
+          "sha256": "bf18a3c2f066bf2b8c38e647caaec14e133ba2753bc6a92adddacefaff24e926",
+          "size": 11735
+        },
+        {
+          "id": "edit-paste",
+          "title": "Paste",
+          "file": "actions/edit-paste.png",
+          "sha256": "c05461554c256dfd121daa36128ec9597a72a746d2895b9ed736e65cfd58dacc",
+          "size": 3349
+        },
+        {
+          "id": "edit-redo",
+          "title": "Redo",
+          "file": "actions/edit-redo.png",
+          "sha256": "86c3821a848080a4fe7864d6c437ec418e89008afb862159bfd9ed51e98dccb1",
+          "size": 6134
+        },
+        {
+          "id": "edit-undo",
+          "title": "Undo",
+          "file": "actions/edit-undo.png",
+          "sha256": "54d4652482b47b32dbf2ec8936f9a6b4e21c653546677f691ba484e58d2db920",
+          "size": 6111
+        }
+      ]
+    },
+    {
+      "id": "folders-places",
+      "icons": [
+        {
+          "id": "folder",
+          "title": "Folder",
+          "file": "folders-places/folder.png",
+          "sha256": "807c474fd8239b3510e211673dea908ce3144db83392dbc09b6712eaab1bc247",
+          "size": 5598
+        },
+        {
+          "id": "folder-bookmarks",
+          "title": "Bookmarks",
+          "file": "folders-places/folder-bookmarks.png",
+          "sha256": "817609c9050468bc6f9ce26019e350bdccbaacb0ad33f5ffda1878113cc27a01",
+          "size": 8030
+        },
+        {
+          "id": "folder-camera",
+          "title": "Camera Folder",
+          "file": "folders-places/folder-camera.png",
+          "sha256": "ec999d3f3dbb058a4a542d9fac6c3486bcd3e772edf0b4e19173a1379d1190eb",
+          "size": 8289
+        },
+        {
+          "id": "folder-design",
+          "title": "Design Folder",
+          "file": "folders-places/folder-design.png",
+          "sha256": "aa9f9d0732e3fa8b8b23deafde98aa96e887936fd5d5971b152c80d98cb98778",
+          "size": 7493
+        },
+        {
+          "id": "folder-development",
+          "title": "Development Folder",
+          "file": "folders-places/folder-development.png",
+          "sha256": "5fdbc39d57f544ac629b7c07384ee1e5a2fffe9ecb9644f272e239f14c0eda59",
+          "size": 7386
+        },
+        {
+          "id": "folder-documents",
+          "title": "Documents Folder",
+          "file": "folders-places/folder-documents.png",
+          "sha256": "5f804e71fb0e5bb24672a783aa7b009b9724452cb6f08a3632708021c4054a77",
+          "size": 8109
+        },
+        {
+          "id": "folder-download",
+          "title": "Downloads Folder",
+          "file": "folders-places/folder-download.png",
+          "sha256": "b1c417457d23415d8a292ffba9486470def6a2447091bc01f713bf8999124952",
+          "size": 8572
+        },
+        {
+          "id": "folder-favorites",
+          "title": "Favorites Folder",
+          "file": "folders-places/folder-favorites.png",
+          "sha256": "7ca395ffcaa00f82881678db2e9d7720294ff816efbad96e3e9bf9b30301b7e8",
+          "size": 7876
+        },
+        {
+          "id": "folder-games",
+          "title": "Games Folder",
+          "file": "folders-places/folder-games.png",
+          "sha256": "d4d8980af73304203c07d205069e4f7fbd970e3c9811dbd2dd0aaf582c69e2de",
+          "size": 8196
+        },
+        {
+          "id": "folder-mail",
+          "title": "Mail Folder",
+          "file": "folders-places/folder-mail.png",
+          "sha256": "042f1b8a81642251b8cc87198ef0c9429b277f4456565f800913b342a7e7f710",
+          "size": 11283
+        },
+        {
+          "id": "folder-music",
+          "title": "Music Folder",
+          "file": "folders-places/folder-music.png",
+          "sha256": "3510dbf1556f49d0855d87343b2c891a57a8f6fdb4928dbbc66024f91336ef58",
+          "size": 7760
+        },
+        {
+          "id": "folder-pictures",
+          "title": "Pictures Folder",
+          "file": "folders-places/folder-pictures.png",
+          "sha256": "ecab8778e4a5f6ba6066d10f515775b7b20ea0e1d689ef9be258ea1f48e1a8d0",
+          "size": 6971
+        },
+        {
+          "id": "folder-private",
+          "title": "Private Folder",
+          "file": "folders-places/folder-private.png",
+          "sha256": "054197d8ac873f53f300b3854f15519f8e1d477caa94e58843ac1679a8760b13",
+          "size": 9255
+        },
+        {
+          "id": "folder-public",
+          "title": "Public Folder",
+          "file": "folders-places/folder-public.png",
+          "sha256": "1e9aca5ee3503dccc8ac82b5c88c5ac888d8e18b6d6ffbd5863e1d9f2a38b105",
+          "size": 7906
+        },
+        {
+          "id": "folder-templates",
+          "title": "Templates Folder",
+          "file": "folders-places/folder-templates.png",
+          "sha256": "1eaf28851fd5f6c9c634f32e7c245be4b15d3b15adb8820224ea2cea0980cb0b",
+          "size": 7554
+        },
+        {
+          "id": "folder-videos",
+          "title": "Videos Folder",
+          "file": "folders-places/folder-videos.png",
+          "sha256": "e1556fb4e0102a9d68c1dc332016cbb21cbf4edd282fd1b22676b67a16814e28",
+          "size": 6349
+        }
+      ]
+    },
+    {
+      "id": "devices-volumes",
+      "icons": [
+        {
+          "id": "audio-headset",
+          "title": "Headset",
+          "file": "devices-volumes/audio-headset.png",
+          "sha256": "6c063db6b271d0285a5c7e200538863834d56663493547705cd5ba94337746ad",
+          "size": 15386
+        },
+        {
+          "id": "audio-input-microphone",
+          "title": "Microphone",
+          "file": "devices-volumes/audio-input-microphone.png",
+          "sha256": "10d6d4927e77335be409e03a1e73f467457f8a4813a4d9293242217a305df7f5",
+          "size": 14244
+        },
+        {
+          "id": "audio-speakers",
+          "title": "Speakers",
+          "file": "devices-volumes/audio-speakers.png",
+          "sha256": "32f5738beb44d123e9c40c4e4caf21a37f9549f48752fa431d11b7b4d2834283",
+          "size": 13294
+        },
+        {
+          "id": "camera-photo",
+          "title": "Photo Camera",
+          "file": "devices-volumes/camera-photo.png",
+          "sha256": "8502067af537f680255694d9ac30a1eca2bccfbff426c443ea1cf266fdcce028",
+          "size": 13454
+        },
+        {
+          "id": "camera-web",
+          "title": "Web Camera",
+          "file": "devices-volumes/camera-web.png",
+          "sha256": "0d9ecf3e47250f00d809798ffd1a741529c7f7e1c7898d8908f95df262c1cbb8",
+          "size": 23689
+        },
+        {
+          "id": "computer-laptop",
+          "title": "Laptop",
+          "file": "devices-volumes/computer-laptop.png",
+          "sha256": "80cfdf754103add8d79a6d893337ea37b3ad05710dae5692d0057b2944e9b75f",
+          "size": 7027
+        },
+        {
+          "id": "computer",
+          "title": "Computer",
+          "file": "devices-volumes/computer.png",
+          "sha256": "570d97903c5015c19330dbbc83f15ace84ad1f70862650ad53462ded0a4ab921",
+          "size": 4701
+        },
+        {
+          "id": "drive-harddisk",
+          "title": "Hard Disk",
+          "file": "devices-volumes/drive-harddisk.png",
+          "sha256": "33cbd6a732e5bf904acc82e25528c94c8ddaafe7b566861e7669f1a7504c72cb",
+          "size": 9755
+        },
+        {
+          "id": "drive-removable-media",
+          "title": "Removable Drive",
+          "file": "devices-volumes/drive-removable-media.png",
+          "sha256": "5d172a07602f6d712212dce023d572454e046bb0637d8362471e60c22cf7bd55",
+          "size": 9573
+        },
+        {
+          "id": "input-gaming",
+          "title": "Game Controller",
+          "file": "devices-volumes/input-gaming.png",
+          "sha256": "59fb34000e0f87c0cc056aef5a73b318ee867b4eff701b7179e0585253c86c2f",
+          "size": 13485
+        },
+        {
+          "id": "input-keyboard",
+          "title": "Keyboard",
+          "file": "devices-volumes/input-keyboard.png",
+          "sha256": "7ae8c9ad4134951dc11ca9c699dfb6639c4143d1d9f96b41ee1bf41dbae9acb7",
+          "size": 12671
+        },
+        {
+          "id": "input-mouse",
+          "title": "Mouse",
+          "file": "devices-volumes/input-mouse.png",
+          "sha256": "01ae5cbb18f9a3f76ea2d51a7b3275440ebb4ec6076ba508c362c8ccf170f983",
+          "size": 6601
+        },
+        {
+          "id": "media-flash-memory-stick",
+          "title": "Memory Stick",
+          "file": "devices-volumes/media-flash-memory-stick.png",
+          "sha256": "b36ff2ecb5651fcec790f30885e8146e4cd7b4f060142266aaee449ab828b72e",
+          "size": 7373
+        },
+        {
+          "id": "media-optical",
+          "title": "Optical Disc",
+          "file": "devices-volumes/media-optical.png",
+          "sha256": "18d4b0cb9ccc8289c452cfde3302012282f8b9be4311a92ff896aa25ed95e398",
+          "size": 15059
+        },
+        {
+          "id": "printer",
+          "title": "Printer",
+          "file": "devices-volumes/printer.png",
+          "sha256": "ada34a6c4a0655c5b08f3599781029dda5bf8ad733eb00a88aaddb84d2320959",
+          "size": 9526
+        },
+        {
+          "id": "scanner",
+          "title": "Scanner",
+          "file": "devices-volumes/scanner.png",
+          "sha256": "44f6489b68181fc2a293982b37234926a22b4417972070e594af11b6be33c38d",
+          "size": 23728
+        },
+        {
+          "id": "smartphone",
+          "title": "Smartphone",
+          "file": "devices-volumes/smartphone.png",
+          "sha256": "972523f67561cf89689ac512b9088e4f0100dbb1cfc3ec6127eb6ef9ac57d307",
+          "size": 4187
+        },
+        {
+          "id": "video-display",
+          "title": "Display",
+          "file": "devices-volumes/video-display.png",
+          "sha256": "54f3b2c0c2b5a0eada0a230f76f67989d6a05e7d613f5e28acf470ac1b2fc96d",
+          "size": 6235
+        }
+      ]
+    },
+    {
+      "id": "documents-mimetypes",
+      "icons": [
+        {
+          "id": "application-archive",
+          "title": "Archive",
+          "file": "documents-mimetypes/application-archive.png",
+          "sha256": "f856a9cb875eb061a5b9baf4a06713e95aa590b6ee53b949150d47d1ed7856a4",
+          "size": 8596
+        },
+        {
+          "id": "application-audio",
+          "title": "Audio File",
+          "file": "documents-mimetypes/application-audio.png",
+          "sha256": "633f39ad0d449b4f9c33e4559703af35c04be0c77553fc14f88d357d3a748af2",
+          "size": 8739
+        },
+        {
+          "id": "application-blank",
+          "title": "Blank File",
+          "file": "documents-mimetypes/application-blank.png",
+          "sha256": "304f6231eabd44bf3232581487308c5eaa219a997cc22d1f64897859c8f5aa91",
+          "size": 2213
+        },
+        {
+          "id": "application-certificate",
+          "title": "Certificate",
+          "file": "documents-mimetypes/application-certificate.png",
+          "sha256": "3ea5f8995638ec9a28068f6e1e1af2bf408f986dcd012d00f57a3a9c864140f1",
+          "size": 9506
+        },
+        {
+          "id": "application-database",
+          "title": "Database",
+          "file": "documents-mimetypes/application-database.png",
+          "sha256": "8de21701fa748c6a0962c8e9492d127ce8612b630912703c10ee1ee5dbdd59bb",
+          "size": 12090
+        },
+        {
+          "id": "application-document",
+          "title": "Document",
+          "file": "documents-mimetypes/application-document.png",
+          "sha256": "134718f0f68b194c9c29f53990d98a19265ac8e3f7c83a491ef10e17cf69e5ee",
+          "size": 9514
+        },
+        {
+          "id": "application-drawing",
+          "title": "Drawing",
+          "file": "documents-mimetypes/application-drawing.png",
+          "sha256": "81c16ccb5d928a7a07f777f5291614291ced610ad8786c673d71987f4f05f32f",
+          "size": 10671
+        },
+        {
+          "id": "application-executable",
+          "title": "Executable",
+          "file": "documents-mimetypes/application-executable.png",
+          "sha256": "da271c43309796d4fd6f05e4723feb7da58d94097845597be1a948f63b95fcdd",
+          "size": 5148
+        },
+        {
+          "id": "application-font",
+          "title": "Font",
+          "file": "documents-mimetypes/application-font.png",
+          "sha256": "f6935d0466db2cbdcec38ca5e1903309a15e2b14cf647d1898c20296ad38937b",
+          "size": 9560
+        },
+        {
+          "id": "application-images",
+          "title": "Image File",
+          "file": "documents-mimetypes/application-images.png",
+          "sha256": "94cbdb0c26cde877263d230e37aaeecc1cc86ca87dc90a8e6e1078d46996b095",
+          "size": 4770
+        },
+        {
+          "id": "application-presentation",
+          "title": "Presentation",
+          "file": "documents-mimetypes/application-presentation.png",
+          "sha256": "e3425032857b732cedef431a11fdf5bcefadab5c200b3cfb7d9dd72e018a8381",
+          "size": 7855
+        },
+        {
+          "id": "application-table",
+          "title": "Spreadsheet",
+          "file": "documents-mimetypes/application-table.png",
+          "sha256": "6b33e620fad5ac0513b5488a68391fb6bf7b2c19cdf8b5aea27886e6c4cf16ab",
+          "size": 4800
+        },
+        {
+          "id": "application-text",
+          "title": "Text File",
+          "file": "documents-mimetypes/application-text.png",
+          "sha256": "471b73db4e626e60a2d69907bd8db01e46ce505b1f33c1bee098408b920f3af0",
+          "size": 12063
+        },
+        {
+          "id": "application-json",
+          "title": "JSON Document",
+          "file": "documents-mimetypes/application-json.png",
+          "sha256": "7e353a4986b8b9e7092a2c4b9e18d6d47f6e6bdd2ce8d9062466b82ec41839e0",
+          "size": 10067
+        },
+        {
+          "id": "application-video",
+          "title": "Video File",
+          "file": "documents-mimetypes/application-video.png",
+          "sha256": "50423fc7f0fb504a7da83cc8319e93bdee1c2f55272453fb591ab4066cbb7dfd",
+          "size": 8976
+        },
+        {
+          "id": "text-html",
+          "title": "HTML Document",
+          "file": "documents-mimetypes/text-html.png",
+          "sha256": "14d9d23bca277d4374d81d5ad82fb823bd9dbfae21f8c3ef83b2c895af1e5643",
+          "size": 13275
+        }
+      ]
+    },
+    {
+      "id": "alerts-badges",
+      "icons": [
+        {
+          "id": "dialog-error",
+          "title": "Error",
+          "file": "alerts-badges/dialog-error.png",
+          "sha256": "cd98d3464c56449078bbb865e2389ee508a10bfc13cd2f42e23c9e7e3638f582",
+          "size": 8598
+        },
+        {
+          "id": "dialog-information",
+          "title": "Information",
+          "file": "alerts-badges/dialog-information.png",
+          "sha256": "e1a2c361856881a14dd9ca135075100569d8c6cb7fa29b6e7fe700ea9d27b9b2",
+          "size": 11132
+        },
+        {
+          "id": "dialog-password",
+          "title": "Password Required",
+          "file": "alerts-badges/dialog-password.png",
+          "sha256": "9af31de70db5530ebebd4da2240719ed62fb796c5c81ed57c11dff4a1f22a79e",
+          "size": 11268
+        },
+        {
+          "id": "dialog-question",
+          "title": "Question",
+          "file": "alerts-badges/dialog-question.png",
+          "sha256": "76f265e199d02e94c70a7ea0b30e655564dd6e22c5404d7b84fec7fab03877be",
+          "size": 12650
+        },
+        {
+          "id": "dialog-warning",
+          "title": "Warning",
+          "file": "alerts-badges/dialog-warning.png",
+          "sha256": "ccde2ab992edff43820f76579e4441d4adb795462224ba604f9deb3ee43d5ae8",
+          "size": 7194
+        }
+      ]
+    },
+    {
+      "id": "emblems",
+      "icons": [
+        {
+          "id": "emblem-checked",
+          "title": "Checked",
+          "file": "emblems/emblem-checked.png",
+          "sha256": "caa2af57fb0b9dfefeda0fb30efc05a8ef3b376b1f4fcac9ca97e2c1d59f608d",
+          "size": 10397
+        },
+        {
+          "id": "emblem-error",
+          "title": "Error Badge",
+          "file": "emblems/emblem-error.png",
+          "sha256": "18a95e9cc2ef3f03b00fa3d950abbf3cf87a27744feca9d7c61983d517ca1d36",
+          "size": 11742
+        },
+        {
+          "id": "emblem-important",
+          "title": "Important",
+          "file": "emblems/emblem-important.png",
+          "sha256": "12c6c0d887aa1cff33af77f7e32a2f2364edf25952022ead31485c52d783c525",
+          "size": 8944
+        },
+        {
+          "id": "emblem-information",
+          "title": "Information Badge",
+          "file": "emblems/emblem-information.png",
+          "sha256": "dfbc398a11741d908428a9dead76add93668720cb8763eec4f45b586af204059",
+          "size": 8985
+        },
+        {
+          "id": "emblem-mounted",
+          "title": "Mounted",
+          "file": "emblems/emblem-mounted.png",
+          "sha256": "1794ca22b24533c436357a592cb2965999b46cdb9af9d85bc5598449bc494e2d",
+          "size": 8359
+        },
+        {
+          "id": "emblem-unlocked",
+          "title": "Unlocked",
+          "file": "emblems/emblem-unlocked.png",
+          "sha256": "97980fcc2f1a5ffc2fa60fbf23d2358523aeaf2727d32f050469bf468c012fa6",
+          "size": 10968
+        },
+        {
+          "id": "emblem-warning",
+          "title": "Warning Badge",
+          "file": "emblems/emblem-warning.png",
+          "sha256": "1b97b6d416b956c392d29d90b858854c75ddb5e7e8fd66450dcdbd61e8080463",
+          "size": 7535
+        }
+      ]
+    }
+  ]
+}

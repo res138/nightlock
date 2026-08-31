@@ -17,6 +17,8 @@
 
 #include <nightlock/group.hpp>
 
+#include "iconreferences.hpp"
+#include "iconpackmanager.hpp"
 #include "overlayscrollbar.hpp"
 #include "standardicons.hpp"
 
@@ -98,6 +100,7 @@ public:
 
 SearchWindow::SearchWindow(nightlock::Group* root, QWidget* parent)
     : QWidget(parent), root_(root) {
+    iconreferences::initialize();
     setWindowFlag(Qt::Window);
     setAttribute(Qt::WA_DeleteOnClose);
     setAttribute(Qt::WA_StyledBackground);  // the qss white background
@@ -158,6 +161,10 @@ SearchWindow::SearchWindow(nightlock::Group* root, QWidget* parent)
     resize(380, 460);
     setMinimumSize(320, 300);
 
+    connect(iconpacks::IconPackManager::instance(),
+            &iconpacks::IconPackManager::packChanged, this,
+            [this](const QString&) { refilter(field_->text()); });
+
     refilter(QString());
 }
 
@@ -171,10 +178,9 @@ void SearchWindow::rebuildIndex() {
             hit.group = group;
             hit.entry = entry.get();
             hit.name = QString::fromStdString(entry->name);
-            const QString iconPath = QString::fromStdString(entry->icon);
-            hit.icon = iconPath.isEmpty()
-                           ? QIcon(standardicons::defaultEntryIcon().resource)
-                           : QIcon(iconPath);
+            const QString iconValue = QString::fromStdString(entry->icon);
+            hit.icon = QIcon(iconreferences::resolveOrFallback(
+                iconValue, standardicons::defaultEntryIcon().resource));
             const QString login = QString::fromStdString(entry->login);
             hit.sub = QString::fromStdString(group->path());
             if (!login.isEmpty())
